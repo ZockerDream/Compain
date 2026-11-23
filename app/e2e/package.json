@@ -1,0 +1,6 @@
+{
+  "name": "compain-e2e",
+  "private": true,
+  "scripts": { "test": "node run.mjs" },
+  "devDependencies": { "playwright": "1.49.1" }
+}

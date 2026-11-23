@@ -1,0 +1,1586 @@
+<!doctype html>
+<html lang="en" data-palette="ember">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Compain Studio Mockup</title>
+<meta name="description" content="Clickable mockup of Compain: home, chats, characters, community, profile, settings with color themes, and Server Management.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    --bg: #f5f4f0;
+    --glow: rgba(232, 112, 58, .16);
+    --surface: #ffffff;
+    --surface-2: #f1efea;
+    --line: #e6e3dc;
+    --fg: #17171a;
+    --muted: #6d6b72;
+    --accent: #e8703a;
+    --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+    --accent-ring: color-mix(in srgb, var(--accent) 35%, transparent);
+    --accent-fg: #ffffff;
+    --ok: #2f8f5b;
+    --warn: #b7791f;
+    --shadow-sm: 0 1px 2px rgba(20,20,30,.05);
+    --shadow: 0 1px 2px rgba(20,20,30,.05), 0 10px 28px rgba(20,20,30,.07);
+    --radius: 20px;
+    --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+    --body: "Inter", system-ui, -apple-system, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-mode="light"]) {
+      --bg: #0c0c0f;
+      --glow: rgba(232, 112, 58, .14);
+      --surface: #151519;
+      --surface-2: #1d1d23;
+      --line: #282830;
+      --fg: #f2f1ee;
+      --muted: #9b9aa4;
+      --accent-fg: #0c0c0f;
+      --ok: #6fd39a;
+      --warn: #f0c060;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.35);
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.4);
+      color-scheme: dark;
+    }
+  }
+  :root[data-mode="dark"] {
+    --bg: #0c0c0f;
+    --glow: rgba(232, 112, 58, .14);
+    --surface: #151519;
+    --surface-2: #1d1d23;
+    --line: #282830;
+    --fg: #f2f1ee;
+    --muted: #9b9aa4;
+    --accent-fg: #0c0c0f;
+    --ok: #6fd39a;
+    --warn: #f0c060;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.35);
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+  /* Color themes: the accent changes, the rest stays. */
+  :root[data-palette="ember"]  { --accent: #e8703a; --glow: color-mix(in srgb, #e8703a 16%, transparent); }
+  :root[data-palette="ocean"]  { --accent: #2f8fd8; --glow: color-mix(in srgb, #2f8fd8 16%, transparent); }
+  :root[data-palette="forest"] { --accent: #2f9e74; --glow: color-mix(in srgb, #2f9e74 16%, transparent); }
+  :root[data-palette="violet"] { --accent: #8b6cf0; --glow: color-mix(in srgb, #8b6cf0 16%, transparent); }
+  :root[data-palette="rose"]   { --accent: #e0517e; --glow: color-mix(in srgb, #e0517e 16%, transparent); }
+
+  /* ---------- Base ---------- */
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(1000px 520px at 85% -12%, var(--glow), transparent 62%), var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--display); font-weight: 600; margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+  h1 { font-size: 30px; line-height: 1.1; }
+  h2 { font-size: 19px; }
+  h3 { font-size: 16px; }
+  p { margin: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button, .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+    padding: 9px 16px; font-weight: 500; font-size: 14px; white-space: nowrap;
+    box-shadow: var(--shadow-sm);
+    transition: background .15s, border-color .15s, transform .08s, color .15s;
+  }
+  button:hover { border-color: var(--accent-ring); }
+  button:active { transform: scale(.98); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 30%, transparent); }
+  button.primary:hover { filter: brightness(1.05); }
+  button.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); padding: 7px 10px; }
+  button.ghost:hover { color: var(--fg); background: var(--surface-2); }
+  button.icon-only { padding: 8px; width: 36px; height: 36px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input, select, textarea {
+    background: var(--surface-2); border: 1px solid transparent; border-radius: 14px;
+    padding: 11px 14px; width: 100%; transition: border-color .15s, background .15s;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-ring); background: var(--surface); }
+  textarea { resize: vertical; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+  .caps { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .hidden { display: none !important; }
+  .row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .grow { flex: 1; min-width: 0; }
+  .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ic.sm { width: 15px; height: 15px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow); min-width: 0;
+  }
+  .card.lift { transition: transform .2s, box-shadow .2s, border-color .2s; }
+  .card.lift:hover { transform: translateY(-2px); border-color: var(--accent-ring); }
+  .grid { display: grid; gap: 16px; }
+  .grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500;
+    padding: 4px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap;
+  }
+  .pill.accent { background: var(--accent-soft); color: var(--accent); }
+  .pill.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 15px; flex: none;
+    display: grid; place-items: center; font-family: var(--display); font-weight: 600; font-size: 15px;
+    background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 40%, #000));
+    color: #fff; letter-spacing: .02em;
+  }
+  .avatar.alt { background: linear-gradient(140deg, #6b7388, #2c3140); }
+  .avatar.sm { width: 36px; height: 36px; border-radius: 12px; font-size: 13px; }
+  .avatar.xs { width: 26px; height: 26px; border-radius: 9px; font-size: 10px; }
+  .avatar.lg { width: 76px; height: 76px; border-radius: 24px; font-size: 24px; }
+  .meter { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .meter > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff)); width: 0; border-radius: 999px; transition: width .4s; }
+  .stat { font-family: var(--display); font-size: 32px; font-weight: 600; line-height: 1.1; margin-top: 6px; }
+  .toggle {
+    width: 46px; height: 27px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line);
+    position: relative; padding: 0; flex: none; box-shadow: none;
+  }
+  .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: var(--fg); transition: transform .2s; }
+  .toggle[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+  .toggle[aria-checked="true"]::after { transform: translateX(19px); background: var(--accent-fg); }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .switch:last-child { border-bottom: 0; }
+  .segmented { display: inline-flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 999px; }
+  .segmented button { border: 0; background: transparent; box-shadow: none; padding: 7px 14px; color: var(--muted); }
+  .segmented button[aria-pressed="true"], .segmented button[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+  .form { display: grid; gap: 16px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .table-wrap { overflow-x: auto; margin: 0 -4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+  th { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+
+  /* ---------- App shell ---------- */
+  .app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+  .sidebar {
+    position: sticky; top: 0; height: 100vh; padding: 22px 14px; display: flex; flex-direction: column; gap: 22px;
+    border-right: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 78%, transparent); backdrop-filter: blur(14px);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 4px 10px; font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: -.02em; }
+  .logo i { width: 30px; height: 30px; border-radius: 10px; background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #000)); display: inline-block; box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .nav { display: grid; gap: 3px; }
+  .nav button { justify-content: flex-start; border: 0; background: transparent; box-shadow: none; border-radius: 13px; padding: 10px 12px; color: var(--muted); font-weight: 500; }
+  .nav button:hover { background: var(--surface-2); color: var(--fg); }
+  .nav button[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+  .sidebar .me { margin-top: auto; padding: 12px; box-shadow: none; border-radius: 16px; }
+  main.content { padding: 28px 32px 56px; min-width: 0; max-width: 1200px; width: 100%; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .page-head .eyebrow { margin-bottom: 6px; }
+  .page-head p { color: var(--muted); margin-top: 6px; max-width: 60ch; }
+  .page-head .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bottombar { display: none; }
+  .view { animation: rise .28s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- Login ---------- */
+  .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px 0; }
+  .login { width: min(410px, 100%); display: grid; gap: 18px; padding: 30px; }
+  .login .logo { justify-content: center; }
+
+  /* ---------- Home ---------- */
+  .hero {
+    position: relative; overflow: hidden; border-radius: 26px; padding: 30px; color: #fff;
+    background:
+      radial-gradient(500px 260px at 100% 0%, rgba(255,255,255,.22), transparent 60%),
+      linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #140d1c));
+    box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .hero h1 { color: #fff; font-size: 34px; }
+  .hero p { color: rgba(255,255,255,.86); margin-top: 8px; max-width: 52ch; }
+  .hero .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+  .hero button { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.32); color: #fff; box-shadow: none; backdrop-filter: blur(6px); }
+  .hero button.primary { background: #fff; color: #17110f; border-color: #fff; box-shadow: none; }
+  .hero-chat {
+    margin-top: 20px; display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 18px;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); cursor: pointer; width: 100%; text-align: left; box-shadow: none;
+  }
+  .hero-chat:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.3); }
+  .hero-chat .avatar { background: rgba(255,255,255,.95); color: #17110f; }
+  .feed { display: grid; gap: 14px; list-style: none; padding: 0; margin: 0; }
+  .feed li { display: flex; gap: 12px; align-items: center; }
+  .feed .time { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .stat-card { display: grid; gap: 4px; }
+  .stat-card .ic-wrap { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 8px; }
+
+  /* ---------- Chats (the list + conversation) ---------- */
+  .chats-shell {
+    display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 0; height: calc(100vh - 170px); min-height: 560px;
+    border: 1px solid var(--line); border-radius: 26px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow);
+  }
+  .list-pane { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); }
+  .list-head { padding: 18px 18px 12px; display: grid; gap: 12px; }
+  .search { position: relative; }
+  .search .ic { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .search input { padding-left: 40px; border-radius: 999px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    border-radius: 999px; padding: 5px 12px; font-size: 13px; background: transparent; border: 1px solid var(--line); color: var(--muted); box-shadow: none;
+  }
+  .chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .chip .count { margin-left: 4px; opacity: .65; }
+  .list-scroll { overflow-y: auto; padding: 4px 10px 14px; min-height: 0; flex: 1; }
+  .group-label { padding: 14px 10px 6px; }
+  .c-row {
+    display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 11px 10px; border-radius: 18px;
+    border: 1px solid transparent; background: transparent; box-shadow: none; margin-bottom: 2px;
+  }
+  .c-row:hover { background: var(--surface); border-color: var(--line); }
+  .c-row[aria-current="true"] { background: var(--surface); border-color: var(--accent-ring); box-shadow: var(--shadow-sm); }
+  .c-row .top { display: flex; align-items: baseline; gap: 8px; }
+  .c-row .title { font-weight: 600; font-size: 14.5px; }
+  .c-row .time { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .c-row .preview { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-fg); font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+  .pin-ic { color: var(--muted); }
+  .empty { text-align: center; padding: 36px 18px; color: var(--muted); }
+  .empty .ic { width: 34px; height: 34px; margin: 0 auto 10px; display: block; color: var(--accent); }
+
+  .conv-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+  .conv-head { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(10px); }
+  .conv-head .name { font-family: var(--display); font-weight: 600; font-size: 18px; }
+  .conv-head .meta { color: var(--muted); font-size: 13px; }
+  .conv-head .tools { margin-left: auto; display: flex; gap: 6px; }
+  .back-btn { display: none; }
+  .conv-stats { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 20px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .messages { flex: 1; overflow-y: auto; padding: 22px 20px 12px; display: grid; gap: 6px; align-content: start; min-height: 0; scroll-behavior: smooth; }
+  .day { justify-self: center; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); padding: 4px 12px; border-radius: 999px; margin: 10px 0 6px; }
+  .msg { display: flex; gap: 10px; align-items: flex-end; max-width: min(640px, 88%); margin-top: 6px; }
+  .msg.user { justify-self: end; flex-direction: row-reverse; }
+  .msg .bubble { padding: 12px 16px; border-radius: 22px; white-space: pre-wrap; line-height: 1.6; position: relative; }
+  .msg.char .bubble { background: var(--surface-2); border-bottom-left-radius: 8px; font-family: var(--display); font-size: 16px; }
+  .msg.user .bubble { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #000)); color: #fff; border-bottom-right-radius: 8px; font-size: 15px; font-family: var(--body); }
+  .msg.important .bubble { box-shadow: 0 0 0 1.5px var(--warn); }
+  .msg .meta-line { display: flex; gap: 8px; align-items: center; margin: 0 6px 4px; font-size: 12px; color: var(--muted); }
+  .msg.user .meta-line { justify-content: flex-end; }
+  .msg .mark { border: 0; background: transparent; box-shadow: none; padding: 2px 6px; font-size: 12px; color: var(--muted); border-radius: 999px; }
+  .msg .mark[aria-pressed="true"] { color: var(--warn); }
+  .msg .mark:hover { background: var(--surface-2); }
+  .typing .bubble { display: inline-flex; gap: 5px; align-items: center; padding: 14px 16px; }
+  .typing .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: bounce 1.2s infinite ease-in-out; }
+  .typing .dot:nth-child(2) { animation-delay: .15s; }
+  .typing .dot:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+  .cursor::after { content: "▍"; color: var(--accent); animation: blink 1s steps(2) infinite; margin-left: 2px; }
+  @keyframes blink { to { visibility: hidden; } }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 20px 0; }
+  .quick button { font-size: 12.5px; padding: 6px 12px; box-shadow: none; background: var(--surface-2); border-color: transparent; color: var(--muted); }
+  .quick button:hover { color: var(--fg); }
+  .composer { display: flex; gap: 10px; padding: 12px 16px 16px; align-items: flex-end; }
+  .composer textarea { min-height: 50px; max-height: 160px; border-radius: 22px; padding: 14px 18px; background: var(--surface-2); }
+  .send { width: 50px; height: 50px; padding: 0; border-radius: 50%; flex: none; }
+  .send .ic { stroke: var(--accent-fg); }
+  .model-select { width: auto; padding: 5px 30px 5px 12px; border-radius: 999px; font-size: 12.5px; background-color: var(--surface-2); }
+
+  .chat-empty { flex: 1; display: grid; place-items: center; text-align: center; padding: 40px; color: var(--muted); }
+  .chat-empty h2 { color: var(--fg); margin-bottom: 6px; }
+
+  /* ---------- Characters and community ---------- */
+  .char-card { display: grid; gap: 14px; align-content: start; }
+  .char-card .desc { color: var(--muted); font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 4.2em; }
+  .char-card .foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+  .char-card .foot .stats { font-size: 12.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex: 1; min-width: 0; }
+  .char-card .foot .stats span { display: inline-flex; align-items: center; gap: 4px; }
+  .featured {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; margin-bottom: 18px; padding: 22px;
+    border-radius: 24px; background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), var(--surface));
+    border: 1px solid var(--accent-ring);
+  }
+  .featured p { color: var(--muted); margin-top: 6px; max-width: 58ch; }
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .empty-card { border: 1px dashed var(--line); border-radius: var(--radius); padding: 30px; text-align: center; color: var(--muted); box-shadow: none; background: transparent; }
+  .new-tile { border: 1.5px dashed var(--accent-ring); border-radius: var(--radius); display: grid; place-items: center; gap: 10px; padding: 28px; text-align: center; background: transparent; box-shadow: none; color: var(--muted); min-height: 220px; }
+  .new-tile:hover { color: var(--accent); background: var(--accent-soft); }
+
+  /* ---------- Profile ---------- */
+  .cover { height: 150px; border-radius: 26px 26px 0 0; background: linear-gradient(120deg, var(--accent), color-mix(in srgb, var(--accent) 35%, #160f1e)); }
+  .profile-card { border-radius: 26px; padding: 0 24px 24px; margin-top: 0; }
+  .profile-top { display: flex; gap: 18px; align-items: flex-end; margin-top: -40px; flex-wrap: wrap; }
+  .profile-top .avatar { border: 4px solid var(--surface); }
+  .profile-top .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 4px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 18px; }
+  .kpi { padding: 14px; border-radius: 18px; background: var(--surface-2); }
+  .kpi b { font-family: var(--display); font-size: 22px; display: block; }
+  .kpi span { font-size: 12.5px; color: var(--muted); }
+
+  /* ---------- Settings ---------- */
+  .palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .palette-card {
+    text-align: left; padding: 12px; border-radius: 18px; background: var(--surface-2); border: 2px solid transparent; box-shadow: none; display: grid; gap: 10px;
+  }
+  .palette-card[aria-checked="true"] { border-color: var(--accent); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .palette-card .preview { height: 54px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); position: relative; overflow: hidden; }
+  .palette-card .preview i { position: absolute; left: 8px; top: 8px; width: 24px; height: 6px; border-radius: 4px; }
+  .palette-card .preview b { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 14px; border-radius: 7px; }
+  .palette-card .name { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 14px; }
+
+  /* ---------- Admin ---------- */
+  .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 22px; }
+  .subtabs button { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); padding: 8px 13px; font-size: 14px; }
+  .subtabs button:hover { background: var(--surface-2); color: var(--fg); }
+  .subtabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); }
+  .admin-panel { display: grid; gap: 16px; }
+  .admin-panel > .card h2 { margin-bottom: 4px; }
+  .kpi-card .stat { font-size: 28px; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%) translateY(12px);
+    background: var(--fg); color: var(--bg); padding: 11px 18px; border-radius: 999px; font-size: 14px; font-weight: 500;
+    opacity: 0; transition: opacity .22s, transform .22s; pointer-events: none; z-index: 60; max-width: calc(100% - 32px); box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Phones ---------- */
+  @media (max-width: 900px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .sidebar { display: none; }
+    main.content { padding: 18px 16px 124px; }
+    .bottombar {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+      padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+      background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(16px); border-top: 1px solid var(--line);
+    }
+    .bottombar button { flex-direction: column; gap: 3px; border: 0; background: transparent; box-shadow: none; padding: 6px 0; font-size: 11px; color: var(--muted); border-radius: 16px; }
+    .bottombar button[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+    .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+    .hero h1 { font-size: 28px; }
+    .featured { grid-template-columns: minmax(0, 1fr); }
+    .cover { height: 110px; }
+  }
+  @media (max-width: 900px) {
+    .chats-shell { grid-template-columns: minmax(0, 1fr); height: calc(100vh - 150px); min-height: 520px; border-radius: 22px; }
+    body[data-chat="1"] .list-pane { display: none; }
+    body[data-chat="0"] .conv-pane { display: none; }
+    body[data-chat="1"] .back-btn { display: inline-flex; }
+    .list-pane { border-right: 0; }
+    .msg { max-width: 92%; }
+  }
+  @media (max-width: 900px) and (max-width: 900px) { .chats-shell { height: calc(100vh - 210px); } }
+  @media (prefers-reduced-motion: reduce) { .view, .cursor::after, .typing .dot { animation: none; } }
+</style>
+</head>
+<body data-chat="0">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 4 3v2H6v-2l4-3z"/><path d="M12 15v6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-chatbub" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+</svg>
+
+<!-- LOGIN -->
+<div id="view-login" class="login-wrap hidden">
+  <div class="login card">
+    <div class="logo"><i></i>Compain</div>
+    <div style="text-align:center">
+      <h1>Welcome back</h1>
+      <p class="muted small" style="margin-top:8px">Your characters and chats live on your own server.</p>
+    </div>
+    <div><label for="user">Username</label><input id="user" value="you" autocomplete="username"></div>
+    <div><label for="pw">Password</label><input id="pw" type="password" value="password" autocomplete="current-password"></div>
+    <div class="switch" style="border:0;padding:0">
+      <span class="small">Stay logged in</span>
+      <button class="toggle" id="remember" role="switch" aria-checked="false" aria-label="Stay logged in"></button>
+    </div>
+    <p class="muted small" id="session-note">Logs in for 48 hours.</p>
+    <button class="primary" id="login-btn" style="width:100%;padding:13px">Log in</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app hidden">
+  <aside class="sidebar" aria-label="Main navigation">
+    <div class="logo"><i></i>Compain</div>
+    <nav class="nav" id="nav-desktop"></nav>
+    <div class="card me">
+      <div class="row">
+        <div class="avatar sm alt">YO</div>
+        <div class="grow"><div style="font-weight:600">You</div><div class="muted small">Admin</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="content" id="main">
+
+    <!-- HOME -->
+    <section id="view-home" class="view hidden">
+      <div class="hero">
+        <div class="caps" style="color:rgba(255,255,255,.8)">Today</div>
+        <h1 style="margin-top:8px">Good evening. Mara is waiting.</h1>
+        <p>Two new messages in The Pier Case. Your phone and PC are in sync.</p>
+        <button class="hero-chat" data-open-chat="mara">
+          <span class="avatar">MS</span>
+          <span class="grow">
+            <span style="display:block;font-weight:600">The Pier Case</span>
+            <span style="display:block;font-size:13px;opacity:.85" class="ellipsis">Mara: "Where were you at five?"</span>
+          </span>
+          <span class="badge" style="background:#fff;color:#17110f">2</span>
+        </button>
+        <div class="actions">
+          <button class="primary" data-go="chats">Open chats</button>
+          <button data-go="characters">New character</button>
+          <button data-go="community">Browse community</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-top:18px">
+        <div class="card stat-card lift"><div class="ic-wrap"><svg class="ic"><use href="#i-chat"/></svg></div><div class="caps">Active chats</div><div class="stat" id="stat-chats">3</div><div class="muted small">conversations this week</div></div>
+        <div class="card stat-card lift"><div class="ic-wrap"><svg class="ic"><use href="#i-bolt"/></svg></div><div class="caps">Messages today</div><div class="stat">41</div><div class="muted small">across all chats</div></div>
+        <div class="card stat-card lift"><div class="ic-wrap"><svg class="ic"><use href="#i-clock"/></svg></div><div class="caps">Hosted API today</div>
+          <div class="stat"><span id="home-quota">12</span><span class="muted" style="font-size:16px"> / 100</span></div>
+          <div class="meter" style="margin-top:10px"><span id="home-quota-bar" style="width:12%"></span></div></div>
+      </div>
+
+      <div class="grid grid-2" style="margin-top:18px">
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:16px"><h2>Recent activity</h2><span class="pill ok">Live</span></div>
+          <ul class="feed">
+            <li><div class="avatar sm">MS</div><div class="grow"><div><b>Mara Stone</b> replied in The Pier Case</div><div class="muted small ellipsis">"Where were you at five?"</div></div><span class="time">2 min</span></li>
+            <li><div class="avatar sm alt">EV</div><div class="grow"><div>You wrote to <b>Elin Vasquez</b></div><div class="muted small">Kitchen scene, 14 messages</div></div><span class="time">1 h</span></li>
+            <li><div class="avatar sm">MS</div><div class="grow"><div>You marked a message as important</div><div class="muted small">Story memory keeps it</div></div><span class="time">3 h</span></li>
+            <li><div class="avatar sm alt">LA</div><div class="grow"><div>Lord Ashford was added to your characters</div></div><span class="time">Yesterday</span></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2 style="margin-bottom:16px">Your profile</h2>
+          <div class="row" style="margin-bottom:16px">
+            <div class="avatar lg alt">YO</div>
+            <div class="grow"><div style="font-weight:600;font-size:17px">You</div><div class="muted small">Admin · Member since setup</div></div>
+          </div>
+          <div class="tags" style="margin-bottom:18px">
+            <span class="pill accent">English replies</span><span class="pill">Ember theme</span><span class="pill">Mistral Small 3.2</span>
+          </div>
+          <button data-go="profile">Open profile</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHATS -->
+    <section id="view-chats" class="view hidden">
+      <div class="page-head">
+        <div><div class="caps eyebrow">Conversations</div><h1>Chats</h1><p>Everything you're in the middle of. Messages sync to every device.</p></div>
+        <div class="actions"><button class="primary" data-go="characters"><svg class="ic sm"><use href="#i-plus"/></svg>New chat</button></div>
+      </div>
+
+      <div class="chats-shell">
+        <aside class="list-pane" aria-label="Chat list">
+          <div class="list-head">
+            <div class="search">
+              <svg class="ic sm"><use href="#i-search"/></svg>
+              <input id="chat-search" placeholder="Search chats or characters" aria-label="Search chats">
+            </div>
+            <div class="chips" role="group" aria-label="Filter chats">
+              <button class="chip" data-filter="all" aria-pressed="true">All<span class="count" id="cnt-all"></span></button>
+              <button class="chip" data-filter="unread" aria-pressed="false">Unread<span class="count" id="cnt-unread"></span></button>
+              <button class="chip" data-filter="important" aria-pressed="false">Important</button>
+            </div>
+          </div>
+          <div class="list-scroll" id="chat-list"></div>
+        </aside>
+
+        <section class="conv-pane" id="conv" aria-live="polite"></section>
+      </div>
+    </section>
+
+    <!-- MY CHARACTERS -->
+    <section id="view-characters" class="view hidden">
+      <div class="page-head">
+        <div><div class="caps eyebrow">Your library</div><h1>Characters</h1><p>Characters you created. You can edit and delete only these.</p></div>
+        <div class="actions"><button class="primary" id="new-char"><svg class="ic sm"><use href="#i-plus"/></svg>New character</button></div>
+      </div>
+      <div class="grid grid-3" id="my-chars"></div>
+    </section>
+
+    <!-- COMMUNITY -->
+    <section id="view-community" class="view hidden">
+      <div class="page-head">
+        <div><div class="caps eyebrow">Shared by users</div><h1>Community</h1><p>Characters others have published. Add one to your list, then start a chat.</p></div>
+      </div>
+      <div class="featured" id="featured"></div>
+      <div class="filter-row" role="group" aria-label="Community filter">
+        <button class="chip" data-cfilter="all" aria-pressed="true">All</button>
+        <button class="chip" data-cfilter="fantasy" aria-pressed="false">Fantasy</button>
+        <button class="chip" data-cfilter="modern" aria-pressed="false">Modern</button>
+        <button class="chip" data-cfilter="drama" aria-pressed="false">Drama</button>
+      </div>
+      <div class="grid grid-3" id="community"></div>
+    </section>
+
+    <!-- PROFILE -->
+    <section id="view-profile" class="view hidden">
+      <div class="page-head"><div><div class="caps eyebrow">Account</div><h1>Profile</h1><p>How you appear to others and what you use.</p></div></div>
+      <div class="card profile-card" style="padding:0;overflow:hidden">
+        <div class="cover"></div>
+        <div style="padding:0 24px 24px">
+          <div class="profile-top">
+            <div class="avatar lg alt" style="width:92px;height:92px;border-radius:28px;font-size:28px;margin-top:-46px">YO</div>
+            <div class="grow" style="min-width:180px">
+              <div style="font-family:var(--display);font-size:24px;font-weight:600">You</div>
+              <div class="muted small">Admin · 12 characters · 47 chats</div>
+            </div>
+            <div class="actions">
+              <button data-go="settings"><svg class="ic sm"><use href="#i-gear"/></svg>Settings</button>
+              <button data-go="admin" class="admin-only"><svg class="ic sm"><use href="#i-shield"/></svg>Server Management</button>
+            </div>
+          </div>
+          <div class="kpis">
+            <div class="kpi"><b>12</b><span>characters</span></div>
+            <div class="kpi"><b>47</b><span>chats</span></div>
+            <div class="kpi"><b>3,820</b><span>messages</span></div>
+            <div class="kpi"><b>9</b><span>community added</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-2" style="margin-top:18px">
+        <div class="card form">
+          <h2>Details</h2>
+          <div class="row"><div class="grow"><label for="display">Display name</label><input id="display" value="You"></div></div>
+          <div><label for="bio">About you</label><textarea id="bio" rows="3" placeholder="A line about the roleplay you like"></textarea></div>
+          <div class="row" style="flex-wrap:wrap"><button class="primary" id="save-profile">Save profile</button><button>Change picture</button></div>
+        </div>
+        <div class="card">
+          <h2 style="margin-bottom:8px">Preferences</h2>
+          <div class="switch"><span>Reply in German by default</span><button class="toggle" role="switch" aria-checked="false" aria-label="Reply in German"></button></div>
+          <div class="switch"><span>Show typing indicator</span><button class="toggle" role="switch" aria-checked="true" aria-label="Typing indicator"></button></div>
+          <div class="switch"><span>Auto-scroll to new messages</span><button class="toggle" role="switch" aria-checked="true" aria-label="Auto-scroll"></button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view hidden">
+      <div class="page-head"><div><div class="caps eyebrow">Preferences</div><h1>Settings</h1><p>Changes apply immediately and stay on this device.</p></div></div>
+      <div class="grid" style="gap:18px">
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+            <div><h2>Color theme</h2><p class="muted small">Pick the accent color for the whole app.</p></div>
+          </div>
+          <div class="palette-grid" id="palettes" role="radiogroup" aria-label="Color theme"></div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:14px">
+            <div><h2>Appearance</h2><p class="muted small">System follows your device.</p></div>
+            <div class="segmented" role="group" aria-label="Appearance">
+              <button aria-pressed="false" data-mode="system">System</button>
+              <button aria-pressed="false" data-mode="light">Light</button>
+              <button aria-pressed="false" data-mode="dark">Dark</button>
+            </div>
+          </div>
+        </div>
+        <div class="card form">
+          <h2>Language and replies</h2>
+          <div class="two">
+            <div><label for="ui-lang">Interface</label><select id="ui-lang"><option>English</option><option>Deutsch</option></select></div>
+            <div><label for="rp-lang">Replies in</label><select id="rp-lang"><option>English</option><option>Deutsch</option></select></div>
+            <div><label for="len">Reply length</label><select id="len"><option>Short</option><option selected>Medium</option><option>Long</option></select></div>
+            <div><label for="ctx">Context sent to model</label><select id="ctx"><option>Last 20 messages</option><option selected>Last 60 messages + summary</option><option>Full history + summary</option></select></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2 style="margin-bottom:6px">Notifications</h2>
+          <div class="switch"><span>Live sync to phone and PC</span><button class="toggle" role="switch" aria-checked="true" aria-label="Live sync"></button></div>
+          <div class="switch"><span>Sound when a reply arrives</span><button class="toggle" role="switch" aria-checked="false" aria-label="Sound"></button></div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+            <div><h2>Data and export</h2><p class="muted small">Your data is yours. Download it at any time as JSON.</p></div>
+          </div>
+          <div class="row" style="flex-wrap:wrap">
+            <button id="exp-chars">Export my characters</button>
+            <button id="exp-chats">Export my chats</button>
+            <button id="exp-all" class="primary">Export everything</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="view-admin" class="view hidden">
+      <div class="page-head"><div><div class="caps eyebrow">Admins only</div><h1>Server Management</h1><p>The server, the users and the models.</p></div></div>
+      <div class="subtabs" role="tablist" aria-label="Server Management sections" id="admin-tabs">
+        <button role="tab" aria-selected="true" data-sub="overview">Overview</button>
+        <button role="tab" aria-selected="false" data-sub="domain">Domain &amp; HTTPS</button>
+        <button role="tab" aria-selected="false" data-sub="security">Access &amp; security</button>
+        <button role="tab" aria-selected="false" data-sub="users">Users</button>
+        <button role="tab" aria-selected="false" data-sub="characters">Characters</button>
+        <button role="tab" aria-selected="false" data-sub="models">Models</button>
+        <button role="tab" aria-selected="false" data-sub="api">Hosted API</button>
+        <button role="tab" aria-selected="false" data-sub="backups">Backups</button>
+        <button role="tab" aria-selected="false" data-sub="storage">Storage</button>
+        <button role="tab" aria-selected="false" data-sub="logs">Logs &amp; maintenance</button>
+      </div>
+
+      <div class="admin-panel" data-panel="overview">
+        <div class="grid grid-3">
+          <div class="card kpi-card"><div class="caps">CPU load</div><div class="stat">34%</div><div class="meter" style="margin-top:10px"><span style="width:34%"></span></div><div class="muted small" style="margin-top:8px">i7-8700 · 6 cores, 12 threads</div></div>
+          <div class="card kpi-card"><div class="caps">Memory</div><div class="stat">19 <span class="muted" style="font-size:16px">/ 64 GB</span></div><div class="meter" style="margin-top:10px"><span style="width:30%"></span></div><div class="muted small" style="margin-top:8px">includes the loaded model</div></div>
+          <div class="card kpi-card"><div class="caps">Disk</div><div class="stat">212 <span class="muted" style="font-size:16px">/ 1000 GB</span></div><div class="meter" style="margin-top:10px"><span style="width:21%"></span></div><div class="muted small" style="margin-top:8px">warning at 85%</div></div>
+          <div class="card kpi-card"><div class="caps">Uptime</div><div class="stat">12 d</div><div class="muted small" style="margin-top:8px">last restart 11 days ago</div></div>
+          <div class="card kpi-card"><div class="caps">Database</div><div class="stat">380 MB</div><div class="muted small" style="margin-top:8px">PostgreSQL · 3 users · 214 chats</div></div>
+          <div class="card kpi-card"><div class="caps">Model runtime</div><div class="row" style="margin-top:10px"><span class="pill ok">Running</span><span class="muted small">Mistral Small 3.2</span></div><div class="muted small" style="margin-top:10px">Speed: not measured yet</div></div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px"><h2>Health checks</h2><button>Run all checks</button></div>
+          <div class="switch"><span>App container</span><span class="pill ok">OK</span></div>
+          <div class="switch"><span>PostgreSQL</span><span class="pill ok">OK</span></div>
+          <div class="switch"><span>Model runtime endpoint</span><span class="pill ok">OK</span></div>
+          <div class="switch"><span>Hosted API reachable</span><span class="pill">Not tested</span></div>
+          <div class="switch"><span>Last backup</span><span class="pill ok">Today 03:00</span></div>
+          <div class="switch"><span>HTTPS certificate</span><span class="pill">Not set (IP mode)</span></div>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="domain">
+        <div class="card form">
+          <h2>Address</h2>
+          <div class="two">
+            <div><label for="domain">Domain (optional)</label><input id="domain" placeholder="e.g. compain.example.com"></div>
+            <div><label for="port">Port</label><input id="port" type="number" value="8080"></div>
+            <div><label>Reachable at now</label><input value="http://192.168.1.20:8080" readonly></div>
+            <div><label for="ip-mode">Who can connect</label><select id="ip-mode"><option selected>Home network only</option><option>Anyone with the address</option><option>Allowlist (IP ranges)</option></select></div>
+          </div>
+          <p class="muted small">Until a domain and HTTPS are set, keep access to your home network. Login details are not encrypted over plain HTTP.</p>
+        </div>
+        <div class="card">
+          <div class="switch"><div><div>Automatic HTTPS certificate</div><div class="muted small">Needs the domain and ports 80 and 443 reachable from the internet</div></div><button class="toggle" role="switch" aria-checked="false" aria-label="Automatic HTTPS certificate"></button></div>
+          <div class="switch"><div><div>Redirect HTTP to HTTPS</div><div class="muted small">Only after HTTPS works</div></div><button class="toggle" role="switch" aria-checked="false" aria-label="Redirect HTTP to HTTPS"></button></div>
+          <div class="switch"><div><div>Certificate status</div><div class="muted small">Not requested</div></div><span class="pill">Not set</span></div>
+          <div class="switch"><div><div>Test connection</div><div class="muted small">Checks that the domain points to this server</div></div><button>Test</button></div>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="security">
+        <div class="grid grid-2">
+          <div class="card form">
+            <h2>Sign-up</h2>
+            <div><label for="reg">New accounts</label><select id="reg"><option selected>Invite only (admin creates users)</option><option>Closed</option><option>Open with invite code</option></select></div>
+            <div><label for="invite">Invite code</label><div class="row"><input id="invite" placeholder="generate one"><button>Generate</button></div></div>
+          </div>
+          <div class="card form">
+            <h2>Sessions</h2>
+            <div class="two">
+              <div><label for="sess">Standard login (hours)</label><input id="sess" type="number" value="48"></div>
+              <div><label for="sess-rem">"Stay logged in" (days)</label><input id="sess-rem" type="number" value="365"></div>
+            </div>
+            <div class="row" style="flex-wrap:wrap"><button>Log out all devices</button></div>
+          </div>
+          <div class="card form">
+            <h2>Passwords and lockout</h2>
+            <div class="two">
+              <div><label for="pw-min">Minimum length</label><input id="pw-min" type="number" value="12"></div>
+              <div><label for="lock-n">Lock after failed tries</label><input id="lock-n" type="number" value="5"></div>
+              <div><label for="lock-m">Lock time (minutes)</label><input id="lock-m" type="number" value="15"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2 style="margin-bottom:6px">Admin safety</h2>
+            <div class="switch"><span>Ask for password before admin actions</span><button class="toggle" role="switch" aria-checked="true" aria-label="Ask for password before admin actions"></button></div>
+            <div class="switch"><span>Two-factor login (later)</span><button class="toggle" role="switch" aria-checked="false" aria-label="Two-factor login" disabled></button></div>
+            <div class="switch"><span>Log every admin action</span><button class="toggle" role="switch" aria-checked="true" aria-label="Log admin actions"></button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="users">
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+            <h2>Users</h2>
+            <div class="row" style="flex-wrap:wrap"><input placeholder="Search users" aria-label="Search users" style="width:210px"><button class="primary">Add user</button></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Characters</th><th>Chats</th><th>Storage</th><th>API today</th><th>Last login</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>you</td><td><span class="pill accent">Admin</span></td><td><span class="pill ok">Active</span></td><td>2</td><td>3</td><td>120 MB</td><td>12 / 100</td><td>now</td><td><button class="ghost">Edit</button></td></tr>
+                <tr><td>friend-1</td><td><span class="pill">User</span></td><td><span class="pill ok">Active</span></td><td>4</td><td>11</td><td>80 MB</td><td>0 / 100</td><td>yesterday</td><td><button class="ghost">Edit</button><button class="ghost">Disable</button></td></tr>
+                <tr><td>friend-2</td><td><span class="pill">User</span></td><td><span class="pill">Invited</span></td><td>0</td><td>0</td><td>0 MB</td><td>—</td><td>never</td><td><button class="ghost">Resend invite</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card form">
+          <h2>Defaults for new users</h2>
+          <div class="two">
+            <div><label for="u-quota">Storage per user (GB)</label><input id="u-quota" type="number" value="2"></div>
+            <div><label for="u-chars">Characters per user</label><input id="u-chars" type="number" value="50"></div>
+            <div><label for="u-api">Hosted API messages per day</label><input id="u-api" type="number" value="100"></div>
+            <div><label for="u-lang">Default language</label><select id="u-lang"><option selected>English</option><option>Deutsch</option></select></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="characters">
+        <div class="card form">
+          <h2>Community and content</h2>
+          <div class="switch"><div><div>Community sharing</div><div class="muted small">Users can publish characters for others to add</div></div><button class="toggle" role="switch" aria-checked="true" aria-label="Community sharing"></button></div>
+          <div class="switch"><div><div>Review before publishing</div><div class="muted small">New community characters stay hidden until you approve them</div></div><button class="toggle" role="switch" aria-checked="true" aria-label="Review before publishing"></button></div>
+          <div class="switch"><div><div>Allow card import</div><div class="muted small">SillyTavern JSON, PNG cards and plain text</div></div><button class="toggle" role="switch" aria-checked="true" aria-label="Allow card import"></button></div>
+          <div class="switch"><div><div>Adults-only check</div><div class="muted small">Always on. Blocks characters described as minors.</div></div><button class="toggle" role="switch" aria-checked="true" aria-label="Adults-only check" disabled></button></div>
+          <div class="switch"><div><div>Real-person check</div><div class="muted small">Flags sexual or degrading content about named real people</div></div><button class="toggle" role="switch" aria-checked="true" aria-label="Real-person check"></button></div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h2>Community queue</h2><span class="pill accent">1 waiting</span></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Character</th><th>Shared by</th><th>Shared</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>Sofia, the new neighbour</td><td>friend-1</td><td>today</td><td><span class="pill">Waiting</span></td><td><button class="ghost">Approve</button><button class="ghost">Hide</button></td></tr>
+              <tr><td>Captain Iris Kade</td><td>nightwatch</td><td>3 days ago</td><td><span class="pill ok">Public</span></td><td><button class="ghost">Hide</button></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="models">
+        <div class="grid grid-2">
+          <div class="card form">
+            <h2>Self-hosted runtime</h2>
+            <div><label for="runtime">Runtime</label><select id="runtime"><option selected>llama.cpp server</option><option>Ollama</option></select></div>
+            <div><label for="rt-url">Endpoint</label><input id="rt-url" value="http://model:8080/v1" readonly></div>
+            <div class="two">
+              <div><label for="threads">CPU threads</label><input id="threads" type="number" value="6"></div>
+              <div><label for="ctxwin">Context window (tokens)</label><input id="ctxwin" type="number" value="8192"></div>
+            </div>
+            <p class="muted small">6 physical cores is a good start on this CPU. Try 12 and compare speed.</p>
+          </div>
+          <div class="card form">
+            <h2>Default model</h2>
+            <div><label for="def-model">Used for new chats</label><select id="def-model"><option selected>Mistral Small 3.2 abliteration</option><option>Gemma 4 26B-A4B uncensored</option></select></div>
+            <div class="switch"><div><div>Allow each user to choose</div><div class="muted small">Per chat, from the models installed here</div></div><button class="toggle" role="switch" aria-checked="true" aria-label="Allow each user to choose"></button></div>
+            <div class="row" style="flex-wrap:wrap"><button>Run speed test</button><span class="muted small">Not run yet</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h2>Installed models</h2><button>Add model</button></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Model</th><th>Quantization</th><th>Size on disk</th><th>Speed</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>Mistral Small 3.2 abliteration</td><td>Q4 (to choose)</td><td>to check</td><td>not measured</td><td><span class="pill ok">Installed</span></td><td><button class="ghost">Test</button><button class="ghost">Remove</button></td></tr>
+              <tr><td>Gemma 4 26B-A4B uncensored</td><td>Q4 (to choose)</td><td>to check</td><td>not measured</td><td><span class="pill">Not installed</span></td><td><button class="ghost">Install</button></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="api">
+        <div class="grid grid-2">
+          <div class="card form">
+            <h2>Provider</h2>
+            <div><label for="api-prov">Choose a provider</label><select id="api-prov">
+              <option>Groq (free)</option>
+              <option>OpenRouter (free models)</option>
+              <option>Cerebras (free)</option>
+              <option>Mistral (free plan)</option>
+              <option>Google AI Studio (free, strict filter)</option>
+              <option>Venice (paid, uncensored)</option>
+              <option>DeepSeek (paid, low price)</option>
+              <option>Custom endpoint</option>
+            </select></div>
+            <div><label for="api-url">Endpoint (OpenAI-compatible)</label><input id="api-url" value="https://api.groq.com/openai/v1" placeholder="https://provider.example/v1"></div>
+            <div><label>API key</label><div class="row"><input value="•••••••• (set)" readonly><button>Replace</button></div></div>
+            <div class="row" style="flex-wrap:wrap"><button>Test connection</button><span class="muted small">Not tested</span></div>
+          </div>
+          <div class="card form">
+            <h2>Limits</h2>
+            <div class="two">
+              <div><label for="api-user">Per user per day</label><input id="api-user" type="number" value="100"></div>
+              <div><label for="api-global">Total per day (all users)</label><input id="api-global" type="number" value="500"></div>
+            </div>
+            <div class="switch"><div><div>Switch to self-hosted when the limit is reached</div><div class="muted small">Keeps the chat going instead of stopping</div></div><button class="toggle" role="switch" aria-checked="false" aria-label="Switch to self-hosted at limit"></button></div>
+            <div><div class="caps" style="margin-bottom:8px">Used today</div><div class="meter"><span style="width:12%"></span></div><div class="muted small" style="margin-top:6px">12 of 500 total · resets at 00:00</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px"><h2>Recommended providers</h2><span class="muted small">Prices and limits change. Check the provider's page first.</span></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Provider</th><th>Type</th><th>Free tier / price</th><th>Why</th><th>Watch out for</th></tr></thead>
+            <tbody>
+              <tr><td><b>Groq</b></td><td><span class="pill ok">Free</span></td><td>Rate-limited per model, e.g. 1,000 to 14,400 requests per day</td><td>Very fast, OpenAI-compatible, simple to set up</td><td>Only hosts the models Groq offers, not every uncensored fine-tune</td></tr>
+              <tr><td><b>OpenRouter</b></td><td><span class="pill ok">Free</span></td><td>20+ free models behind one endpoint</td><td>Easy to compare models, including community roleplay models</td><td>Free models are rate-limited and change often; policies depend on the upstream model</td></tr>
+              <tr><td><b>Cerebras</b></td><td><span class="pill ok">Free</span></td><td>Free tier, OpenAI-compatible</td><td>Fast inference</td><td>Free-tier context is capped at about 8K tokens, which is tight for long chats</td></tr>
+              <tr><td><b>Mistral</b></td><td><span class="pill ok">Free plan</span></td><td>Rate-limited free plan</td><td>Same model family as your first test model</td><td>Check the current limits and whether the free plan needs a phone number</td></tr>
+              <tr><td><b>Google AI Studio</b></td><td><span class="pill">Free, filtered</span></td><td>About 1,500 requests per day on some Gemini models</td><td>Strong general model</td><td>Strict content filter, not suitable for adult roleplay</td></tr>
+              <tr><td><b>Venice</b></td><td><span class="pill accent">Paid</span></td><td>About $0.20 input and $0.90 output per million tokens (Dolphin-based model)</td><td>Built around uncensored models</td><td>Price from a third-party listing, check Venice's own page</td></tr>
+              <tr><td><b>DeepSeek</b></td><td><span class="pill accent">Paid</span></td><td>About $0.14 to $0.24 input and $0.96 output per million tokens (Flash models)</td><td>Very low price per token, strong quality</td><td>Content policy for adult roleplay is not verified, test before you use it</td></tr>
+            </tbody>
+          </table></div>
+          <p class="muted small" style="margin-top:12px">Every free provider has rate limits, so the per-user limit above matters. Long chats resend the transcript each time, so the price per message grows with chat length.</p>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="backups">
+        <div class="grid grid-2">
+          <div class="card form">
+            <h2>Schedule and keep</h2>
+            <div class="two">
+              <div><label for="bk-time">Nightly time</label><input id="bk-time" type="time" value="03:00"></div>
+              <div><label for="bk-keep">Keep daily backups (days)</label><input id="bk-keep" type="number" value="14"></div>
+              <div><label for="bk-weeks">Keep weekly backups (weeks)</label><input id="bk-weeks" type="number" value="8"></div>
+              <div><label for="bk-loc">Location</label><select id="bk-loc"><option>Same server disk</option><option>Second disk (path)</option><option>Cloud (later)</option></select></div>
+            </div>
+            <div class="switch"><div><div>Include character pictures</div></div><button class="toggle" role="switch" aria-checked="true" aria-label="Include character pictures"></button></div>
+            <div class="switch"><div><div>Encrypt backups</div><div class="muted small">Needs a passphrase you keep safe</div></div><button class="toggle" role="switch" aria-checked="true" aria-label="Encrypt backups"></button></div>
+          </div>
+          <div class="card form">
+            <h2>Status and actions</h2>
+            <div class="switch"><span>Last backup</span><span class="pill ok">Today 03:00 · 380 MB</span></div>
+            <div class="switch"><span>Last restore test</span><span class="pill">Never</span></div>
+            <div class="switch"><span>Backups stored</span><span>14 daily, 2 weekly</span></div>
+            <div class="row" style="flex-wrap:wrap;margin-top:6px"><button class="primary" id="bk-now">Back up now</button><button>Test restore (copy)</button><button>Export all data (JSON)</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h2>Restore</h2><span class="muted small">Restoring replaces current data. You confirm on the page.</span></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Backup</th><th>Size</th><th>Type</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>2026-11-23 03:00</td><td>380 MB</td><td>Daily</td><td><button class="ghost">Restore</button><button class="ghost">Download</button></td></tr>
+              <tr><td>2026-11-22 03:00</td><td>378 MB</td><td>Daily</td><td><button class="ghost">Restore</button><button class="ghost">Download</button></td></tr>
+              <tr><td>2026-11-17 03:00</td><td>351 MB</td><td>Weekly</td><td><button class="ghost">Restore</button><button class="ghost">Download</button></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="storage">
+        <div class="grid grid-2">
+          <div class="card form">
+            <h2>Uploads</h2>
+            <div class="two">
+              <div><label for="up-max">Max file size (MB)</label><input id="up-max" type="number" value="10"></div>
+              <div><label for="up-warn">Warn when disk is full at (%)</label><input id="up-warn" type="number" value="85"></div>
+            </div>
+            <div class="tags"><span class="pill">PNG</span><span class="pill">JPG</span><span class="pill">WebP</span><span class="pill">JSON cards</span><span class="pill">PNG cards</span></div>
+          </div>
+          <div class="card form">
+            <h2>Cleanup</h2>
+            <div class="switch"><span>Pictures not used by any character</span><span>3 files, 4 MB</span></div>
+            <div class="switch"><span>Chats of deleted users</span><span>0</span></div>
+            <div class="row" style="flex-wrap:wrap"><button>Remove unused files</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-panel hidden" data-panel="logs">
+        <div class="grid grid-2">
+          <div class="card form">
+            <h2>Maintenance</h2>
+            <div class="switch"><div><div>Maintenance mode</div><div class="muted small">Users see a notice, admins can still log in</div></div><button class="toggle" role="switch" aria-checked="false" aria-label="Maintenance mode"></button></div>
+            <div><label for="notice">Notice for users</label><textarea id="notice" rows="2" placeholder="e.g. Server restarts tonight at 23:00"></textarea></div>
+            <div class="row" style="flex-wrap:wrap"><button>Restart server</button><button>Check for updates</button></div>
+          </div>
+          <div class="card form">
+            <h2>Logging</h2>
+            <div><label for="loglvl">Log level</label><select id="loglvl"><option>Errors only</option><option selected>Normal</option><option>Verbose (debugging)</option></select></div>
+            <div class="switch"><div><div>Keep chat content in logs</div><div class="muted small">Off by default. Your chats stay private.</div></div><button class="toggle" role="switch" aria-checked="false" aria-label="Keep chat content in logs"></button></div>
+            <div><label for="keep-logs">Keep logs (days)</label><input id="keep-logs" type="number" value="30"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2>Recent admin activity</h2><span class="muted small">Version 0.1.0 (mockup)</span></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+            <tbody>
+              <tr><td>today 09:12</td><td>you</td><td>Changed</td><td>Hosted API per-user limit 100</td></tr>
+              <tr><td>today 03:00</td><td>system</td><td>Backup</td><td>Completed, 380 MB</td></tr>
+              <tr><td>yesterday 18:40</td><td>friend-1</td><td>Login</td><td>Remember me on</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<nav class="bottombar hidden" id="bottombar" aria-label="Mobile navigation"></nav>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var PALETTES = [
+    { id: "ember",  name: "Ember",  color: "#e8703a" },
+    { id: "ocean",  name: "Ocean",  color: "#2f8fd8" },
+    { id: "forest", name: "Forest", color: "#2f9e74" },
+    { id: "violet", name: "Violet", color: "#8b6cf0" },
+    { id: "rose",   name: "Rose",   color: "#e0517e" }
+  ];
+
+  var NAV = [
+    { id: "home",       label: "Home",       icon: "i-home" },
+    { id: "chats",      label: "Chats",      icon: "i-chat" },
+    { id: "characters", label: "Characters", icon: "i-users" },
+    { id: "community",  label: "Community",  icon: "i-globe" },
+    { id: "profile",    label: "Profile",    icon: "i-user" },
+    { id: "settings",   label: "Settings",   icon: "i-gear" }
+  ];
+
+  var chars = [
+    { id: "mara", name: "Mara Stone", ini: "MS", tagline: "Harbour detective, 34", desc: "A tired detective who trusts no one and hides a soft spot for stray cats.", mine: true, tags: ["modern", "drama"] },
+    { id: "elin", name: "Elin Vasquez", ini: "EV", tagline: "Ship's cook, 29", desc: "Runs the galley on a night ferry. Warm, quick, and keeps a list of everyone's secrets.", mine: true, tags: ["modern"] }
+  ];
+
+  var community = [
+    { id: "iris", name: "Captain Iris Kade", ini: "IK", by: "nightwatch", uses: "12.4k", likes: 310, tags: ["fantasy", "drama"], desc: "Commander of a storm-battered airship. Strict, fair, and secretly writes poetry." },
+    { id: "ashford", name: "Lord Ashford", ini: "LA", by: "quillhouse", uses: "8.1k", likes: 190, tags: ["fantasy"], desc: "A Regency-era butler who knows where every body in the house is buried." },
+    { id: "sofia", name: "Sofia, the new neighbour", ini: "SO", by: "marlowe", uses: "5.7k", likes: 142, tags: ["modern"], desc: "Moved in across the hall last week. Friendly, nosy, and never home at night." }
+  ];
+
+  // Chats: a chat belongs to one character. "unread" counts unseen char replies.
+  var chats = [
+    { id: "mara", char: "mara", title: "The Pier Case", unread: 2, pinned: true,  when: "2 min",    group: "today" },
+    { id: "elin", char: "elin", title: "Night ferry kitchen", unread: 0, pinned: false, when: "1 h",     group: "today" },
+    { id: "iris", char: "iris", title: "Storm over the bay", unread: 0, pinned: false, when: "Yesterday", group: "earlier" }
+  ];
+
+  var chatLog = {
+    mara: [
+      { who: "char", text: "*Rain hammers the tin roof of the pier office.* You're late. Sit down before the coffee goes cold.", day: "Today" },
+      { who: "user", text: "The ferry was delayed. I came as fast as I could." },
+      { who: "char", text: "*She leans on the doorframe, arms folded.* Your story has one gap. The ferry didn't leave until six. Where were you at five?" }
+    ],
+    elin: [
+      { who: "char", text: "*Steam fogs the galley window.* Hands in the water, please. We're serving in twenty minutes.", day: "Today" }
+    ],
+    iris: [
+      { who: "char", text: "*The deck tilts under your boots.* Cadet! Report. Is the mainsail holding?", day: "Yesterday" }
+    ]
+  };
+
+  var replies = {
+    mara: [
+      "*Mara sets the cup down without looking at it.* Start with the timestamps. Somebody has been lying about the time, and I want to know who.",
+      "*A pause. She taps the file once.* Fine. Then tell me what you saw from the stairs."
+    ],
+    elin: [
+      "*She laughs, low, and hands you a wooden spoon.* Taste it. Tell me what it's missing.",
+      "*Plates clatter behind her.* Good. Now carry these to table four before they go cold."
+    ],
+    iris: [
+      "*She studies the horizon, jaw set.* Then we hold course. Pass the word to the bosun.",
+      "*The wind rises. She grips the rail.* Steady. We will not lose another sail tonight."
+    ]
+  };
+
+  var QUICK = ["Continue", "Describe the scene", "Shorter", "Longer", "Narrate the weather"];
+
+  // Models the user can pick per chat. The admin decides which are installed or allowed.
+  var MODELS = [
+    "Mistral Small 3.2 (self-hosted)",
+    "Gemma 4 26B-A4B (self-hosted)",
+    "Hosted API: Groq (100 messages/day)"
+  ];
+
+  var state = {
+    route: "home",
+    chatId: "mara",
+    palette: "ember",
+    mode: "system",
+    filter: "all",
+    query: "",
+    cfilter: "all",
+    used: 12,
+    LIMIT: 100,
+    important: {},
+    model: "Mistral Small 3.2 (self-hosted)",
+    streaming: false
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function icon(id, cls) { return '<svg class="ic ' + (cls || "") + '" aria-hidden="true"><use href="#' + id + '"/></svg>'; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(t._h);
+    t._h = setTimeout(function () { t.classList.remove("show"); }, 1800);
+  }
+
+  function findChar(id) {
+    var all = chars.concat(community);
+    return all.filter(function (x) { return x.id === id; })[0] || chars[0];
+  }
+  function findChat(id) { return chats.filter(function (c) { return c.id === id; })[0]; }
+  function lastMsg(charId) {
+    var log = chatLog[charId] || [];
+    return log.length ? log[log.length - 1].text : "No messages yet";
+  }
+  function countMsgs(charId) { return (chatLog[charId] || []).length; }
+
+  /* ---------- Navigation ---------- */
+  function buildNav() {
+    var desk = $("nav-desktop");
+    var bar = $("bottombar");
+    desk.innerHTML = "";
+    bar.innerHTML = "";
+    NAV.forEach(function (n) {
+      var b = document.createElement("button");
+      b.innerHTML = icon(n.icon) + "<span>" + n.label + "</span>";
+      b.setAttribute("data-go", n.id);
+      desk.appendChild(b);
+    });
+    var a = document.createElement("button");
+    a.innerHTML = icon("i-shield") + "<span>Server Management</span>";
+    a.setAttribute("data-go", "admin");
+    desk.appendChild(a);
+
+    ["home", "chats", "characters", "community", "profile"].forEach(function (id) {
+      var n = NAV.filter(function (x) { return x.id === id; })[0];
+      var b = document.createElement("button");
+      b.innerHTML = icon(n.icon) + "<span>" + n.label + "</span>";
+      b.setAttribute("data-go", n.id);
+      bar.appendChild(b);
+    });
+    bindGo(document);
+  }
+
+  function bindGo(root) {
+    root.querySelectorAll("[data-go]").forEach(function (el) {
+      if (el.__bound) return;
+      el.__bound = true;
+      el.addEventListener("click", function () { go(el.getAttribute("data-go")); });
+    });
+  }
+
+  function go(route) {
+    var parts = route.split("/");
+    var name = parts[0];
+    if (name === "chat") { name = "chats"; if (parts[1]) state.chatId = parts[1]; }
+    var valid = ["home", "chats", "characters", "community", "profile", "settings", "admin"];
+    if (valid.indexOf(name) === -1) name = "home";
+    state.route = name;
+
+    // On phones the chat list and an open chat are shown one at a time.
+    document.body.setAttribute("data-chat", name === "chats" && parts.length > 1 ? "1" : "0");
+
+    valid.forEach(function (v) { $("view-" + v).classList.toggle("hidden", v !== name); });
+
+    document.querySelectorAll(".nav button, .bottombar button").forEach(function (b) {
+      if (b.getAttribute("data-go") === name) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+
+    if (name === "home") renderHome();
+    if (name === "chats") renderChats();
+    if (name === "characters") renderMine();
+    if (name === "community") renderCommunity();
+    if (name === "settings") renderSettings();
+    if (name === "admin") { /* static panels */ }
+
+    var hash = "#" + (name === "chats" && document.body.getAttribute("data-chat") === "1" ? "chats/" + state.chatId : name);
+    if (location.hash !== hash) history.replaceState(null, "", hash);
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- Home ---------- */
+  function renderHome() {
+    updateQuota();
+    $("stat-chats").textContent = chats.length;
+  }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-open-chat]");
+    if (b) { go("chat/" + b.getAttribute("data-open-chat")); }
+  });
+
+  /* ---------- Chats ---------- */
+  function visibleChats() {
+    var q = state.query.trim().toLowerCase();
+    return chats.filter(function (c) {
+      if (state.filter === "unread" && !c.unread) return false;
+      if (state.filter === "important" && !(state.important[c.char] || []).some(Boolean)) return false;
+      if (!q) return true;
+      var ch = findChar(c.char);
+      return (c.title + " " + ch.name + " " + lastMsg(c.char)).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  function chatRow(c) {
+    var ch = findChar(c.char);
+    var sel = c.id === state.chatId;
+    var b = document.createElement("button");
+    b.className = "c-row";
+    b.setAttribute("aria-current", sel ? "true" : "false");
+    b.innerHTML =
+      '<span class="avatar">' + esc(ch.ini) + '</span>' +
+      '<span class="grow" style="min-width:0">' +
+        '<span class="top">' +
+          (c.pinned ? icon("i-pin", "ic sm pin-ic") : "") +
+          '<span class="title ellipsis">' + esc(c.title) + '</span>' +
+          '<span class="time">' + esc(c.when) + '</span>' +
+        '</span>' +
+        '<span class="preview ellipsis" style="display:block">' + esc(ch.name) + ' · ' + esc(lastMsg(c.char)) + '</span>' +
+      '</span>' +
+      (c.unread ? '<span class="badge" aria-label="' + c.unread + ' unread">' + c.unread + '</span>' : '');
+    b.addEventListener("click", function () {
+      state.chatId = c.id;
+      c.unread = 0;
+      go("chat/" + c.id);
+    });
+    return b;
+  }
+
+  function renderChats() {
+    // counts for the chips
+    $("cnt-all").textContent = chats.length;
+    $("cnt-unread").textContent = chats.filter(function (c) { return c.unread; }).length || "";
+    document.querySelectorAll("[data-filter]").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-filter") === state.filter ? "true" : "false");
+    });
+
+    var list = $("chat-list");
+    list.innerHTML = "";
+    var items = visibleChats();
+    if (!items.length) {
+      list.innerHTML = '<div class="empty">' + icon("i-search") + '<div>No chats match.</div><div class="small">Try another search or filter.</div></div>';
+    } else {
+      var pinned = items.filter(function (c) { return c.pinned; });
+      var today = items.filter(function (c) { return !c.pinned && c.group === "today"; });
+      var earlier = items.filter(function (c) { return !c.pinned && c.group !== "today"; });
+      [["Pinned", pinned], ["Today", today], ["Earlier", earlier]].forEach(function (g) {
+        if (!g[1].length) return;
+        var label = document.createElement("div");
+        label.className = "caps group-label";
+        label.textContent = g[0];
+        list.appendChild(label);
+        g[1].forEach(function (c) { list.appendChild(chatRow(c)); });
+      });
+    }
+    renderConv();
+  }
+
+  function renderConv() {
+    var pane = $("conv");
+    var c = findChat(state.chatId);
+    if (!c) {
+      pane.innerHTML = '<div class="chat-empty"><div><h2>Pick a conversation</h2><p>Your chats stay here, synced to every device.</p></div></div>';
+      return;
+    }
+    var ch = findChar(c.char);
+    var log = chatLog[c.char] || [];
+    var imp = (state.important[c.char] || []).filter(Boolean).length;
+    var msgCount = log.length;
+
+    pane.innerHTML =
+      '<header class="conv-head">' +
+        '<button class="ghost icon-only back-btn" id="back-chats" aria-label="Back to chat list">' + icon("i-back") + '</button>' +
+        '<span class="avatar">' + esc(ch.ini) + '</span>' +
+        '<div class="grow" style="min-width:0">' +
+          '<div class="name ellipsis">' + esc(ch.name) + '</div>' +
+          '<div class="meta ellipsis">' + esc(c.title) + ' · ' + esc(ch.tagline || "Community character") + '</div>' +
+        '</div>' +
+        '<div class="tools">' +
+          '<button class="ghost icon-only" id="pin-chat" aria-pressed="' + (c.pinned ? "true" : "false") + '" aria-label="Pin chat">' + icon("i-pin") + '</button>' +
+          '<button class="ghost icon-only" id="export-chat" aria-label="Export this chat">' + icon("i-down") + '</button>' +
+          '<button class="ghost icon-only" id="info-chat" aria-label="Chat info">' + icon("i-info") + '</button>' +
+        '</div>' +
+      '</header>' +
+      '<div class="conv-stats">' +
+        '<span class="pill">' + msgCount + ' messages</span>' +
+        '<span class="pill">' + icon("i-star", "ic sm") + ' ' + imp + ' of 10 important</span>' +
+        '<span class="pill">Summary updated 2 h ago</span>' +
+        '<select id="chat-model" class="model-select" aria-label="Model for this chat">' + MODELS.map(function (m) { return '<option' + ((c.model || state.model) === m ? ' selected' : '') + '>' + esc(m) + '</option>'; }).join('') + '</select>' +
+      '</div>' +
+      '<div class="messages" id="messages"></div>' +
+      '<div class="quick" id="quick"></div>' +
+      '<form class="composer" id="composer">' +
+        '<textarea id="input" rows="1" placeholder="Write your line or action…" aria-label="Message"></textarea>' +
+        '<button class="primary send" type="submit" aria-label="Send">' + icon("i-send") + '</button>' +
+      '</form>';
+
+    var box = $("messages");
+    var lastDay = null;
+    log.forEach(function (m, idx) {
+      if (m.day && m.day !== lastDay) {
+        var d = document.createElement("div");
+        d.className = "day";
+        d.textContent = m.day;
+        box.appendChild(d);
+        lastDay = m.day;
+      }
+      box.appendChild(messageEl(m.who, m.text, c.char, idx));
+    });
+    box.scrollTop = box.scrollHeight;
+
+    var q = $("quick");
+    QUICK.forEach(function (t) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = t;
+      b.addEventListener("click", function () { $("input").value = t; $("input").focus(); });
+      q.appendChild(b);
+    });
+
+    $("back-chats").addEventListener("click", function () { go("chats"); });
+    $("pin-chat").addEventListener("click", function () {
+      c.pinned = !c.pinned;
+      toast(c.pinned ? "Pinned to the top" : "Unpinned");
+      renderChats();
+    });
+    $("info-chat").addEventListener("click", function () {
+      toast(ch.name + " · " + msgCount + " messages · " + imp + " important");
+    });
+    $("export-chat").addEventListener("click", function () {
+      toast("Exports \"" + c.title + "\" as JSON (" + msgCount + " messages)");
+    });
+    $("chat-model").addEventListener("change", function (e) {
+      c.model = e.target.value;
+      toast("Model for this chat: " + c.model);
+    });
+    $("composer").addEventListener("submit", onSend);
+    $("input").addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(e); }
+    });
+  }
+
+  function messageEl(who, text, charId, idx) {
+    var wrap = document.createElement("div");
+    wrap.className = "msg " + (who === "user" ? "user" : "char");
+    if (who !== "user") {
+      var av = document.createElement("span");
+      av.className = "avatar xs";
+      av.textContent = findChar(charId).ini;
+      wrap.appendChild(av);
+    }
+    var col = document.createElement("div");
+    col.style.minWidth = "0";
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    col.appendChild(bubble);
+    if (who !== "user") {
+      var flags = state.important[charId] || [];
+      var isImp = flags[idx] === true;
+      if (isImp) wrap.classList.add("important");
+      var line = document.createElement("div");
+      line.className = "meta-line";
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "mark";
+      b.setAttribute("aria-pressed", isImp ? "true" : "false");
+      b.innerHTML = icon("i-star", "ic sm") + (isImp ? " Important" : " Mark important");
+      b.addEventListener("click", function () {
+        var all = (state.important[charId] = state.important[charId] || []);
+        var count = all.filter(Boolean).length;
+        if (!all[idx] && count >= 10) { toast("Limit: 10 important messages per chat"); return; }
+        all[idx] = !all[idx];
+        renderConv();
+      });
+      line.appendChild(b);
+      col.appendChild(line);
+    }
+    wrap.appendChild(col);
+    return wrap;
+  }
+
+  function typingEl(charId) {
+    var wrap = document.createElement("div");
+    wrap.className = "msg char typing";
+    wrap.id = "typing";
+    wrap.innerHTML = '<span class="avatar xs">' + esc(findChar(charId).ini) + '</span>' +
+      '<div class="bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+    return wrap;
+  }
+
+  function onSend(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (state.streaming) return;
+    var input = $("input");
+    var text = input.value.trim();
+    var c = findChat(state.chatId);
+    if (!text || !c) return;
+    var hosted = /Hosted/.test(c.model || state.model);
+    if (hosted && state.used >= state.LIMIT) { toast("Daily limit reached for the hosted API"); return; }
+    if (hosted) { state.used++; updateQuota(); }
+
+    var log = (chatLog[c.char] = chatLog[c.char] || []);
+    log.push({ who: "user", text: text });
+    input.value = "";
+    c.when = "now";
+    c.last = text;
+    renderChats();
+
+    var box = $("messages");
+    box.appendChild(messageEl("user", text, c.char, 0));
+    box.appendChild(typingEl(c.char));
+    box.scrollTop = box.scrollHeight;
+
+    state.streaming = true;
+    var pool = replies[c.char] || replies.mara;
+    var reply = pool[(text.length + state.used) % pool.length];
+    setTimeout(function () {
+      var t = $("typing");
+      if (t) t.remove();
+      var el = messageEl("char", "", c.char, log.length);
+      box.appendChild(el);
+      var target = el.querySelector(".bubble");
+      target.classList.add("cursor");
+      var words = reply.split(" ");
+      var i = 0;
+      var timer = setInterval(function () {
+        i++;
+        target.textContent = words.slice(0, i).join(" ");
+        box.scrollTop = box.scrollHeight;
+        if (i >= words.length) {
+          clearInterval(timer);
+          target.classList.remove("cursor");
+          log.push({ who: "char", text: reply });
+          state.streaming = false;
+          if (state.chatId !== c.id) c.unread = (c.unread || 0) + 1;
+        }
+      }, 55);
+    }, 700);
+  }
+
+  function setFilter(f) { state.filter = f; renderChats(); }
+  $("chat-search").addEventListener("input", function (e) { state.query = e.target.value; renderChats(); });
+  document.querySelectorAll("[data-filter]").forEach(function (b) {
+    b.addEventListener("click", function () { setFilter(b.getAttribute("data-filter")); });
+  });
+
+  /* ---------- Characters ---------- */
+  function charCard(c, foot, lift) {
+    var card = document.createElement("article");
+    card.className = "card char-card" + (lift ? " lift" : "");
+    card.innerHTML =
+      '<div class="row"><span class="avatar' + (c.mine ? "" : " alt") + '">' + esc(c.ini) + '</span>' +
+        '<div class="grow" style="min-width:0"><h3 class="ellipsis">' + esc(c.name) + '</h3>' +
+        '<div class="muted small ellipsis">' + (c.mine ? esc(c.tagline || "") : "by @" + esc(c.by)) + '</div></div></div>' +
+      '<p class="desc">' + esc(c.desc) + '</p>' +
+      '<div class="tags">' + (c.tags || []).map(function (t) { return '<span class="pill">' + esc(t) + '</span>'; }).join("") + '</div>' +
+      '<div class="foot">' + foot + '</div>';
+    return card;
+  }
+
+  function renderMine() {
+    var grid = $("my-chars");
+    grid.innerHTML = "";
+    chars.forEach(function (c) {
+      var card = charCard(c,
+        '<button class="primary" data-act="chat">Chat</button>' +
+        '<button class="ghost" data-act="edit">Edit</button>' +
+        '<button class="ghost" data-act="export">Export</button>' +
+        '<button class="ghost" data-act="del">Delete</button>', true);
+      card.querySelector('[data-act="export"]').addEventListener("click", function () { toast("Exports " + c.name + " as JSON (card format)"); });
+      card.querySelector('[data-act="chat"]').addEventListener("click", function () { openChatWith(c.id); });
+      card.querySelector('[data-act="edit"]').addEventListener("click", function () { toast("Editor opens here (mockup)"); });
+      card.querySelector('[data-act="del"]').addEventListener("click", function () { toast("Delete asks for confirmation on the page"); });
+      grid.appendChild(card);
+    });
+    var tile = document.createElement("button");
+    tile.className = "new-tile";
+    tile.innerHTML = icon("i-plus") + "<span>Create a new character</span>";
+    tile.addEventListener("click", function () { toast("New character form (mockup)"); });
+    grid.appendChild(tile);
+  }
+
+  function renderCommunity() {
+    var top = community[0];
+    $("featured").innerHTML =
+      '<div class="grow" style="min-width:0">' +
+        '<div class="caps">Featured this week</div>' +
+        '<h2 style="margin-top:6px;font-size:24px">' + esc(top.name) + '</h2>' +
+        '<p>' + esc(top.desc) + '</p>' +
+        '<div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="primary" id="feat-chat">Start chat</button><button id="feat-add">Add to my characters</button></div>' +
+      '</div>' +
+      '<span class="avatar lg">' + esc(top.ini) + '</span>';
+    $("feat-chat").addEventListener("click", function () { toast("Starts a chat with " + top.name); });
+    $("feat-add").addEventListener("click", function () { addCommunity(top); });
+
+    var grid = $("community");
+    grid.innerHTML = "";
+    community.forEach(function (c) {
+      if (state.cfilter !== "all" && c.tags.indexOf(state.cfilter) === -1) return;
+      var card = charCard(c,
+        '<span class="stats">' + icon("i-chat", "ic sm") + '<span>' + c.uses + '</span>' + icon("i-star", "ic sm") + '<span>' + c.likes + '</span></span>' +
+        '<button class="ghost" data-act="add">Add</button>' +
+        '<button class="primary" data-act="chat">Chat</button>', true);
+      card.querySelector('[data-act="chat"]').addEventListener("click", function () { toast("Starts a chat with " + c.name); });
+      card.querySelector('[data-act="add"]').addEventListener("click", function () { addCommunity(c); });
+      grid.appendChild(card);
+    });
+    if (!grid.children.length) {
+      grid.innerHTML = '<div class="empty-card" style="grid-column:1/-1">No characters in this filter yet.</div>';
+    }
+    document.querySelectorAll("[data-cfilter]").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-cfilter") === state.cfilter ? "true" : "false");
+    });
+  }
+
+  function addCommunity(c) {
+    if (chars.some(function (x) { return x.id === c.id; })) { toast("Already in your characters"); return; }
+    chars.push(Object.assign({}, c, { mine: false }));
+    toast("Added " + c.name + " to your characters");
+  }
+
+  document.querySelectorAll("[data-cfilter]").forEach(function (b) {
+    b.addEventListener("click", function () { state.cfilter = b.getAttribute("data-cfilter"); renderCommunity(); });
+  });
+
+  function openChatWith(charId) {
+    var existing = chats.filter(function (x) { return x.char === charId; })[0];
+    if (!existing) {
+      var ch = findChar(charId);
+      chats.unshift({ id: charId, char: charId, title: ch.name + " (new)", unread: 0, pinned: false, when: "now", group: "today" });
+      chatLog[charId] = [];
+    }
+    go("chat/" + charId);
+  }
+
+  $("new-char").addEventListener("click", function () { toast("New character form (mockup)"); });
+
+  /* ---------- Profile ---------- */
+  $("save-profile").addEventListener("click", function () { toast("Profile saved"); });
+
+  /* ---------- Settings ---------- */
+  function applyPalette(id) {
+    state.palette = id;
+    document.documentElement.setAttribute("data-palette", id);
+    store("compain-palette", id);
+    renderPalettes();
+  }
+
+  function applyMode(m) {
+    state.mode = m;
+    if (m === "system") document.documentElement.removeAttribute("data-mode");
+    else document.documentElement.setAttribute("data-mode", m);
+    store("compain-mode", m);
+    document.querySelectorAll("[data-mode]").forEach(function (b) {
+      if (b.tagName === "BUTTON") b.setAttribute("aria-pressed", b.getAttribute("data-mode") === m ? "true" : "false");
+    });
+  }
+
+  function renderPalettes() {
+    var box = $("palettes");
+    box.innerHTML = "";
+    PALETTES.forEach(function (p) {
+      var b = document.createElement("button");
+      b.className = "palette-card";
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", p.id === state.palette ? "true" : "false");
+      b.innerHTML =
+        '<span class="preview"><i style="background:' + p.color + '"></i><b style="background:linear-gradient(90deg,' + p.color + ',color-mix(in srgb,' + p.color + ' 40%,#000))"></b></span>' +
+        '<span class="name"><span>' + p.name + '</span>' + (p.id === state.palette ? '<span class="pill accent">Active</span>' : '') + '</span>';
+      b.addEventListener("click", function () { applyPalette(p.id); toast("Theme: " + p.name); });
+      box.appendChild(b);
+    });
+  }
+
+  function renderSettings() {
+    renderPalettes();
+    applyMode(state.mode);
+  }
+
+  $("exp-chars").addEventListener("click", function () { toast("Exports " + chars.length + " characters as JSON"); });
+  $("exp-chats").addEventListener("click", function () { toast("Exports " + chats.length + " chats as JSON"); });
+  $("exp-all").addEventListener("click", function () { toast("Exports characters, chats and pictures"); });
+
+  document.querySelectorAll(".segmented button").forEach(function (b) {
+    b.addEventListener("click", function () { applyMode(b.getAttribute("data-mode")); });
+  });
+
+  /* ---------- Login ---------- */
+  $("remember").addEventListener("click", function () {
+    var on = this.getAttribute("aria-checked") !== "true";
+    this.setAttribute("aria-checked", on ? "true" : "false");
+    $("session-note").textContent = on ? "Stays logged in permanently on this device." : "Logs in for 48 hours.";
+  });
+
+  function showLogin(show) {
+    $("view-login").classList.toggle("hidden", !show);
+    $("app").classList.toggle("hidden", show);
+    $("bottombar").classList.toggle("hidden", show);
+  }
+
+  $("login-btn").addEventListener("click", function () {
+    showLogin(false);
+    go(location.hash.slice(1) || "home");
+  });
+
+  /* ---------- Shared controls ---------- */
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest(".toggle");
+    if (!t || t.id === "remember" || t.disabled) return;
+    t.setAttribute("aria-checked", t.getAttribute("aria-checked") === "true" ? "false" : "true");
+  });
+
+  document.querySelectorAll("#admin-tabs button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var key = b.getAttribute("data-sub");
+      document.querySelectorAll("#admin-tabs button").forEach(function (x) {
+        x.setAttribute("aria-selected", x === b ? "true" : "false");
+      });
+      document.querySelectorAll(".admin-panel").forEach(function (p) {
+        p.classList.toggle("hidden", p.getAttribute("data-panel") !== key);
+      });
+    });
+  });
+
+  $("bk-now").addEventListener("click", function () { toast("Backup started"); });
+
+  function updateQuota() {
+    var pct = Math.min(100, Math.round(state.used / state.LIMIT * 100));
+    if ($("home-quota")) $("home-quota").textContent = state.used;
+    if ($("home-quota-bar")) $("home-quota-bar").style.width = pct + "%";
+  }
+
+  /* ---------- Start ---------- */
+  var savedPalette = load("compain-palette");
+  var savedMode = load("compain-mode");
+  if (savedPalette && PALETTES.some(function (p) { return p.id === savedPalette; })) state.palette = savedPalette;
+  if (savedMode === "light" || savedMode === "dark" || savedMode === "system") state.mode = savedMode;
+  document.documentElement.setAttribute("data-palette", state.palette);
+  if (state.mode !== "system") document.documentElement.setAttribute("data-mode", state.mode);
+
+  buildNav();
+  bindGo(document);
+  updateQuota();
+
+  showLogin(false);
+  go(location.hash.slice(1) || "home");
+  window.addEventListener("hashchange", function () { go(location.hash.slice(1) || "home"); });
+})();
+</script>
+</body>
+</html>

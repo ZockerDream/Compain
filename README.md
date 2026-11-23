@@ -4,7 +4,7 @@ A private, self-hosted AI roleplay chat app. Compain is a personal replacement f
 
 ## Status
 
-Planning and design complete for version 1. The clickable design is approved. The backend (v0) is built and runs in Docker with PostgreSQL. The browser UI is not connected to it yet. See [agent.md](agent.md) for the exact state and next steps.
+Version 1 is built in large parts: API, web UI, Docker with PostgreSQL, tests (API and browser). Server Management, live sync, story summaries, backups and model setup are still open. See [agent.md](agent.md) for the exact state and next steps.
 
 ## Files
 
@@ -29,6 +29,8 @@ Requirements: Docker with Compose.
 
 The model is `mock` by default, so the app answers with a test reply. Set `COMPAIN_MODEL_BASE_URL` (self-hosted) or `COMPAIN_HOSTED_API_BASE_URL` plus `COMPAIN_HOSTED_API_KEY` (hosted) to use a real model.
 
-To see the design, open `design/mockup.html` in a browser. It works offline except for the two web fonts. The mockup is not connected to the API yet.
+Open http://localhost:8080 for the app. The design reference is `design/mockup.html`.
 
-Run the tests (needs Python 3.12): `cd app && python3 -m venv .venv && ./.venv/bin/pip install -r requirements-dev.txt && ./.venv/bin/python -m pytest -q`
+Run the API tests (needs Python 3.12): `cd app && python3 -m venv .venv && ./.venv/bin/pip install -r requirements-dev.txt && ./.venv/bin/python -m pytest -q`
+
+Run the browser tests against the running stack: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs` (needs Chromium; see agent.md).

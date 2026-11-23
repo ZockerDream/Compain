@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-palette="ember">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Compain</title>
+<meta name="description" content="Compain: private self-hosted roleplay chat.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:,">
+</head>
+<body data-chat="0">
+
+<div id="boot" class="login-wrap"><p class="muted">Loading…</p></div>
+
+<!-- LOGIN -->
+<div id="view-login" class="login-wrap hidden">
+  <form class="login card" id="login-form" autocomplete="on">
+    <div class="logo"><i></i>Compain</div>
+    <div style="text-align:center">
+      <h1>Welcome back</h1>
+      <p class="muted small" style="margin-top:8px">Your characters and chats live on your own server.</p>
+    </div>
+    <div><label for="user">Username</label><input id="user" name="username" autocomplete="username" required></div>
+    <div><label for="pw">Password</label><input id="pw" name="password" type="password" autocomplete="current-password" required></div>
+    <label class="switch" style="border:0;padding:0;cursor:pointer">
+      <span class="small">Stay logged in</span>
+      <input type="checkbox" id="remember" style="width:auto">
+    </label>
+    <p class="muted small" id="session-note">Logs in for 48 hours.</p>
+    <p id="login-error" class="small" style="color:var(--warn);min-height:1.2em"></p>
+    <button class="primary" type="submit" style="width:100%;padding:13px">Log in</button>
+  </form>
+</div>
+
+<!-- APP -->
+<div id="app" class="app hidden">
+  <aside class="sidebar" aria-label="Main navigation">
+    <div class="logo"><i></i>Compain</div>
+    <nav class="nav" id="nav-desktop"></nav>
+    <div class="card me">
+      <div class="row">
+        <div class="avatar sm alt" id="me-ini">YO</div>
+        <div class="grow"><div style="font-weight:600" class="ellipsis" id="me-name">You</div><div class="muted small" id="me-role"></div></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="content" id="main">
+    <section id="view-home" class="view hidden"></section>
+    <section id="view-chats" class="view hidden"></section>
+    <section id="view-characters" class="view hidden"></section>
+    <section id="view-community" class="view hidden"></section>
+    <section id="view-profile" class="view hidden"></section>
+    <section id="view-settings" class="view hidden"></section>
+    <section id="view-admin" class="view hidden"></section>
+  </main>
+</div>
+
+<nav class="bottombar hidden" id="bottombar" aria-label="Mobile navigation"></nav>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="/static/app.js" defer></script>
+</body>
+</html>

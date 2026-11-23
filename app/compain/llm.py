@@ -1,0 +1,51 @@
+"""Model client. Talks to any OpenAI-compatible chat endpoint, self-hosted or hosted.
+
+If the base URL is "mock", a fixed test reply is streamed instead. Tests and local
+runs without a model use this.
+"""
+
+import json
+from collections.abc import AsyncIterator
+
+import httpx
+
+
+def build_messages(system_prompt: str, history: list[dict]) -> list[dict]:
+    return [{"role": "system", "content": system_prompt}, *history]
+
+
+async def stream_chat(
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: list[dict],
+    max_tokens: int,
+) -> AsyncIterator[str]:
+    """Yield text pieces as they arrive from the model."""
+    if base_url == "mock":
+        for piece in ["*The model answers in a test reply.* ", "Streaming works. ", "Ask again to see it change."]:
+            yield piece
+        return
+
+    url = base_url.rstrip("/") + "/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    payload = {"model": model, "messages": messages, "max_tokens": max_tokens, "stream": True}
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
+        async with client.stream("POST", url, headers=headers, json=payload) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                data = line[len("data:"):].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data)
+                    delta = chunk["choices"][0].get("delta", {}).get("content")
+                except (ValueError, KeyError, IndexError):
+                    continue
+                if delta:
+                    yield delta

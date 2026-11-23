@@ -1,0 +1,8 @@
+.env
+app/.venv/
+__pycache__/
+*.pyc
+*.db
+.pytest_cache/
+app/e2e/node_modules/
+app/e2e/screens/

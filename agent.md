@@ -37,31 +37,35 @@ Last updated: 2026-11-23.
 
 Done:
 - Planning and design: concept, technical notes, approved mockup (`design/mockup.html`, mockup version 6).
-- Backend v0 in `app/` (FastAPI, SQLAlchemy, PostgreSQL). 14 API tests pass (SQLite).
-- `docker compose up --build` runs the app with PostgreSQL. Verified: health check, admin login, character creation, adults-only check, chat streaming (mock model) with both messages stored.
+- Backend (FastAPI, SQLAlchemy, PostgreSQL): login with 48-hour and "stay logged in" sessions, lockout, characters (owner rules, adults-only check, picture upload, publish and review, add from Community), chats with streaming replies, important messages (max 10), per-chat model choice, hosted daily limits (per user and total), JSON export (characters, chats, everything, one chat), profile name, admin users, admin limits, review queue.
+- Real web UI served by the API at `/` (`app/compain/static/`): login, Home, Chats (list, filters, streaming conversation, important, pin, model, export), Characters (create, edit, delete, picture, publish, chat), Community (featured, add, chat), Profile (name, exports), Settings (five themes, System/Light/Dark, reply length, context, log out), Server Management (overview, users, characters review, hosted API limits; other sections show a "planned" note).
+- Tests: 14 API tests (`app/tests`), 23 browser checks (`app/e2e`) against the Docker build, desktop and phone.
+- Docker Compose runs the app and PostgreSQL. Data (pictures) is in a volume.
 
 Not done yet (next, in this order):
-1. Connect the UI: replace the mockup's canned data with calls to the API, keep the mockup's look. Login, chats (streaming), characters, community, settings, Server Management.
-2. Measure Mistral Small 3.2 and Gemma 4 26B-A4B on the server (tokens per second, memory). Set `COMPAIN_MODEL_BASE_URL` to the real runtime.
-3. Story memory: generate `chats.summary` automatically (every 40 messages).
-4. Backups: nightly `pg_dump` and picture files, with the settings from Server Management, and restore.
-5. Live sync between devices (WebSocket).
-6. Character card import (SillyTavern V1/V2 JSON, PNG V2, plain text) and export endpoints.
-7. Server Management endpoints for domain, HTTPS, sessions, models, backups, storage and logs (only settings and users exist so far).
-8. Migrations with Alembic instead of `create_all`.
+1. Measure Mistral Small 3.2 and Gemma 4 26B-A4B on the server (tokens per second, memory). Set `COMPAIN_MODEL_BASE_URL` to the real runtime (llama.cpp or Ollama). Not in Compose yet.
+2. Story memory: generate `chats.summary` automatically (every 40 messages). Only the field exists.
+3. Server Management sections still missing: Domain and HTTPS (Caddy), Access and security controls (sign-up, sessions, lockout settings), Models, Backups (nightly pg_dump, restore), Storage cleanup, Logs and maintenance.
+4. Live sync between devices (WebSocket). Right now a second device sees new messages only after reloading.
+5. Character card import (SillyTavern V1/V2 JSON, PNG V2, plain text).
+6. Unread counts and "Summary updated" in the UI (the mockup shows them; the API does not track them yet).
+7. Alembic migrations instead of `create_all`.
+8. Settings for reply length and context are stored per device (localStorage), not on the server yet.
 
 Known gaps and risks:
-- The adults-only check is a keyword and age heuristic in `app/compain/content.py`. It is not complete. Community review by the admin is the second safety layer.
+- The adults-only check is a keyword and age heuristic in `app/compain/content.py`. It is not complete. Admin review of community characters is the second layer.
 - The real-person rule is not checked by code yet.
 - Sessions use a cookie without `Secure` until HTTPS is set up.
-- Lockout and "stay logged in" work in the API, not yet in the UI.
-- The Compose file uses the `mock` model by default.
+- The Compose file uses the `mock` model by default, so replies are test text.
+- Browser tests need Chromium at `/opt/google/chrome/chrome` (linked to the Playwright download) and its system libraries (installed with dnf on this machine).
 
 ## Layout
 
 - `docker-compose.yml`: `db` (PostgreSQL 16) and `app` (the API on port 8080). Reads `.env`.
 - `.env.example`: all variables. Copy to `.env` and set real passwords.
-- `app/`: the FastAPI service.
+- `app/`: the FastAPI service and the web UI.
+  - `compain/static/`: `index.html`, `app.js` (plain JavaScript, no build), `style.css` and `sprite.svg` (taken from the mockup).
+  - `e2e/`: browser tests (`node run.mjs`, needs `npm install` in that folder). Screenshots go to `e2e/screens/` (not committed).
   - `Dockerfile`, `requirements.txt`, `requirements-dev.txt`.
   - `compain/config.py`: settings from environment variables.
   - `compain/db.py`: engine, session factory, table creation.
@@ -78,7 +82,8 @@ Known gaps and risks:
 
 ## Commands
 
-- Tests: `cd app && ./.venv/bin/python -m pytest -q`
+- API tests: `cd app && ./.venv/bin/python -m pytest -q`
+- Browser tests: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs`
 - Run with Docker: `docker compose up --build -d`
 - Health check: `curl http://localhost:8080/api/health`
 - Stop: `docker compose down` (keeps the database volume; add `-v` only to delete all data)

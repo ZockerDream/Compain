@@ -129,7 +129,10 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - Chats: streaming replies over Server-Sent Events. Context = character, summary, important messages, last 60 messages.
 - Hosted limit: per user per day and a total per day, read from Server Management first, then from environment defaults.
 - Admin API: overview, users, settings (limits), community review queue. Other Server Management sections are not built yet.
-- Tests: 14 API tests pass. Docker stack verified with PostgreSQL.
+- Web UI: plain JavaScript served by the API from `compain/static/`, built on the mockup's CSS. Uses only the API.
+- Pictures: PNG, JPG or WebP up to 10 MB, checked by file content, stored in the data volume.
+- Export: JSON of characters, chats, everything, and one chat.
+- Tests: 14 API tests and 23 browser checks (desktop and phone) pass against the Docker build.
 
 Environment variables are listed in `.env.example`.
 

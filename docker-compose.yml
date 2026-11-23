@@ -1,0 +1,41 @@
+# Compain: app + PostgreSQL. Secrets come from .env (never committed).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: compain
+      POSTGRES_USER: compain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - compain-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compain -d compain"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: ./app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      COMPAIN_DB_URL: postgresql+psycopg://compain:${POSTGRES_PASSWORD}@db:5432/compain
+      COMPAIN_SECRET_KEY: ${COMPAIN_SECRET_KEY:?set COMPAIN_SECRET_KEY in .env}
+      COMPAIN_ADMIN_USERNAME: ${COMPAIN_ADMIN_USERNAME:-admin}
+      COMPAIN_ADMIN_PASSWORD: ${COMPAIN_ADMIN_PASSWORD:?set COMPAIN_ADMIN_PASSWORD in .env}
+      COMPAIN_MODEL_BASE_URL: ${COMPAIN_MODEL_BASE_URL:-mock}
+      COMPAIN_MODEL_NAME: ${COMPAIN_MODEL_NAME:-mistral-small-3.2}
+      COMPAIN_HOSTED_API_BASE_URL: ${COMPAIN_HOSTED_API_BASE_URL:-mock}
+      COMPAIN_HOSTED_API_KEY: ${COMPAIN_HOSTED_API_KEY:-}
+      COMPAIN_HOSTED_MODEL: ${COMPAIN_HOSTED_MODEL:-llama-3.1-8b-instant}
+    volumes:
+      - compain-data:/srv/app/data
+    ports:
+      - "8080:8080"
+
+volumes:
+  compain-db:
+  compain-data:
