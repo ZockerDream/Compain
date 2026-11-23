@@ -22,6 +22,7 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     password_hash: Mapped[str] = mapped_column(String(256))
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
+    preferences: Mapped[str] = mapped_column(Text, default="{}")  # JSON: theme, reply length, context
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -68,7 +69,9 @@ class Chat(Base):
     title: Mapped[str] = mapped_column(String(256), default="")
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     model: Mapped[str] = mapped_column(String(128), default="")  # empty = server default
-    summary: Mapped[str] = mapped_column(Text, default="")  # story memory (filled later)
+    summary: Mapped[str] = mapped_column(Text, default="")  # story memory
+    summary_upto: Mapped[int] = mapped_column(Integer, default=0)  # id of the last message in the summary
+    read_upto: Mapped[int] = mapped_column(Integer, default=0)  # id of the last message the owner has seen
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

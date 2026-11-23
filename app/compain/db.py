@@ -20,8 +20,24 @@ def make_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+# Columns added after the first release. create_all() does not add columns to existing tables,
+# so these are added here. Move to Alembic before the first real data on the server.
+ADDED_COLUMNS = [
+    ("chats", "summary_upto", "INTEGER NOT NULL DEFAULT 0"),
+    ("chats", "read_upto", "INTEGER NOT NULL DEFAULT 0"),
+    ("users", "preferences", "TEXT NOT NULL DEFAULT '{}'"),
+]
+
+
 def init_db(engine: Engine) -> None:
-    # Tables are created on startup for now. Move to migrations (Alembic) before the first real data.
+    from sqlalchemy import inspect, text
+
     from . import models  # noqa: F401  (registers the tables)
 
     Base.metadata.create_all(engine)
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table, column, ddl in ADDED_COLUMNS:
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))

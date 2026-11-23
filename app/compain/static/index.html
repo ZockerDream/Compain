@@ -34,6 +34,17 @@
     <p id="login-error" class="small" style="color:var(--warn);min-height:1.2em"></p>
     <button class="primary" type="submit" style="width:100%;padding:13px">Log in</button>
   </form>
+  <p id="login-notice" class="card hidden small" style="padding:12px 16px;width:min(410px,100%)"></p>
+  <details id="register-box" class="card hidden" style="width:min(410px,100%)">
+    <summary style="cursor:pointer;font-weight:600">Create an account with an invite code</summary>
+    <form id="register-form" class="form" style="margin-top:14px">
+      <div><label for="reg-user">Username</label><input id="reg-user" required></div>
+      <div><label for="reg-pw">Password</label><input id="reg-pw" type="password" autocomplete="new-password" required></div>
+      <div><label for="reg-invite">Invite code</label><input id="reg-invite" required></div>
+      <p id="register-error" class="small" style="min-height:1.2em"></p>
+      <button class="primary" type="submit">Create account</button>
+    </form>
+  </details>
 </div>
 
 <!-- APP -->
@@ -50,6 +61,7 @@
   </aside>
 
   <main class="content" id="main">
+    <div id="notice-banner" class="card hidden" style="margin-bottom:16px;padding:12px 16px;font-size:14px"></div>
     <section id="view-home" class="view hidden"></section>
     <section id="view-chats" class="view hidden"></section>
     <section id="view-characters" class="view hidden"></section>

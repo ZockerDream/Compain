@@ -1,7 +1,7 @@
 # Compain: app + PostgreSQL. Secrets come from .env (never committed).
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: compain
@@ -36,6 +36,43 @@ services:
     ports:
       - "8080:8080"
 
+  # Self-hosted model servers (llama.cpp, OpenAI-compatible). Start one with its profile:
+  #   docker compose --profile llm-mistral up -d
+  # and set COMPAIN_MODEL_BASE_URL=http://llm-mistral:8081/v1 in .env.
+  llm-mistral:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    profiles: ["llm-mistral"]
+    restart: unless-stopped
+    volumes:
+      - ./models:/models:ro
+    command: ["-m", "/models/mistral-small-3.2-abliterated-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "8192", "-t", "${LLM_THREADS:-6}"]
+
+  llm-gemma:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    profiles: ["llm-gemma"]
+    restart: unless-stopped
+    volumes:
+      - ./models:/models:ro
+    command: ["-m", "/models/gemma-4-26b-a4b-uncensored-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "8192", "-t", "${LLM_THREADS:-6}"]
+
+  # HTTPS in front of the app. Start with: docker compose --profile https up -d
+  # Needs COMPAIN_DOMAIN in .env (a domain pointing to this server) and ports 80 and 443 open.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      COMPAIN_DOMAIN: ${COMPAIN_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
 volumes:
   compain-db:
   compain-data:
+  caddy-data:

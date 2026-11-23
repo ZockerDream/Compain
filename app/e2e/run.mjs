@@ -120,7 +120,7 @@ await page.click("#view-settings .segmented button:has-text('System')");
 // Community: publish, approve, add
 await page.click("#nav-desktop button[data-go=characters]");
 await page.waitForSelector("#view-characters .char-card");
-await page.click("#view-characters .char-card .ghost:has-text('Publish')");
+await page.locator("#view-characters .char-card:has-text('Mara Stone') .ghost:has-text('Publish')").first().click();
 await page.waitForTimeout(500);
 check("publish sends the character to review", (await page.textContent("#view-characters")).includes("In review"));
 
@@ -131,14 +131,68 @@ await page.waitForSelector("#view-admin .stat-card, #view-admin .card", { timeou
 check("Server Management overview loads", (await page.textContent("#view-admin")).includes("Hosted API today"));
 await page.click("#view-admin .subtabs button:has-text('Characters')");
 await page.waitForSelector("#view-admin .card:has-text('review queue')");
-await page.click("#view-admin .feed li .ghost:has-text('Approve')");
-await page.waitForTimeout(500);
+// Approve everything waiting in the queue (earlier runs may have left items).
+for (let i = 0; i < 20; i++) {
+  const approve = page.locator("#view-admin .feed li .ghost:has-text('Approve')").first();
+  if (!(await approve.count())) break;
+  await approve.click();
+  await page.waitForTimeout(400);
+}
 await page.click("#nav-desktop button[data-go=community]");
 await page.waitForSelector("#view-community:not(.hidden)");
 await page.waitForSelector("#view-community .featured, #view-community .empty-card", { timeout: 10000 });
 check("approved character shows in Community", (await page.textContent("#view-community")).includes("Mara Stone"));
 await page.screenshot({ path: SHOTS + "04-community-desktop.png" });
 await page.click("#view-community .grid .ghost:has-text('Add')").catch(() => {});
+
+// Card import from a file
+await page.click("#nav-desktop button[data-go=characters]");
+await page.waitForSelector("#view-characters:not(.hidden)");
+await page.setInputFiles("input[type=file][aria-label='Import a character card']", {
+  name: "iris.json", mimeType: "application/json",
+  buffer: Buffer.from(JSON.stringify({ name: "Captain Iris Kade", description: "Airship captain.", first_mes: "Report!" })) });
+await page.waitForSelector("text=Imported Captain Iris Kade", { timeout: 10000 }).catch(() => {});
+check("character card import works", (await page.textContent("#view-characters")).includes("Captain Iris Kade"));
+
+// Live sync: a second window of the same user sees the new message without reloading
+const second = await newPage(1280, 860);
+await second.goto(BASE + "/");
+await second.waitForSelector("#login-form", { state: "visible" });
+await second.fill("#user", ADMIN_USER);
+await second.fill("#pw", ADMIN_PW);
+await second.click("#login-form button[type=submit]");
+await second.waitForSelector("#app:not(.hidden)");
+await second.click("#nav-desktop button[data-go=chats]");
+await second.waitForSelector("#view-chats:not(.hidden)");
+await page.click("#nav-desktop button[data-go=chats]");
+await page.waitForSelector("#view-chats:not(.hidden) #chat-list");
+await page.click("#chat-list .c-row");
+await page.waitForSelector("#conv textarea");
+await page.fill("#conv textarea", "Live sync check");
+await page.keyboard.press("Enter");
+await page.waitForSelector("#messages .msg.char .bubble:has-text('Streaming works')", { timeout: 15000 });
+await second.waitForFunction(() => document.querySelector("#chat-list") && document.querySelector("#chat-list").textContent.indexOf("Streaming works") !== -1, null, { timeout: 15000 }).catch(() => {});
+const liveSeen = (await second.textContent("#chat-list")).includes("Streaming works");
+check("second window updates without reload (live sync)", liveSeen);
+await second.close();
+
+// Admin: backup, speed test, invite code
+await page.click("#nav-desktop button[data-go=admin]");
+await page.waitForSelector("#view-admin:not(.hidden)");
+await page.click("#view-admin .subtabs button:has-text('Backups')");
+await page.waitForSelector("#view-admin button:has-text('Back up now')");
+await page.click("#view-admin button:has-text('Back up now')");
+await page.waitForSelector("#view-admin td:has-text('compain-')", { timeout: 60000 });
+check("backup can be created from the browser", true);
+await page.click("#view-admin .subtabs button:has-text('Models')");
+await page.click("#view-admin button:has-text('Run speed test')");
+await page.waitForSelector("text=pieces per second", { timeout: 60000 });
+check("speed test shows a result", true);
+await page.click("#view-admin .subtabs button:has-text('Access')");
+await page.click("#view-admin button:has-text('New invite code')");
+await page.waitForTimeout(500);
+check("invite code can be created", (await page.textContent("#view-admin")).length > 0);
+await page.screenshot({ path: SHOTS + "08-admin-security-desktop.png" });
 
 check("no layout problems on desktop", (await layoutProblems(page)).length === 0, (await layoutProblems(page)).join("; "));
 await page.close();

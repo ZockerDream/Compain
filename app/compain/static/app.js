@@ -104,6 +104,8 @@
   }
   function savePrefs() {
     try { localStorage.setItem("compain-prefs", JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+    // Also on the server, so every device of this user looks the same.
+    if (me) api("/api/auth/preferences", { method: "PUT", body: prefs }).catch(function () { /* offline: kept on this device */ });
   }
   function applyPrefs() {
     document.documentElement.setAttribute("data-palette", prefs.palette);
@@ -114,7 +116,7 @@
   /* ---------- state ---------- */
   var prefs = loadPrefs();
   var me = null;
-  var state = { chatId: null, cfilter: "all", query: "", communityFilter: "all", adminTab: "overview", editing: null };
+  var state = { chatId: null, cfilter: "all", query: "", communityFilter: "all", adminTab: "overview", editing: null, sending: false, route: "home" };
 
   /* ---------- navigation ---------- */
   var NAV = [
@@ -151,6 +153,7 @@
     var openChat = name === "chats" && parts.length > 1;
     document.body.setAttribute("data-chat", openChat ? "1" : "0");
 
+    state.route = name;
     VIEWS.forEach(function (v) { $("view-" + v).classList.toggle("hidden", v !== name); });
     document.querySelectorAll(".nav button, .bottombar button").forEach(function (b) {
       if (b.getAttribute("data-go") === name) b.setAttribute("aria-current", "page");
@@ -241,7 +244,7 @@
     search.addEventListener("input", function () { state.query = search.value; drawList(); });
 
     var chips = el("div", { class: "chips", role: "group", "aria-label": "Filter chats" });
-    [["all", "All"], ["pinned", "Pinned"], ["important", "Important"]].forEach(function (f) {
+    [["all", "All"], ["unread", "Unread"], ["pinned", "Pinned"], ["important", "Important"]].forEach(function (f) {
       chips.appendChild(el("button", { class: "chip", "aria-pressed": state.cfilter === f[0] ? "true" : "false",
         onclick: function () { state.cfilter = f[0]; renderChats(); } }, f[1]));
     });
@@ -260,6 +263,7 @@
     function visible() {
       var q = state.query.trim().toLowerCase();
       return chats.filter(function (c) {
+        if (state.cfilter === "unread" && !c.unread) return false;
         if (state.cfilter === "pinned" && !c.pinned) return false;
         if (state.cfilter === "important" && c.important_count === 0) return false;
         if (!q) return true;
@@ -276,7 +280,8 @@
             c.pinned ? icon("i-pin", "sm pin-ic") : null,
             el("span", { class: "title ellipsis", text: c.title }),
             el("span", { class: "time", text: fmtTime(c.updated_at) })),
-          el("span", { class: "preview ellipsis", style: "display:block", text: c.character_name + " · " + (c.last_message || "No messages yet") })));
+          el("span", { class: "preview ellipsis", style: "display:block", text: c.character_name + " · " + (c.last_message || "No messages yet") })),
+        c.unread ? el("span", { class: "badge", "aria-label": c.unread + " unread", text: String(c.unread) }) : null);
     }
 
     function drawList() {
@@ -320,6 +325,14 @@
       } }, icon("i-pin"));
 
     var exportLink = el("a", { class: "btn ghost icon-only", href: "/api/export/chat/" + chatId, download: "", "aria-label": "Export this chat" }, icon("i-down"));
+    var summaryBox = el("div", { class: "conv-stats hidden", style: "display:block;font-size:13px;line-height:1.55;color:var(--fg)" },
+      el("div", { class: "caps", style: "margin-bottom:6px", text: "Story so far" }),
+      el("div", { text: chat.summary || "No summary yet. It is written automatically after every 40 messages and keeps long stories consistent." }));
+    var infoBtn = el("button", { class: "ghost icon-only", "aria-label": "Story summary", "aria-pressed": "false",
+      onclick: function () {
+        var open = summaryBox.classList.toggle("hidden") === false;
+        infoBtn.setAttribute("aria-pressed", open ? "true" : "false");
+      } }, icon("i-info"));
 
     pane.appendChild(el("header", { class: "conv-head" },
       el("button", { class: "ghost icon-only back-btn", "aria-label": "Back to chat list", onclick: function () { go("chats"); } }, icon("i-back")),
@@ -327,13 +340,15 @@
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "name ellipsis", text: chat.character_name }),
         el("div", { class: "meta ellipsis", text: chat.title + (chat.character_tagline ? " · " + chat.character_tagline : "") })),
-      el("div", { class: "tools" }, pinBtn, exportLink)));
+      el("div", { class: "tools" }, pinBtn, infoBtn, exportLink)));
 
     var important = chat.messages.filter(function (m) { return m.important; }).length;
     pane.appendChild(el("div", { class: "conv-stats" },
       el("span", { class: "pill", text: chat.messages.length + " messages" }),
       el("span", { class: "pill" }, icon("i-star", "sm"), " " + important + " of 10 important"),
+      el("span", { class: "pill", text: chat.summary ? "Story summary saved" : "No story summary yet" }),
       el("span", { class: "pill", text: "Model:" }), modelSel));
+    pane.appendChild(summaryBox);
 
     var box = el("div", { class: "messages", id: "messages" });
     pane.appendChild(box);
@@ -360,6 +375,7 @@
       var text = input.value.trim();
       if (!text || busy) return;
       busy = true;
+      state.sending = true;
       sendBtn.disabled = true;
       input.value = "";
       box.appendChild(messageNode({ id: null, role: "user", content: text, important: false }, chat));
@@ -391,6 +407,7 @@
         toast(e.message);
       } finally {
         busy = false;
+        state.sending = false;
         sendBtn.disabled = false;
       }
     }
@@ -458,10 +475,26 @@
     if (state.editing !== null) return renderEditor(view);
 
     var chars = await api("/api/characters");
+    var importInput = el("input", { type: "file", accept: ".json,.png,.txt,application/json,image/png,text/plain", style: "display:none", "aria-label": "Import a character card" });
+    importInput.addEventListener("change", async function () {
+      var file = importInput.files && importInput.files[0];
+      if (!file) return;
+      try {
+        var r = await fetch("/api/characters/import", { method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": file.type || "text/plain", "X-Filename": file.name }, body: file });
+        var data = null; try { data = await r.json(); } catch (e) {}
+        if (!r.ok) throw new Error((data && data.detail) || "Import failed");
+        toast("Imported " + data.name);
+        renderCharacters();
+      } catch (e) { toast(e.message); }
+    });
+    view.appendChild(importInput);
     view.appendChild(el("div", { class: "page-head" },
       el("div", null, el("div", { class: "caps eyebrow", text: "Your library" }), el("h1", { text: "Characters" }),
-        el("p", { text: "Characters you created. You can edit and delete only these." })),
-      el("div", { class: "actions" }, el("button", { class: "primary", onclick: function () { state.editing = {}; renderCharacters(); } }, "New character"))));
+        el("p", { text: "Characters you created. You can edit and delete only these. Import SillyTavern cards (JSON or PNG) or plain text." })),
+      el("div", { class: "actions" },
+        el("button", { onclick: function () { importInput.click(); } }, "Import card"),
+        el("button", { class: "primary", onclick: function () { state.editing = {}; renderCharacters(); } }, "New character"))));
 
     var grid = el("div", { class: "grid grid-3" });
     chars.forEach(function (c) {
@@ -707,16 +740,64 @@
   /* ---------- admin ---------- */
   var ADMIN_TABS = [
     ["overview", "Overview"], ["users", "Users"], ["characters", "Characters"], ["api", "Hosted API"],
-    ["security", "Access & security"], ["domain", "Domain & HTTPS"], ["models", "Models"], ["backups", "Backups"], ["storage", "Storage"], ["logs", "Logs & maintenance"]
+    ["security", "Access & security"], ["domain", "Domain & HTTPS"], ["models", "Models"], ["backups", "Backups"],
+    ["storage", "Storage"], ["logs", "Logs & maintenance"]
   ];
-  var PLANNED = {
-    security: "Sign-up modes, invite codes and session lengths are part of the design. Lockout is active in the API now; the admin controls follow in a later build.",
-    domain: "Domain and HTTPS need the reverse proxy (Caddy) and certificate setup. Planned for the next build.",
-    models: "Model install, speed test and runtime settings follow after the first model measurements.",
-    backups: "Nightly backups and restore are planned next. Until then, back up the Docker volumes manually.",
-    storage: "Upload limits are enforced now (10 MB, PNG/JPG/WebP). Cleanup tools follow later.",
-    logs: "Admin action log is recorded in the database. The viewer and maintenance controls follow later."
-  };
+  var adminSettings = null;
+
+  async function loadAdminSettings() {
+    adminSettings = await api("/api/admin/settings");
+    return adminSettings;
+  }
+
+  // A form that saves only the fields the admin changed.
+  function settingsForm(fields, note) {
+    var inputs = {};
+    var box = el("div", { class: "form" });
+    var grid = el("div", { class: "two" }); // short fields side by side
+    box.appendChild(grid);
+    fields.forEach(function (f) {
+      var v = adminSettings[f.key];
+      var input;
+      if (f.type === "bool") {
+        input = el("button", { class: "toggle", role: "switch", "aria-checked": v ? "true" : "false", "aria-label": f.label,
+          onclick: function () { input.setAttribute("aria-checked", input.getAttribute("aria-checked") === "true" ? "false" : "true"); } });
+        box.appendChild(el("div", { class: "switch" }, el("div", null, el("div", { text: f.label }), f.help ? el("div", { class: "muted small", text: f.help }) : null), input));
+      } else if (f.type === "select") {
+        input = el("select", null);
+        f.options.forEach(function (o) { input.appendChild(el("option", { value: o[0], selected: String(v) === o[0], text: o[1] })); });
+        grid.appendChild(el("div", null, el("label", { text: f.label }), input));
+      } else {
+        input = el("input", { type: f.type === "int" ? "number" : "text", min: f.type === "int" ? "0" : null, value: v === null || v === undefined ? "" : String(v) });
+        grid.appendChild(el("div", null, el("label", { text: f.label }), input, f.help ? el("div", { class: "muted small", style: "margin-top:6px", text: f.help }) : null));
+      }
+      inputs[f.key] = { el: input, type: f.type, original: v };
+    });
+    var status = el("span", { class: "muted small" });
+    var save = el("button", { class: "primary", onclick: async function () {
+      var body = {};
+      Object.keys(inputs).forEach(function (k) {
+        var i = inputs[k], value;
+        if (i.type === "bool") value = i.el.getAttribute("aria-checked") === "true";
+        else if (i.type === "int") value = Number(i.el.value);
+        else value = i.el.value;
+        if (value !== i.original) body[k] = value;
+      });
+      if (!Object.keys(body).length) { status.textContent = "Nothing changed."; return; }
+      try {
+        adminSettings = await api("/api/admin/settings", { method: "PUT", body: body });
+        toast("Saved");
+        renderAdmin();
+      } catch (e) { toast(e.message); }
+    } }, "Save");
+    box.appendChild(el("div", { class: "row", style: "flex-wrap:wrap" }, save, status));
+    if (note) box.appendChild(el("p", { class: "muted small", text: note }));
+    return box;
+  }
+
+  function panel(title, content) {
+    return el("div", { class: "card" }, el("h2", { text: title }), el("div", { style: "margin-top:12px" }, content));
+  }
 
   async function renderAdmin() {
     var view = $("view-admin");
@@ -731,31 +812,46 @@
     view.appendChild(tabs);
     var body = el("div", { class: "admin-panel" });
     view.appendChild(body);
-
-    if (state.adminTab === "overview") return adminOverview(body);
-    if (state.adminTab === "users") return adminUsers(body);
-    if (state.adminTab === "characters") return adminCharacters(body);
-    if (state.adminTab === "api") return adminApi(body);
-    body.appendChild(el("div", { class: "card" }, el("h2", { text: ADMIN_TABS.filter(function (t) { return t[0] === state.adminTab; })[0][1] }),
-      el("p", { class: "muted", style: "margin-top:8px", text: PLANNED[state.adminTab] || "" })));
+    await loadAdminSettings();
+    var tab = state.adminTab;
+    if (tab === "overview") return adminOverview(body);
+    if (tab === "users") return adminUsers(body);
+    if (tab === "characters") return adminCharacters(body);
+    if (tab === "api") return adminApi(body);
+    if (tab === "security") return adminSecurity(body);
+    if (tab === "domain") return adminDomain(body);
+    if (tab === "models") return adminModels(body);
+    if (tab === "backups") return adminBackups(body);
+    if (tab === "storage") return adminStorage(body);
+    if (tab === "logs") return adminLogs(body);
   }
 
   async function adminOverview(body) {
     var o = await api("/api/admin/overview");
+    var disk = o.disk;
     body.appendChild(el("div", { class: "grid grid-3" },
       statCard("i-users", "Users", String(o.users), "accounts"),
       statCard("i-users", "Characters", String(o.characters), "all users"),
       statCard("i-chat", "Chats", String(o.chats), "all users"),
       statCard("i-chat", "Messages", String(o.messages), "stored"),
       statCard("i-clock", "Hosted API today", String(o.hosted_used_today), "messages, all users"),
-      el("div", { class: "card stat-card" }, el("div", { class: "caps", text: "Model endpoints" }),
-        el("div", { class: "small", style: "margin-top:8px", text: "Self-hosted: " + o.self_hosted_url }),
-        el("div", { class: "small", text: "Hosted: " + o.hosted_url }))));
+      el("div", { class: "card stat-card" }, el("div", { class: "caps", text: "Disk" }),
+        el("div", { class: "stat", text: disk.percent + "%" }),
+        el("div", { class: "muted small", text: disk.used_gb + " of " + disk.total_gb + " GB used" }),
+        el("div", { class: "meter", style: "margin-top:8px" }, el("span", { style: "width:" + disk.percent + "%" })))));
+    body.appendChild(panel("Endpoints and status", el("div", { class: "form" },
+      el("div", { class: "switch" }, el("span", { text: "Self-hosted model" }), el("span", { class: "muted small", text: o.self_hosted_url })),
+      el("div", { class: "switch" }, el("span", { text: "Hosted API" }), el("span", { class: "muted small", text: o.hosted_url })),
+      el("div", { class: "switch" }, el("span", { text: "Database" }), el("span", { class: "muted small", text: o.database })),
+      el("div", { class: "switch" }, el("span", { text: "Maintenance mode" }), el("span", { class: "pill " + (o.maintenance_mode ? "accent" : "ok"), text: o.maintenance_mode ? "On" : "Off" })))));
+    if (disk.percent >= adminSettings.disk_warn_percent) {
+      body.appendChild(el("div", { class: "card", style: "border-color:var(--warn)" }, el("p", { text: "The disk is " + disk.percent + "% full. Check backups and storage." })));
+    }
   }
 
   async function adminUsers(body) {
     var users = await api("/api/admin/users");
-    var nu = { u: el("input", { placeholder: "username", "aria-label": "New username" }), p: el("input", { type: "password", placeholder: "password (12+ characters)", "aria-label": "New password" }) };
+    var nu = { u: el("input", { placeholder: "username", "aria-label": "New username" }), p: el("input", { type: "password", placeholder: "password (min. length from settings)", "aria-label": "New password" }) };
     var table = el("table", null,
       el("thead", null, el("tr", null, el("th", { text: "User" }), el("th", { text: "Role" }), el("th", { text: "Status" }), el("th", null))),
       el("tbody", null, users.map(function (u) {
@@ -768,14 +864,17 @@
             catch (e) { toast(e.message); }
           } }, u.active ? "Disable" : "Enable")));
       })));
-    body.appendChild(el("div", { class: "card" },
-      el("h2", { text: "Users" }),
-      el("div", { class: "table-wrap", style: "margin-top:12px" }, table),
+    body.appendChild(panel("Users", el("div", null,
+      el("div", { class: "table-wrap" }, table),
       el("div", { class: "row", style: "flex-wrap:wrap;margin-top:16px" }, nu.u, nu.p,
         el("button", { class: "primary", onclick: async function () {
           try { await api("/api/admin/users", { method: "POST", body: { username: nu.u.value, password: nu.p.value } }); toast("User created"); renderAdmin(); }
           catch (e) { toast(e.message); }
-        } }, "Add user"))));
+        } }, "Add user")))));
+    body.appendChild(panel("Settings for new accounts", settingsForm([
+      { key: "upload_max_mb", label: "Largest upload (MB)", type: "int", help: "Pictures and card files" },
+      { key: "password_min_length", label: "Minimum password length", type: "int" }
+    ])));
   }
 
   async function adminCharacters(body) {
@@ -785,30 +884,162 @@
         el("button", { class: "ghost", onclick: async function () { await review(c.id, "approve"); } }, "Approve"),
         el("button", { class: "ghost", onclick: async function () { await review(c.id, "hide"); } }, "Hide"));
     })) : el("p", { class: "muted", text: "Nothing waiting for review." });
-    body.appendChild(el("div", { class: "card" }, el("h2", { text: "Community review queue" }), el("div", { style: "margin-top:12px" }, list)));
-    body.appendChild(el("div", { class: "card" }, el("p", { class: "muted small", text: "The adults-only check runs on every save. Review every character before it becomes public." })));
+    body.appendChild(panel("Community review queue", list));
+    body.appendChild(panel("Community and import", settingsForm([
+      { key: "card_import_enabled", label: "Allow card import", type: "bool", help: "SillyTavern JSON, PNG cards and plain text" }
+    ], "The adults-only check runs on every save and import. Review every character before it becomes public.")));
     async function review(id, action) {
       try { await api("/api/admin/community/" + id + "/review", { method: "POST", body: { action: action } }); toast("Done"); renderAdmin(); }
       catch (e) { toast(e.message); }
     }
   }
 
-  async function adminApi(body) {
-    var s = await api("/api/admin/settings");
-    var perUser = el("input", { type: "number", min: "0", value: String(s.hosted_daily_limit), "aria-label": "Messages per user per day" });
-    var total = el("input", { type: "number", min: "0", value: String(s.hosted_daily_total), "aria-label": "Total per day" });
-    body.appendChild(el("div", { class: "card form" },
-      el("h2", { text: "Limits for the hosted API" }),
-      el("div", { class: "two" },
-        el("div", null, el("label", { text: "Messages per user per day" }), perUser),
-        el("div", null, el("label", { text: "Total per day (all users)" }), total)),
-      el("p", { class: "muted small", text: "Self-hosted models are unlimited. The provider is set with the environment variables (see .env.example)." }),
-      el("div", null, el("button", { class: "primary", onclick: async function () {
-        try { await api("/api/admin/settings", { method: "PUT", body: { hosted_daily_limit: Number(perUser.value), hosted_daily_total: Number(total.value) } }); toast("Saved"); }
+  function adminApi(body) {
+    body.appendChild(panel("Limits for the hosted API", settingsForm([
+      { key: "hosted_daily_limit", label: "Messages per user per day", type: "int" },
+      { key: "hosted_daily_total", label: "Total per day (all users)", type: "int" }
+    ], "Self-hosted models are unlimited. The provider is set with the environment variables (see .env.example).")));
+    body.appendChild(panel("Recommended providers",
+      el("p", { class: "muted small", text: "Groq (free, fast, start here) · OpenRouter (free models) · Cerebras (free, short context) · Mistral (free plan) · Google AI Studio (free, strict filter, not for adult roleplay) · Venice (paid, uncensored) · DeepSeek (paid, low price, policy to test). Details in technical.md." })));
+  }
+
+  async function adminSecurity(body) {
+    var inv = el("code", { text: adminSettings.invite_code || "no code yet" });
+    body.appendChild(panel("Sign-up", el("div", null,
+      el("div", { class: "row", style: "flex-wrap:wrap;margin-bottom:12px" }, el("span", { class: "muted small", text: "Invite code: " }), inv,
+        el("button", { onclick: async function () {
+          try { var r = await api("/api/admin/invite-code", { method: "POST" }); toast("New invite code created"); inv.textContent = r.invite_code; }
+          catch (e) { toast(e.message); }
+        } }, "New invite code")),
+      settingsForm([
+        { key: "signup_mode", label: "New accounts", type: "select", options: [["closed", "Closed (admin creates users)"], ["invite", "With invite code"]] }
+      ]))));
+    body.appendChild(panel("Sessions and lockout", settingsForm([
+      { key: "session_hours", label: "Login lasts (hours)", type: "int" },
+      { key: "remember_days", label: "\"Stay logged in\" lasts (days)", type: "int" },
+      { key: "failed_login_limit", label: "Lock after failed tries", type: "int" },
+      { key: "lock_minutes", label: "Lock time (minutes)", type: "int" },
+      { key: "password_min_length", label: "Minimum password length", type: "int" }
+    ])));
+    body.appendChild(panel("Log out everyone", el("div", { class: "row", style: "flex-wrap:wrap" },
+      el("p", { class: "muted small", style: "flex:1", text: "Ends every login, including yours. Users must log in again." }),
+      el("button", { class: "ghost", onclick: async function () {
+        if (!confirm_inline(this)) return;
+        try { await api("/api/admin/logout-everyone", { method: "POST" }); location.reload(); }
         catch (e) { toast(e.message); }
-      } }, "Save limits"))));
-    body.appendChild(el("div", { class: "card" }, el("h2", { text: "Recommended providers" }),
-      el("p", { class: "muted small", style: "margin-top:8px", text: "Groq (free, fast, start here) · OpenRouter (free models) · Cerebras (free, short context) · Mistral (free plan) · Google AI Studio (free, strict filter, not for adult roleplay) · Venice (paid, uncensored) · DeepSeek (paid, low price, policy to test). Details in technical.md." })));
+      } }, "Log out everyone"))));
+  }
+
+  function adminDomain(body) {
+    body.appendChild(panel("Address", settingsForm([
+      { key: "domain", label: "Domain (optional)", type: "text", help: "For example compain.example.com. It must point to this server." },
+      { key: "https_enabled", label: "HTTPS is set up", type: "bool", help: "Turn this on after starting the proxy: docker compose --profile https up -d (set COMPAIN_DOMAIN in .env first)." }
+    ])));
+    body.appendChild(panel("Where to reach Compain", el("p", { class: "muted small", text: "Now: http://this-server:8080 (home network only). After HTTPS: https://your-domain. Login details are not encrypted over plain HTTP, so do not open port 8080 to the internet." })));
+  }
+
+  async function adminModels(body) {
+    var s = adminSettings;
+    var last = s.last_speed_test || {};
+    var result = el("p", { class: "muted small", text: last.at ? ("Last test " + last.at + ": " + last.pieces_per_second + " pieces per second, first piece after " + last.first_piece_seconds + " s") : "No speed test yet." });
+    body.appendChild(panel("Models", settingsForm([
+      { key: "self_hosted_model_name", label: "Name of the self-hosted model", type: "text", help: "Shown in chats. Start: Mistral Small 3.2 abliteration (Q4_K_M)." },
+      { key: "default_model", label: "Default for new chats", type: "select", options: [["self", "Self-hosted model"], ["hosted", "Hosted API"]] }
+    ])));
+    body.appendChild(panel("Speed test", el("div", null,
+      el("p", { class: "muted small", text: "Measures how fast the self-hosted model writes. Run it after changing the model or the server." }),
+      el("div", { class: "row", style: "flex-wrap:wrap" }, el("button", { class: "primary", onclick: async function () {
+        result.textContent = "Testing…";
+        try { var r = await api("/api/admin/models/speedtest", { method: "POST" }); toast("Done"); result.textContent = "Result: " + r.pieces_per_second + " pieces per second (" + r.pieces + " pieces in " + r.seconds + " s)."; }
+        catch (e) { result.textContent = e.message; }
+      } }, "Run speed test")),
+      result)));
+  }
+
+  async function adminBackups(body) {
+    body.appendChild(panel("Nightly backup", settingsForm([
+      { key: "backup_time", label: "Time (24-hour clock)", type: "text", help: "Backups run once a day at this time." },
+      { key: "backup_keep_days", label: "Keep backups for (days)", type: "int" },
+      { key: "backup_include_pictures", label: "Include character pictures", type: "bool" }
+    ], "Last run: " + (adminSettings.backup_last_run || "never") + " · status: " + adminSettings.backup_last_status)));
+    var list = el("div", { class: "table-wrap" });
+    async function drawList() {
+      var rows = await api("/api/admin/backups");
+      list.textContent = "";
+      if (!rows.length) { list.appendChild(el("p", { class: "muted", text: "No backups yet." })); return; }
+      list.appendChild(el("table", null,
+        el("thead", null, el("tr", null, el("th", { text: "File" }), el("th", { text: "Size" }), el("th", { text: "Created" }), el("th", null))),
+        el("tbody", null, rows.map(function (b) {
+          return el("tr", null,
+            el("td", { text: b.name }), el("td", { text: b.size_mb + " MB" }), el("td", { text: b.created }),
+            el("td", null,
+              el("a", { class: "btn ghost", href: "/api/admin/backups/" + encodeURIComponent(b.name), download: "" }, "Download"),
+              el("button", { class: "ghost", onclick: async function () {
+                var typed = prompt("Restoring replaces all current data. Type the file name to confirm:\n" + b.name);
+                if (typed === null) return;
+                try { await api("/api/admin/backups/" + encodeURIComponent(b.name) + "/restore", { method: "POST", body: { confirm: typed } }); toast("Restored. Reloading."); setTimeout(function () { location.reload(); }, 1200); }
+                catch (e) { toast(e.message); }
+              } }, "Restore")));
+        }))));
+    }
+    body.appendChild(panel("Backups", el("div", null,
+      el("div", { class: "row", style: "margin-bottom:12px" }, el("button", { class: "primary", onclick: async function () {
+        try { var r = await api("/api/admin/backups/run", { method: "POST" }); toast("Backup " + r.name + " created"); renderAdmin(); }
+        catch (e) { toast(e.message); }
+      } }, "Back up now")),
+      list)));
+    drawList();
+  }
+
+  function adminStorage(body) {
+    body.appendChild(panel("Uploads and disk", settingsForm([
+      { key: "upload_max_mb", label: "Largest upload (MB)", type: "int", help: "Pictures and card files (1 to 50)" },
+      { key: "disk_warn_percent", label: "Warn when the disk is full at (%)", type: "int" }
+    ])));
+    body.appendChild(panel("Cleanup", el("div", { class: "row", style: "flex-wrap:wrap" },
+      el("p", { class: "muted small", style: "flex:1", text: "Removes picture files that no character uses any more." }),
+      el("button", { onclick: async function () {
+        try { var r = await api("/api/admin/storage/cleanup", { method: "POST" }); toast("Removed " + r.removed + " files (" + r.freed_mb + " MB)"); }
+        catch (e) { toast(e.message); }
+      } }, "Remove unused pictures"))));
+  }
+
+  async function adminLogs(body) {
+    body.appendChild(panel("Maintenance", settingsForm([
+      { key: "maintenance_mode", label: "Maintenance mode", type: "bool", help: "Users see a notice and cannot use the app. Admins can still log in." },
+      { key: "notice", label: "Notice for users", type: "text", help: "Shown on the login page and in the app. Leave empty for none." }
+    ])));
+    body.appendChild(panel("Logging", settingsForm([
+      { key: "log_chat_content", label: "Keep chat content in logs", type: "bool", help: "Off by default. Your chats stay private." },
+      { key: "log_keep_days", label: "Keep logs (days)", type: "int" }
+    ])));
+    var rows = await api("/api/admin/audit");
+    body.appendChild(panel("Recent admin activity", rows.length ? el("div", { class: "table-wrap" }, el("table", null,
+      el("thead", null, el("tr", null, el("th", { text: "Time" }), el("th", { text: "User" }), el("th", { text: "Action" }), el("th", { text: "Detail" }))),
+      el("tbody", null, rows.slice(0, 50).map(function (r) {
+        return el("tr", null, el("td", { text: fmtTime(r.time) }), el("td", { text: r.user_id === me.id ? "you" : "#" + r.user_id }),
+          el("td", { text: r.action }), el("td", { text: r.detail || "" }));
+      })))) : el("p", { class: "muted", text: "Nothing yet." })));
+  }
+
+  /* ---------- live sync ---------- */
+  var liveSocket = null;
+  function connectLive() {
+    if (!window.WebSocket) return;
+    var proto = location.protocol === "https:" ? "wss://" : "ws://";
+    var ws = new WebSocket(proto + location.host + "/ws");
+    liveSocket = ws;
+    ws.onmessage = function (ev) {
+      var msg = null;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      if (msg.type !== "chats" || state.sending || !me) return;
+      if (state.route === "chats") renderChats();
+      else if (state.route === "home") renderHome();
+    };
+    ws.onclose = function () {
+      liveSocket = null;
+      if (me) setTimeout(connectLive, 3000); // reconnect after a short wait
+    };
   }
 
   /* ---------- login and start ---------- */
@@ -828,7 +1059,17 @@
     $("me-name").textContent = me.display_name || me.username;
     $("me-role").textContent = me.role === "admin" ? "Admin" : "User";
     buildNav();
+    api("/api/auth/preferences").then(function (p) {
+      if (p && Object.keys(p).length) {
+        Object.assign(prefs, p);
+        try { localStorage.setItem("compain-prefs", JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+        applyPrefs();
+      }
+    }).catch(function () { /* keep the local values */ });
+    var banner = $("notice-banner");
+    if (banner) { banner.textContent = me.notice || ""; banner.classList.toggle("hidden", !me.notice); }
     go(location.hash.slice(1) || "home");
+    connectLive();
   }
 
   $("login-form").addEventListener("submit", async function (e) {
@@ -858,6 +1099,23 @@
     holder.innerHTML = svg;
     document.body.insertBefore(holder.firstChild, document.body.firstChild);
   }).catch(function () { /* icons missing: layout still works */ });
+
+  fetch("/api/auth/status", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (st) {
+    if (st.notice) { $("login-notice").textContent = st.notice; $("login-notice").classList.remove("hidden"); }
+    if (st.signup_open) $("register-box").classList.remove("hidden");
+  }).catch(function () { /* offline: the login still works */ });
+
+  $("register-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    $("register-error").textContent = "";
+    try {
+      await api("/api/auth/register", { method: "POST", body: {
+        username: $("reg-user").value, password: $("reg-pw").value, invite: $("reg-invite").value } });
+      $("register-error").textContent = "Account created. You can log in now.";
+      $("user").value = $("reg-user").value;
+      $("pw").value = "";
+    } catch (err) { $("register-error").textContent = err.message; }
+  });
 
   api("/api/auth/me").then(function (u) { me = u; showApp(); }).catch(function () { showLogin(); });
 })();

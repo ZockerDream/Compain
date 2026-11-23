@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from . import settings as cfg
 from .config import Settings
 from .models import Session as UserSession
 from .models import User
@@ -49,10 +50,12 @@ def current_session(request: Request, db: Session = Depends(get_db)) -> UserSess
     return session
 
 
-def current_user(session: UserSession = Depends(current_session)) -> User:
+def current_user(session: UserSession = Depends(current_session), db: Session = Depends(get_db)) -> User:
     user = session.user
     if not user.active:
         raise HTTPException(status_code=403, detail="Account is disabled")
+    if user.role != "admin" and cfg.get(db, "maintenance_mode"):
+        raise HTTPException(status_code=503, detail="The server is in maintenance. Try again later.")
     return user
 
 

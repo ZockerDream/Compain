@@ -6,6 +6,7 @@ Rules (concept.md):
 - Hosted model: a per-user daily message limit (and a total daily cap). Self-hosted: unlimited.
 """
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import date
@@ -16,15 +17,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
+from .. import settings as cfg
 from ..config import Settings
-from ..deps import get_db, get_settings, current_user
+from ..deps import current_user, get_db, get_settings
 from ..llm import build_messages, stream_chat
-from ..models import ApiUsage, Chat, Character, Message, ServerSetting, User, utcnow
+from ..models import ApiUsage, Chat, Character, Message, User, utcnow
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
 MAX_IMPORTANT = 10
 CONTEXT_MESSAGES = 60
+SUMMARY_EVERY = 40  # new messages between two story summaries
 REPLY_TOKENS = {"short": 150, "medium": 400, "long": 900}
 
 # Model keys the user can pick per chat. "self" = self-hosted, "hosted" = hosted API.
@@ -64,6 +67,7 @@ def chat_out(c: Chat) -> dict:
         "model": c.model or "self",
         "message_count": len(c.messages),
         "important_count": sum(1 for m in c.messages if m.important),
+        "unread": sum(1 for m in c.messages if m.role == "assistant" and m.id > c.read_upto),
         "last_message": last.content[:160] if last else "",
         "updated_at": c.updated_at.isoformat(),
     }
@@ -99,11 +103,7 @@ def bump_usage(db: DbSession, user: User) -> None:
 
 
 def effective_limits(db: DbSession, settings: Settings) -> tuple[int, int]:
-    """Admin values from Server Management win over the environment defaults."""
-    stored = {row.key: row.value for row in db.query(ServerSetting).all()}
-    per_user = int(stored.get("hosted_daily_limit", settings.hosted_daily_limit))
-    total = int(stored.get("hosted_daily_total", settings.hosted_daily_total))
-    return per_user, total
+    return cfg.effective_limits(db, settings)
 
 
 def total_usage_today(db: DbSession) -> int:
@@ -132,6 +132,48 @@ def build_context(db: DbSession, chat: Chat, character: Character, limit: int) -
     return build_messages(system_prompt(character, chat.summary, important), history)
 
 
+def endpoint_for(settings: Settings, kind: str) -> tuple[str, str, str]:
+    if kind == "hosted":
+        return settings.hosted_url, settings.hosted_api_key, settings.hosted_model
+    return settings.self_hosted_url, "", settings.self_hosted_model
+
+
+async def notify(hub, user_id: int) -> None:
+    if hub is not None:
+        await hub.publish(user_id, {"type": "chats"})
+
+
+async def update_summary(session_factory, settings: Settings, chat_id: int, kind: str) -> None:
+    """Rewrite the story summary from the previous summary and the messages since then."""
+    with session_factory() as db:
+        chat = db.get(Chat, chat_id)
+        if chat is None:
+            return
+        new = [m for m in chat.messages if m.id > chat.summary_upto]
+        if len(new) < SUMMARY_EVERY:
+            return
+        block = "\n".join(f"{m.role}: {m.content}" for m in new)
+        previous = chat.summary or "(none yet)"
+        prompt = [
+            {"role": "system", "content": "Summarize the roleplay so far in at most 180 words: who the characters are, "
+                                          "where the story stands, and open threads. Keep names and facts exact."},
+            {"role": "user", "content": f"Previous summary:\n{previous}\n\nNew messages:\n{block}"},
+        ]
+        last_id = new[-1].id
+    base_url, api_key, model_name = endpoint_for(settings, kind)
+    pieces: list[str] = []
+    try:
+        async for piece in stream_chat(base_url, api_key, model_name, prompt, 300):
+            pieces.append(piece)
+    except Exception:
+        return  # the model is not reachable now; the next message tries again
+    with session_factory() as db:
+        chat = db.get(Chat, chat_id)
+        chat.summary = "".join(pieces).strip()
+        chat.summary_upto = last_id
+        db.commit()
+
+
 async def stream_reply(
     request_settings: Settings,
     chat_id: int,
@@ -139,6 +181,7 @@ async def stream_reply(
     model_kind: str,
     body: MessageIn,
     session_factory,
+    hub=None,
 ) -> AsyncIterator[bytes]:
     def event(payload: dict) -> bytes:
         return f"data: {json.dumps(payload)}\n\n".encode()
@@ -151,19 +194,9 @@ async def stream_reply(
         db.commit()
         db.refresh(chat)
         messages = build_messages_for(db, chat, character, body.context_messages)
+    await notify(hub, user_id)
 
-    if model_kind == "hosted":
-        base_url, api_key, model_name = (
-            request_settings.hosted_url,
-            request_settings.hosted_api_key,
-            request_settings.hosted_model,
-        )
-    else:
-        base_url, api_key, model_name = (
-            request_settings.self_hosted_url,
-            "",
-            request_settings.self_hosted_model,
-        )
+    base_url, api_key, model_name = endpoint_for(request_settings, model_kind)
 
     pieces: list[str] = []
     try:
@@ -184,7 +217,12 @@ async def stream_reply(
         chat.updated_at = utcnow()
         db.commit()
         db.refresh(msg)
-        yield event({"done": True, "message_id": msg.id})
+        due = sum(1 for m in chat.messages if m.id > chat.summary_upto) >= SUMMARY_EVERY
+        msg_id = msg.id
+    await notify(hub, user_id)
+    if due:
+        asyncio.create_task(update_summary(session_factory, request_settings, chat_id, model_kind))
+    yield event({"done": True, "message_id": msg_id})
 
 
 def build_messages_for(db: DbSession, chat: Chat, character: Character, limit: int) -> list[dict]:
@@ -203,7 +241,7 @@ def list_chats(user: User = Depends(current_user), db: DbSession = Depends(get_d
 
 
 @router.post("", status_code=201)
-def create_chat(body: ChatIn, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+async def create_chat(body: ChatIn, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     check_model_kind(body.model)
     character = db.get(Character, body.character_id)
     if character is None or (character.owner_id != user.id and character.visibility != "public"):
@@ -212,17 +250,22 @@ def create_chat(body: ChatIn, user: User = Depends(current_user), db: DbSession 
     db.add(c)
     db.commit()
     db.refresh(c)
+    await notify(request.app.state.hub, user.id)
     return chat_out(c)
 
 
 @router.get("/{chat_id}")
 def get_chat(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     c = owned_chat(db, chat_id, user)
-    return {**chat_out(c), "summary": c.summary, "messages": [message_out(m) for m in c.messages]}
+    out = {**chat_out(c), "summary": c.summary, "messages": [message_out(m) for m in c.messages]}
+    if c.messages:
+        c.read_upto = c.messages[-1].id
+        db.commit()
+    return out
 
 
 @router.patch("/{chat_id}")
-def update_chat(chat_id: int, body: ChatPatch, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+async def update_chat(chat_id: int, body: ChatPatch, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     c = owned_chat(db, chat_id, user)
     changes = body.model_dump(exclude_unset=True)
     if "model" in changes and changes["model"] is not None:
@@ -231,22 +274,25 @@ def update_chat(chat_id: int, body: ChatPatch, user: User = Depends(current_user
         if value is not None:
             setattr(c, key, value)
     db.commit()
+    await notify(request.app.state.hub, user.id)
     return chat_out(c)
 
 
 @router.delete("/{chat_id}")
-def delete_chat(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+async def delete_chat(chat_id: int, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     c = owned_chat(db, chat_id, user)
     db.delete(c)
     db.commit()
+    await notify(request.app.state.hub, user.id)
     return {"ok": True}
 
 
 @router.patch("/{chat_id}/messages/{message_id}")
-def mark_important(
+async def mark_important(
     chat_id: int,
     message_id: int,
     body: ImportantIn,
+    request: Request,
     user: User = Depends(current_user),
     db: DbSession = Depends(get_db),
 ):
@@ -260,6 +306,7 @@ def mark_important(
             raise HTTPException(status_code=409, detail=f"Limit: {MAX_IMPORTANT} important messages per chat")
     msg.important = body.important
     db.commit()
+    await notify(request.app.state.hub, user.id)
     return message_out(msg)
 
 
@@ -284,7 +331,7 @@ async def send_message(
         db.commit()
 
     return StreamingResponse(
-        stream_reply(settings, c.id, user.id, kind, body, request.app.state.session_factory),
+        stream_reply(settings, c.id, user.id, kind, body, request.app.state.session_factory, request.app.state.hub),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

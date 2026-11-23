@@ -6,3 +6,4 @@ __pycache__/
 .pytest_cache/
 app/e2e/node_modules/
 app/e2e/screens/
+models/

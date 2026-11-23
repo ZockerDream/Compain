@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session as DbSession
 
+from .. import settings as cfg
 from ..config import Settings
 from ..deps import current_user, get_db, get_settings
 from ..models import Character, User
@@ -49,8 +50,9 @@ async def upload_picture(
     if declared not in TYPES:
         raise HTTPException(status_code=415, detail="Use PNG, JPG or WebP")
     data = await request.body()
-    if len(data) > MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Picture is larger than 10 MB")
+    limit = cfg.get(db, "upload_max_mb") * 1024 * 1024
+    if len(data) > limit:
+        raise HTTPException(status_code=413, detail=f"Picture is larger than {cfg.get(db, 'upload_max_mb')} MB")
     real = sniff(data)
     if real is None or real != TYPES[declared]:
         raise HTTPException(status_code=415, detail="The file is not a valid PNG, JPG or WebP image")
@@ -75,3 +77,43 @@ def get_picture(
     if not c.picture_path or not Path(c.picture_path).exists():
         raise HTTPException(status_code=404, detail="No picture")
     return FileResponse(c.picture_path)
+
+
+@router.post("/import", status_code=201)
+async def import_card(
+    request: Request,
+    user: User = Depends(current_user),
+    db: DbSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    """Import a character card: SillyTavern JSON (V1/V2), PNG with an embedded card, or plain text."""
+    from ..cards import CardError, parse_card
+    from ..content import minor_violation
+    from ..models import Character
+
+    if not cfg.get(db, "card_import_enabled"):
+        raise HTTPException(status_code=403, detail="Card import is switched off by the admin")
+    data = await request.body()
+    limit = cfg.get(db, "upload_max_mb") * 1024 * 1024
+    if not data or len(data) > limit:
+        raise HTTPException(status_code=413, detail=f"The file is empty or larger than {cfg.get(db, 'upload_max_mb')} MB")
+    filename = request.headers.get("x-filename", "")
+    try:
+        fields, picture = parse_card(filename, data)
+    except CardError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    reason = minor_violation(fields["name"], fields["description"], fields["personality"], fields["scenario"], fields["greeting"])
+    if reason:
+        raise HTTPException(status_code=422, detail=reason)
+    c = Character(owner_id=user.id, visibility="private", **fields)
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    if picture is not None:
+        kind = sniff(picture)
+        if kind:
+            target = picture_dir(settings) / f"{c.id}.{kind}"
+            target.write_bytes(picture)
+            c.picture_path = str(target)
+            db.commit()
+    return {"id": c.id, "name": c.name}
