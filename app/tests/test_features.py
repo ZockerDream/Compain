@@ -219,3 +219,60 @@ def test_preferences_are_stored_per_user(tmp_path):
     assert client.put("/api/auth/preferences", json={"admin": True}, headers=h).status_code == 422
     assert client.get("/api/auth/preferences", headers=h).json()["palette"] == "violet"
     client.__exit__(None, None, None)
+
+
+def test_greeting_opens_the_chat_and_turns_alternate(tmp_path):
+    from compain.models import Character, Chat, Message
+    from compain.routes.chats import build_context
+
+    app, client, h = admin_client(tmp_path)
+    cid = client.post("/api/characters", json={"name": "Mara", "greeting": "*Rain.* You're late."}, headers=h).json()["id"]
+    chat = client.post("/api/chats", json={"character_id": cid}, headers=h).json()
+    assert chat["message_count"] == 1 and chat["unread"] == 0
+    detail = client.get(f"/api/chats/{chat['id']}", headers=h).json()
+    assert detail["messages"][0] == {"id": detail["messages"][0]["id"], "role": "assistant", "content": "*Rain.* You're late.", "important": False}
+
+    with app.state.session_factory() as db:
+        db.add(Message(chat_id=chat["id"], role="user", content="one"))
+        db.add(Message(chat_id=chat["id"], role="user", content="two"))  # e.g. after a failed reply
+        db.commit()
+        c = db.get(Chat, chat["id"])
+        msgs = build_context(db, c, db.get(Character, cid), 60, "short", "de")
+    roles = [m["role"] for m in msgs]
+    assert roles == ["system", "user", "assistant", "user"]
+    assert "German" in msgs[0]["content"] and "one to three sentences" in msgs[0]["content"]
+    assert msgs[-1]["content"] == "one\n\ntwo"
+    client.__exit__(None, None, None)
+
+
+def test_default_model_for_new_chats_comes_from_settings(tmp_path):
+    app, client, h = admin_client(tmp_path)
+    cid = client.post("/api/characters", json={"name": "Mara"}, headers=h).json()["id"]
+    client.put("/api/admin/settings", json={"default_model": "hosted"}, headers=h)
+    assert client.post("/api/chats", json={"character_id": cid}, headers=h).json()["model"] == "hosted"
+    client.__exit__(None, None, None)
+
+
+def test_hosted_provider_from_server_management(tmp_path):
+    from compain.models import ServerSetting
+    from compain.routes.chats import endpoint_for
+
+    app, client, h = admin_client(tmp_path)
+    r = client.put("/api/admin/settings", json={"hosted_provider": "groq", "hosted_url": "https://api.groq.com/openai/v1",
+                                                "hosted_model": "llama-3.1-8b-instant", "hosted_api_key": "gsk_secret_value"}, headers=h)
+    assert r.status_code == 200
+    assert r.json()["hosted_api_key"] == "••••••••"  # never sent back
+    with app.state.session_factory() as db:
+        stored = db.get(ServerSetting, "hosted_api_key").value
+        assert "gsk_secret_value" not in stored  # encrypted at rest
+        assert endpoint_for(app.state.settings, "hosted", db) == ("https://api.groq.com/openai/v1", "gsk_secret_value", "llama-3.1-8b-instant")
+    # Saving the form again with the mask keeps the key
+    client.put("/api/admin/settings", json={"hosted_api_key": "••••••••", "hosted_model": "other"}, headers=h)
+    with app.state.session_factory() as db:
+        assert endpoint_for(app.state.settings, "hosted", db)[1] == "gsk_secret_value"
+    assert client.put("/api/admin/settings", json={"hosted_url": "ftp://x"}, headers=h).status_code == 422
+    # Back to the mock endpoint for the connection test
+    client.put("/api/admin/settings", json={"hosted_url": ""}, headers=h)
+    r = client.post("/api/admin/hosted/test", headers=h).json()
+    assert r["ok"] is True and r["reply"]
+    client.__exit__(None, None, None)

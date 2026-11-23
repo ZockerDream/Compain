@@ -29,6 +29,11 @@ SCHEMA: dict[str, tuple[str, object]] = {
     # Domain and HTTPS (the reverse proxy is configured with COMPAIN_DOMAIN in .env)
     "domain": ("str", ""),
     "https_enabled": ("bool", False),
+    # Hosted API provider (empty = use the environment variables)
+    "hosted_provider": ("str", ""),
+    "hosted_url": ("str", ""),
+    "hosted_model": ("str", ""),
+    "hosted_api_key": ("str", ""),  # encrypted, see secret.py
     # Models
     "default_model": ("str", "self"),
     "self_hosted_model_name": ("str", "Mistral Small 3.2 abliteration"),

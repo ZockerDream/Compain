@@ -390,3 +390,6 @@
 .grid-3 { grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); }
 .card { overflow: hidden; }
 .feed li > div { min-width: 0; flex: 1 1 0; }
+/* Build fix: palette cards are buttons; let their grid fill the whole card. */
+.palette-card { justify-content: stretch; align-items: stretch; }
+.palette-card .preview { display: block; width: 100%; }

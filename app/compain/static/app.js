@@ -95,7 +95,7 @@
   var CONTEXTS = [[20, "Last 20 messages"], [60, "Last 60 messages + summary"], [200, "Last 200 messages + summary"]];
 
   function loadPrefs() {
-    var p = { palette: "ember", mode: "system", replyLength: "medium", ctx: 60 };
+    var p = { palette: "ember", mode: "system", replyLength: "medium", ctx: 60, language: "auto", uiLanguage: "en" };
     try {
       var raw = localStorage.getItem("compain-prefs");
       if (raw) Object.assign(p, JSON.parse(raw));
@@ -108,6 +108,7 @@
     if (me) api("/api/auth/preferences", { method: "PUT", body: prefs }).catch(function () { /* offline: kept on this device */ });
   }
   function applyPrefs() {
+    if (window.CompainI18n) window.CompainI18n.setLanguage(prefs.uiLanguage);
     document.documentElement.setAttribute("data-palette", prefs.palette);
     if (prefs.mode === "system") document.documentElement.removeAttribute("data-mode");
     else document.documentElement.setAttribute("data-mode", prefs.mode);
@@ -440,7 +441,7 @@
     var r = await fetch("/api/chats/" + chatId + "/messages", {
       method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: text, reply_length: prefs.replyLength, context_messages: prefs.ctx })
+      body: JSON.stringify({ content: text, reply_length: prefs.replyLength, context_messages: prefs.ctx, language: prefs.language })
     });
     if (!r.ok) {
       var data = null;
@@ -713,11 +714,12 @@
     ctx.addEventListener("change", function () { prefs.ctx = Number(ctx.value); savePrefs(); toast("Context saved"); });
 
     view.appendChild(el("div", { class: "page-head" }, el("div", null, el("div", { class: "caps eyebrow", text: "Preferences" }), el("h1", { text: "Settings" }),
-      el("p", { text: "Changes apply at once and stay on this device." }))));
+      el("p", { text: "Changes apply at once on all your devices." }))));
     view.appendChild(el("div", { class: "grid", style: "gap:18px" },
       el("div", { class: "card" }, el("h2", { text: "Color theme" }), el("p", { class: "muted small", style: "margin:6px 0 16px", text: "The accent color for the whole app." }), swatches),
       el("div", { class: "card" }, el("div", { class: "row", style: "justify-content:space-between;flex-wrap:wrap;gap:14px" },
         el("div", null, el("h2", { text: "Appearance" }), el("p", { class: "muted small", text: "System follows your device." })), modes)),
+      languageCard(),
       el("div", { class: "card form" }, el("h2", { text: "Replies" }),
         el("div", { class: "two" },
           el("div", null, el("label", { for: "len", text: "Reply length" }), len),
@@ -726,6 +728,23 @@
         el("div", { class: "row", style: "flex-wrap:wrap;margin-top:12px" },
           el("button", { onclick: logout }, "Log out on this device"),
           el("button", { class: "ghost", onclick: logoutAll }, "Log out on all devices")))));
+  }
+
+  function languageCard() {
+    var ui = el("select", { id: "ui-lang" });
+    [["en", "English"], ["de", "Deutsch"]].forEach(function (o) { ui.appendChild(el("option", { value: o[0], selected: prefs.uiLanguage === o[0], text: o[1] })); });
+    ui.addEventListener("change", function () {
+      prefs.uiLanguage = ui.value;
+      savePrefs();
+      setTimeout(function () { location.reload(); }, 300); // redraw every screen in the new language
+    });
+    var rl = el("select", { id: "rp-lang" });
+    [["auto", "Automatic (my language)"], ["en", "English"], ["de", "Deutsch"]].forEach(function (o) { rl.appendChild(el("option", { value: o[0], selected: prefs.language === o[0], text: o[1] })); });
+    rl.addEventListener("change", function () { prefs.language = rl.value; savePrefs(); toast("Saved"); });
+    return el("div", { class: "card form" }, el("h2", { text: "Language" }),
+      el("div", { class: "two" },
+        el("div", null, el("label", { for: "ui-lang", text: "Interface" }), ui),
+        el("div", null, el("label", { for: "rp-lang", text: "Replies in" }), rl)));
   }
 
   async function logout() {
@@ -894,13 +913,62 @@
     }
   }
 
+  var PROVIDERS = [
+    { id: "", name: "From .env (default)", url: "", model: "", note: "Uses COMPAIN_HOSTED_API_BASE_URL and COMPAIN_HOSTED_API_KEY from .env." },
+    { id: "groq", name: "Groq (free)", url: "https://api.groq.com/openai/v1", model: "llama-3.1-8b-instant", note: "Free, rate-limited per model, very fast. Recommended start." },
+    { id: "openrouter", name: "OpenRouter (free models)", url: "https://openrouter.ai/api/v1", model: "", note: "Many free models behind one key. Enter the model id from openrouter.ai (free ones end with :free)." },
+    { id: "cerebras", name: "Cerebras (free)", url: "https://api.cerebras.ai/v1", model: "llama3.1-8b", note: "Free, fast, but about 8K tokens of context on the free tier." },
+    { id: "mistral", name: "Mistral (free plan)", url: "https://api.mistral.ai/v1", model: "mistral-small-latest", note: "Free plan with rate limits." },
+    { id: "google", name: "Google AI Studio (free, strict filter)", url: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.0-flash", note: "Strict content filter. Not suitable for adult roleplay." },
+    { id: "venice", name: "Venice (paid, uncensored)", url: "https://api.venice.ai/api/v1", model: "venice-uncensored", note: "Paid. Built around uncensored models. Recommended paid option." },
+    { id: "deepseek", name: "DeepSeek (paid, low price)", url: "https://api.deepseek.com/v1", model: "deepseek-chat", note: "Paid, very cheap. Test the content policy before relying on it." },
+    { id: "custom", name: "Custom endpoint", url: "", model: "", note: "Any OpenAI-compatible endpoint." }
+  ];
+
   function adminApi(body) {
+    var s = adminSettings;
+    var prov = el("select", { id: "h-prov" });
+    PROVIDERS.forEach(function (p) { prov.appendChild(el("option", { value: p.id, selected: s.hosted_provider === p.id, text: p.name })); });
+    var url = el("input", { id: "h-url", value: s.hosted_url || "", placeholder: "https://…/v1" });
+    var model = el("input", { id: "h-model", value: s.hosted_model || "", placeholder: "model id" });
+    var key = el("input", { id: "h-key", type: "password", value: s.hosted_api_key || "", placeholder: "API key", autocomplete: "off" });
+    var note = el("p", { class: "muted small" });
+    function showNote() { var p = PROVIDERS.filter(function (x) { return x.id === prov.value; })[0]; note.textContent = p ? p.note + " Check the model name on the provider's page." : ""; }
+    prov.addEventListener("change", function () {
+      var p = PROVIDERS.filter(function (x) { return x.id === prov.value; })[0];
+      if (p && p.id !== "custom") { url.value = p.url; model.value = p.model; }
+      showNote();
+    });
+    showNote();
+    var result = el("p", { class: "small", style: "min-height:1.2em" });
+    body.appendChild(panel("Provider", el("div", { class: "form" },
+      el("div", { class: "two" },
+        el("div", null, el("label", { for: "h-prov", text: "Provider" }), prov),
+        el("div", null, el("label", { for: "h-model", text: "Model" }), model),
+        el("div", null, el("label", { for: "h-url", text: "Endpoint (OpenAI-compatible)" }), url),
+        el("div", null, el("label", { for: "h-key", text: "API key" }), key)),
+      note,
+      el("div", { class: "row", style: "flex-wrap:wrap" },
+        el("button", { class: "primary", onclick: async function () {
+          try {
+            adminSettings = await api("/api/admin/settings", { method: "PUT", body: { hosted_provider: prov.value, hosted_url: url.value, hosted_model: model.value, hosted_api_key: key.value } });
+            toast("Saved");
+            key.value = adminSettings.hosted_api_key;
+          } catch (e) { toast(e.message); }
+        } }, "Save provider"),
+        el("button", { onclick: async function () {
+          result.textContent = "Testing…";
+          try {
+            var r = await api("/api/admin/hosted/test", { method: "POST" });
+            result.textContent = r.ok ? ("Connected. Reply: \u201c" + r.reply + "\u201d (" + r.seconds + " s, " + r.model + ")") : ("Not connected: " + r.error + " at " + r.endpoint);
+          } catch (e) { result.textContent = e.message; }
+        } }, "Test connection")),
+      result,
+      el("p", { class: "muted small", text: "The key is stored encrypted and never shown again. It is also inside backups (encrypted), so keep COMPAIN_SECRET_KEY safe." }))));
     body.appendChild(panel("Limits for the hosted API", settingsForm([
       { key: "hosted_daily_limit", label: "Messages per user per day", type: "int" },
       { key: "hosted_daily_total", label: "Total per day (all users)", type: "int" }
-    ], "Self-hosted models are unlimited. The provider is set with the environment variables (see .env.example).")));
-    body.appendChild(panel("Recommended providers",
-      el("p", { class: "muted small", text: "Groq (free, fast, start here) · OpenRouter (free models) · Cerebras (free, short context) · Mistral (free plan) · Google AI Studio (free, strict filter, not for adult roleplay) · Venice (paid, uncensored) · DeepSeek (paid, low price, policy to test). Details in technical.md." })));
+    ], "Self-hosted models are unlimited.")));
   }
 
   async function adminSecurity(body) {
@@ -1093,6 +1161,7 @@
   window.addEventListener("hashchange", function () { if (me) go(location.hash.slice(1) || "home"); });
 
   /* ---------- boot ---------- */
+  if (window.CompainI18n) window.CompainI18n.start();
   applyPrefs();
   fetch("/static/sprite.svg").then(function (r) { return r.text(); }).then(function (svg) {
     var holder = document.createElement("div");

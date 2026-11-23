@@ -18,6 +18,7 @@ from ..config import Settings
 from ..deps import get_db, get_settings, require_admin
 from ..llm import stream_chat
 from ..models import ApiUsage, AuditLog, Character, Chat, Message, User
+from ..secret import MASK, encrypt
 from ..security import hash_password
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -147,13 +148,30 @@ def logout_everyone(admin: User = Depends(require_admin), db: DbSession = Depend
 
 # ---------- settings ----------
 
+def _public_settings(db: DbSession) -> dict:
+    values = cfg.get_all(db)
+    values["hosted_api_key"] = MASK if values["hosted_api_key"] else ""  # never send the key back
+    return values
+
+
 @router.get("/settings")
 def get_settings_values(_: User = Depends(require_admin), db: DbSession = Depends(get_db)):
-    return cfg.get_all(db)
+    return _public_settings(db)
 
 
 @router.put("/settings")
-def put_settings(values: dict, admin: User = Depends(require_admin), db: DbSession = Depends(get_db)):
+def put_settings(values: dict, admin: User = Depends(require_admin), db: DbSession = Depends(get_db), settings: Settings = Depends(get_settings)):
+    if "hosted_api_key" in values:
+        key = values["hosted_api_key"]
+        if key == MASK:
+            values.pop("hosted_api_key")  # unchanged
+        elif isinstance(key, str):
+            values["hosted_api_key"] = encrypt(settings.secret_key, key.strip())
+    if "hosted_url" in values and isinstance(values["hosted_url"], str):
+        url = values["hosted_url"].strip()
+        if url and not url.startswith(("https://", "http://")):
+            raise HTTPException(status_code=422, detail="The endpoint must start with https://")
+        values["hosted_url"] = url
     try:
         changed = cfg.set_values(db, values)
     except ValueError as exc:
@@ -161,7 +179,25 @@ def put_settings(values: dict, admin: User = Depends(require_admin), db: DbSessi
     if changed:
         audit(db, admin, "settings.update", ", ".join(changed))
     db.commit()
-    return cfg.get_all(db)
+    return _public_settings(db)
+
+
+@router.post("/hosted/test")
+async def test_hosted(admin: User = Depends(require_admin), db: DbSession = Depends(get_db), settings: Settings = Depends(get_settings)):
+    """Send one short request to the hosted provider and report what came back."""
+    from .chats import endpoint_for
+
+    base_url, api_key, model = endpoint_for(settings, "hosted", db)
+    prompt = [{"role": "user", "content": "Reply with the single word: ready"}]
+    pieces: list[str] = []
+    started = time.monotonic()
+    try:
+        async for piece in stream_chat(base_url, api_key, model, prompt, 20):
+            pieces.append(piece)
+    except Exception as exc:
+        detail = getattr(getattr(exc, "response", None), "status_code", None)
+        return {"ok": False, "error": f"{type(exc).__name__}" + (f" (HTTP {detail})" if detail else ""), "endpoint": base_url, "model": model}
+    return {"ok": True, "reply": "".join(pieces).strip()[:200], "seconds": round(time.monotonic() - started, 2), "endpoint": base_url, "model": model}
 
 
 @router.post("/invite-code")

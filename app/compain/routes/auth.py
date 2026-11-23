@@ -140,6 +140,8 @@ PREF_KEYS = {
     "mode": {"system", "light", "dark"},
     "replyLength": {"short", "medium", "long"},
     "ctx": {20, 60, 200},
+    "language": {"auto", "en", "de"},
+    "uiLanguage": {"en", "de"},
 }
 
 

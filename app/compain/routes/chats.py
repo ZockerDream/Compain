@@ -36,7 +36,7 @@ MODEL_KINDS = {"self", "hosted"}
 
 class ChatIn(BaseModel):
     character_id: int
-    model: str = "self"
+    model: str | None = None  # None = the default set in Server Management
 
 
 class ChatPatch(BaseModel):
@@ -53,6 +53,7 @@ class MessageIn(BaseModel):
     content: str = Field(min_length=1, max_length=8000)
     reply_length: str = "medium"  # short | medium | long
     context_messages: int = Field(default=CONTEXT_MESSAGES, ge=4, le=200)
+    language: str = "auto"  # auto | en | de
 
 
 def chat_out(c: Chat) -> dict:
@@ -110,13 +111,33 @@ def total_usage_today(db: DbSession) -> int:
     return db.query(func.coalesce(func.sum(ApiUsage.count), 0)).filter(ApiUsage.day == date.today()).scalar() or 0
 
 
-def system_prompt(c: Character, summary: str, important_texts: list[str]) -> str:
+LENGTH_GUIDE = {
+    "short": "Keep each reply short: one to three sentences.",
+    "medium": "Write one or two paragraphs per reply.",
+    "long": "Write rich, detailed replies of three to five paragraphs.",
+}
+LANGUAGE_GUIDE = {
+    "de": "Always write in German.",
+    "en": "Always write in English.",
+    "auto": "Reply in the language the user writes in.",
+}
+
+
+def system_prompt(
+    c: Character, summary: str, important_texts: list[str], reply_length: str = "medium", language: str = "auto"
+) -> str:
     parts = [
         f"You are {c.name}. {c.tagline}".strip(),
         c.description,
         f"Personality: {c.personality}" if c.personality else "",
         f"Scenario: {c.scenario}" if c.scenario else "",
-        "Stay in character. Write as a person would in this story. Adults only.",
+        f"This is an ongoing roleplay. Stay in character as {c.name} at all times and behave like a real person "
+        "would in this story, with your own feelings, opinions and goals. Never mention being an AI. "
+        "Write actions and descriptions in *asterisks* and speech as plain text. "
+        "Only write for your own character: never decide what the user says, thinks or does. "
+        "All characters are adults.",
+        LENGTH_GUIDE.get(reply_length, LENGTH_GUIDE["medium"]),
+        LANGUAGE_GUIDE.get(language, LANGUAGE_GUIDE["auto"]),
     ]
     if summary:
         parts.append(f"Story so far (summary): {summary}")
@@ -125,15 +146,35 @@ def system_prompt(c: Character, summary: str, important_texts: list[str]) -> str
     return "\n\n".join(p for p in parts if p)
 
 
-def build_context(db: DbSession, chat: Chat, character: Character, limit: int) -> list[dict]:
+def build_context(
+    db: DbSession, chat: Chat, character: Character, limit: int, reply_length: str = "medium", language: str = "auto"
+) -> list[dict]:
     important = [m.content for m in chat.messages if m.important]
     recent = chat.messages[-limit:]
-    history = [{"role": m.role, "content": m.content} for m in recent]
-    return build_messages(system_prompt(character, chat.summary, important), history)
+    # Many chat templates (Mistral, Gemma) need user and assistant turns to alternate, starting with
+    # the user. Merge repeated roles (for example after a failed reply) and open with a user turn.
+    history: list[dict] = []
+    for m in recent:
+        if history and history[-1]["role"] == m.role:
+            history[-1]["content"] += "\n\n" + m.content
+        else:
+            history.append({"role": m.role, "content": m.content})
+    if history and history[0]["role"] == "assistant":
+        history.insert(0, {"role": "user", "content": "(The scene begins.)"})
+    return build_messages(system_prompt(character, chat.summary, important, reply_length, language), history)
 
 
-def endpoint_for(settings: Settings, kind: str) -> tuple[str, str, str]:
+def endpoint_for(settings: Settings, kind: str, db: DbSession | None = None) -> tuple[str, str, str]:
+    """Where to send a request. The hosted provider set in Server Management wins over the environment."""
     if kind == "hosted":
+        if db is not None and cfg.get(db, "hosted_url"):
+            from ..secret import decrypt
+
+            return (
+                cfg.get(db, "hosted_url"),
+                decrypt(settings.secret_key, cfg.get(db, "hosted_api_key")),
+                cfg.get(db, "hosted_model") or settings.hosted_model,
+            )
         return settings.hosted_url, settings.hosted_api_key, settings.hosted_model
     return settings.self_hosted_url, "", settings.self_hosted_model
 
@@ -160,7 +201,8 @@ async def update_summary(session_factory, settings: Settings, chat_id: int, kind
             {"role": "user", "content": f"Previous summary:\n{previous}\n\nNew messages:\n{block}"},
         ]
         last_id = new[-1].id
-    base_url, api_key, model_name = endpoint_for(settings, kind)
+    with session_factory() as db:
+        base_url, api_key, model_name = endpoint_for(settings, kind, db)
     pieces: list[str] = []
     try:
         async for piece in stream_chat(base_url, api_key, model_name, prompt, 300):
@@ -193,10 +235,11 @@ async def stream_reply(
         chat.updated_at = utcnow()
         db.commit()
         db.refresh(chat)
-        messages = build_messages_for(db, chat, character, body.context_messages)
+        messages = build_context(db, chat, character, body.context_messages, body.reply_length, body.language)
     await notify(hub, user_id)
 
-    base_url, api_key, model_name = endpoint_for(request_settings, model_kind)
+    with session_factory() as db:
+        base_url, api_key, model_name = endpoint_for(request_settings, model_kind, db)
 
     pieces: list[str] = []
     try:
@@ -225,10 +268,6 @@ async def stream_reply(
     yield event({"done": True, "message_id": msg_id})
 
 
-def build_messages_for(db: DbSession, chat: Chat, character: Character, limit: int) -> list[dict]:
-    return build_context(db, chat, character, limit)
-
-
 @router.get("")
 def list_chats(user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     rows = (
@@ -242,13 +281,21 @@ def list_chats(user: User = Depends(current_user), db: DbSession = Depends(get_d
 
 @router.post("", status_code=201)
 async def create_chat(body: ChatIn, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
-    check_model_kind(body.model)
+    model = body.model or cfg.get(db, "default_model")
+    check_model_kind(model)
     character = db.get(Character, body.character_id)
     if character is None or (character.owner_id != user.id and character.visibility != "public"):
         raise HTTPException(status_code=404, detail="Character not found")
-    c = Chat(owner_id=user.id, character_id=character.id, title=character.name, model=body.model)
+    c = Chat(owner_id=user.id, character_id=character.id, title=character.name, model=model)
     db.add(c)
     db.commit()
+    if character.greeting:
+        # The character opens the scene, like in Chai.
+        greeting = Message(chat_id=c.id, role="assistant", content=character.greeting)
+        db.add(greeting)
+        db.commit()
+        c.read_upto = greeting.id
+        db.commit()
     db.refresh(c)
     await notify(request.app.state.hub, user.id)
     return chat_out(c)
