@@ -68,9 +68,13 @@ await page.click("#view-characters .new-tile");
 await page.fill("#f-name", "Mara Stone");
 await page.fill("#f-tagline", "Harbour detective, 34");
 await page.fill("#f-description", "A tired detective who trusts no one and hides a soft spot for stray cats.");
+await page.setInputFiles("#f-picture", { name: "mara.png", mimeType: "image/png",
+  buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64") });
 await page.click("text=Save character");
 await page.waitForSelector("#view-characters .char-card", { timeout: 10000 });
 check("character is created and listed", (await page.textContent("#view-characters")).includes("Mara Stone"));
+await page.waitForSelector("#view-characters .char-card .avatar img", { timeout: 10000 }).catch(() => {});
+check("uploaded picture is shown as the avatar", (await page.locator("#view-characters .char-card .avatar img").count()) > 0);
 
 // Adults-only rule shows in the UI
 await page.click("#view-characters .new-tile");

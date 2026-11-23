@@ -50,6 +50,18 @@
     return ((parts[0] || "?")[0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
   }
 
+  // Avatar: the character's picture if there is one, otherwise the initials.
+  function avatar(name, characterId, hasPicture, cls) {
+    var box = el("span", { class: "avatar" + (cls ? " " + cls : ""), text: hasPicture ? null : initials(name) });
+    if (hasPicture && characterId) {
+      var img = el("img", { src: "/api/characters/" + characterId + "/picture", alt: "", loading: "lazy",
+        style: "width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block" });
+      img.addEventListener("error", function () { box.textContent = initials(name); });
+      box.appendChild(img);
+    }
+    return box;
+  }
+
   function fmtTime(iso) {
     if (!iso) return "";
     var d = new Date(iso), now = new Date();
@@ -182,7 +194,7 @@
       el("h1", { style: "margin-top:8px", text: latest ? "Pick up where you left off." : "Create your first character." }),
       el("p", { text: latest ? "Your most recent conversation is below. Messages sync to every device." : "Characters are the people you chat with. Make one, then start a chat." }),
       latest ? el("button", { class: "hero-chat", onclick: function () { go("chat/" + latest.id); } },
-        el("span", { class: "avatar", text: initials(latest.character_name) }),
+        avatar(latest.character_name, latest.character_id, latest.character_has_picture),
         el("span", { class: "grow" },
           el("span", { style: "display:block;font-weight:600", text: latest.title }),
           el("span", { style: "display:block;font-size:13px;opacity:.85", class: "ellipsis", text: latest.last_message || "No messages yet" }))) : null,
@@ -202,7 +214,7 @@
 
     var recent = chats.slice(0, 5).map(function (c) {
       return el("li", null,
-        el("span", { class: "avatar sm", text: initials(c.character_name) }),
+        avatar(c.character_name, c.character_id, c.character_has_picture, "sm"),
         el("div", { class: "grow", style: "min-width:0" },
           el("div", { text: c.character_name + " · " + c.title }),
           el("div", { class: "muted small ellipsis", text: c.last_message || "No messages yet" })),
@@ -275,14 +287,15 @@
     function row(c) {
       return el("button", { class: "c-row", "aria-current": state.chatId === c.id ? "true" : "false",
         onclick: function () { go("chat/" + c.id); } },
-        el("span", { class: "avatar", text: initials(c.character_name) }),
+        avatar(c.character_name, c.character_id, c.character_has_picture),
         el("span", { class: "grow", style: "min-width:0" },
           el("span", { class: "top" },
             c.pinned ? icon("i-pin", "sm pin-ic") : null,
             el("span", { class: "title ellipsis", text: c.title }),
             el("span", { class: "time", text: fmtTime(c.updated_at) })),
           el("span", { class: "preview ellipsis", style: "display:block", text: c.character_name + " · " + (c.last_message || "No messages yet") })),
-        c.unread ? el("span", { class: "badge", "aria-label": c.unread + " unread", text: String(c.unread) }) : null);
+        // The open chat counts as read: it is on screen.
+        c.unread && state.chatId !== c.id ? el("span", { class: "badge", "aria-label": c.unread + " unread", text: String(c.unread) }) : null);
     }
 
     function drawList() {
@@ -337,7 +350,7 @@
 
     pane.appendChild(el("header", { class: "conv-head" },
       el("button", { class: "ghost icon-only back-btn", "aria-label": "Back to chat list", onclick: function () { go("chats"); } }, icon("i-back")),
-      el("span", { class: "avatar", text: initials(chat.character_name) }),
+      avatar(chat.character_name, chat.character_id, chat.character_has_picture),
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "name ellipsis", text: chat.character_name }),
         el("div", { class: "meta ellipsis", text: chat.title + (chat.character_tagline ? " · " + chat.character_tagline : "") })),
@@ -380,7 +393,7 @@
       sendBtn.disabled = true;
       input.value = "";
       box.appendChild(messageNode({ id: null, role: "user", content: text, important: false }, chat));
-      var typing = el("div", { class: "msg char typing" }, el("span", { class: "avatar xs", text: initials(chat.character_name) }),
+      var typing = el("div", { class: "msg char typing" }, avatar(chat.character_name, chat.character_id, chat.character_has_picture, "xs"),
         el("div", { class: "bubble" }, el("span", { class: "dot" }), el("span", { class: "dot" }), el("span", { class: "dot" })));
       box.appendChild(typing);
       box.scrollTop = box.scrollHeight;
@@ -418,7 +431,7 @@
   function messageNode(m, chat) {
     var who = m.role === "user" ? "You" : chat.character_name;
     var wrap = el("div", { class: "msg " + (m.role === "user" ? "user" : "char") + (m.important ? " important" : "") });
-    if (m.role !== "user") wrap.appendChild(el("span", { class: "avatar xs", text: initials(chat.character_name) }));
+    if (m.role !== "user") wrap.appendChild(avatar(chat.character_name, chat.character_id, chat.character_has_picture, "xs"));
     var col = el("div", { style: "min-width:0" },
       el("div", { class: "bubble", text: m.content }));
     if (m.role !== "user" && m.id) {
@@ -508,7 +521,7 @@
   function characterCard(c) {
     var status = c.visibility === "public" ? "Public" : c.visibility === "pending" ? "In review" : "Private";
     var card = el("article", { class: "card char-card lift" },
-      el("div", { class: "row" }, el("span", { class: "avatar", text: initials(c.name) }),
+      el("div", { class: "row" }, avatar(c.name, c.id, c.has_picture),
         el("div", { class: "grow", style: "min-width:0" }, el("h3", { class: "ellipsis", text: c.name }), el("div", { class: "muted small ellipsis", text: c.tagline || "" }))),
       el("p", { class: "desc", text: c.description || "No description yet." }),
       el("div", { class: "tags" }, el("span", { class: "pill", text: status }), c.tags.map(function (t) { return el("span", { class: "pill", text: t }); })),
@@ -610,7 +623,7 @@
         el("div", { class: "row", style: "margin-top:14px;flex-wrap:wrap" },
           el("button", { class: "primary", onclick: function () { startChat(top.id); } }, "Start chat"),
           el("button", { onclick: function () { addToMine(top.id); } }, "Add to my characters"))),
-      el("span", { class: "avatar lg", text: initials(top.name) })));
+      avatar(top.name, top.id, top.has_picture, "lg")));
 
     var filters = el("div", { class: "filter-row", role: "group", "aria-label": "Community filter" });
     ["all", "fantasy", "modern", "drama"].forEach(function (f) {
@@ -623,7 +636,7 @@
     items.filter(function (c) { return state.communityFilter === "all" || c.tags.indexOf(state.communityFilter) !== -1; })
       .forEach(function (c) {
         grid.appendChild(el("article", { class: "card char-card lift" },
-          el("div", { class: "row" }, el("span", { class: "avatar alt", text: initials(c.name) }),
+          el("div", { class: "row" }, avatar(c.name, c.id, c.has_picture, "alt"),
             el("div", { class: "grow", style: "min-width:0" }, el("h3", { class: "ellipsis", text: c.name }), el("div", { class: "muted small", text: c.mine ? "Yours" : "Shared by a user" }))),
           el("p", { class: "desc", text: c.description || c.tagline }),
           el("div", { class: "tags" }, c.tags.map(function (t) { return el("span", { class: "pill", text: t }); })),

@@ -63,6 +63,7 @@ def chat_out(c: Chat) -> dict:
         "character_id": c.character_id,
         "character_name": c.character.name,
         "character_tagline": c.character.tagline,
+        "character_has_picture": bool(c.character.picture_path),
         "title": c.title,
         "pinned": c.pinned,
         "model": c.model or "self",

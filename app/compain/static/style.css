@@ -399,3 +399,4 @@
   #view-home .stat-card, #view-admin .stat-card { padding: 14px; }
   #view-home .stat, #view-admin .stat { font-size: 24px; }
 }
+.avatar { overflow: hidden; }

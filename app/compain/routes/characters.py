@@ -50,6 +50,7 @@ def character_out(c: Character, viewer: User) -> dict:
         "visibility": c.visibility,
         "owner_id": c.owner_id,
         "mine": c.owner_id == viewer.id,
+        "has_picture": bool(c.picture_path),
     }
 
 
