@@ -107,7 +107,8 @@
     "Save provider": "Anbieter speichern", "Test connection": "Verbindung testen",
     "The key is stored encrypted and never shown again. It is also inside backups (encrypted), so keep COMPAIN_SECRET_KEY safe.":
       "Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt. Er ist auch (verschlüsselt) in Backups enthalten, also COMPAIN_SECRET_KEY sicher aufbewahren.",
-    "Self-hosted models are unlimited.": "Eigene Modelle sind unbegrenzt.", "From .env (default)": "Aus .env (Standard)"
+    "Self-hosted models are unlimited.": "Eigene Modelle sind unbegrenzt.",
+    "Context window per request (tokens)": "Kontextfenster pro Anfrage (Tokens)", "From .env (default)": "Aus .env (Standard)"
   };
 
   var lang = "en";

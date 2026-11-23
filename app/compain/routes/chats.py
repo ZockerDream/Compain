@@ -160,9 +160,22 @@ def build_context(
             history[-1]["content"] += "\n\n" + m.content
         else:
             history.append({"role": m.role, "content": m.content})
+    system = system_prompt(character, chat.summary, important, reply_length, language)
+
+    # Stay inside the model's context window: drop the oldest turns first. Rough estimate:
+    # about 3.5 characters per token, plus room for the reply.
+    budget = int(cfg.get(db, "context_tokens")) - REPLY_TOKENS.get(reply_length, 400) - 256
+
+    def tokens(items: list[dict]) -> int:
+        return int((len(system) + sum(len(m["content"]) for m in items)) / 3.5)
+
+    while len(history) > 1 and tokens(history) > budget:
+        history.pop(0)
+    while history and history[0]["role"] == "assistant" and len(history) > 1 and tokens(history) > budget:
+        history.pop(0)
     if history and history[0]["role"] == "assistant":
         history.insert(0, {"role": "user", "content": "(The scene begins.)"})
-    return build_messages(system_prompt(character, chat.summary, important, reply_length, language), history)
+    return build_messages(system, history)
 
 
 def endpoint_for(settings: Settings, kind: str, db: DbSession | None = None) -> tuple[str, str, str]:

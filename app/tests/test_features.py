@@ -276,3 +276,23 @@ def test_hosted_provider_from_server_management(tmp_path):
     r = client.post("/api/admin/hosted/test", headers=h).json()
     assert r["ok"] is True and r["reply"]
     client.__exit__(None, None, None)
+
+
+def test_long_history_is_trimmed_to_the_context_window(tmp_path):
+    from compain.models import Character, Chat, Message
+    from compain.routes.chats import build_context
+
+    app, client, h = admin_client(tmp_path)
+    cid = client.post("/api/characters", json={"name": "Mara"}, headers=h).json()["id"]
+    chat = client.post("/api/chats", json={"character_id": cid}, headers=h).json()
+    client.put("/api/admin/settings", json={"context_tokens": 2048}, headers=h)
+    with app.state.session_factory() as db:
+        for i in range(60):
+            db.add(Message(chat_id=chat["id"], role="user" if i % 2 == 0 else "assistant", content=f"turn {i} " + "x" * 400))
+        db.commit()
+        msgs = build_context(db, db.get(Chat, chat["id"]), db.get(Character, cid), 60, "medium", "auto")
+    total_chars = sum(len(m["content"]) for m in msgs)
+    assert total_chars / 3.5 <= 2048
+    assert msgs[1]["role"] == "user"  # still starts with a user turn
+    assert msgs[-1]["content"].startswith("turn 59")  # the newest turn is kept
+    client.__exit__(None, None, None)

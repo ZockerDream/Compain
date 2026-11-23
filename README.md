@@ -39,3 +39,15 @@ Open http://localhost:8080 for the app. The design reference is `design/mockup.h
 Run the API tests (needs Python 3.12): `cd app && python3 -m venv .venv && ./.venv/bin/pip install -r requirements-dev.txt && ./.venv/bin/python -m pytest -q`
 
 Run the browser tests against the running stack: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs` (needs Chromium; see agent.md).
+
+## Install on the server
+
+1. Get the code: `git clone -b develop git@github.com:ZockerDream/Compain.git /opt/docker/Compain && cd /opt/docker/Compain`
+2. Settings: `cp .env.example .env`, then set real values for `POSTGRES_PASSWORD`, `COMPAIN_SECRET_KEY` (long random text, keep it safe) and `COMPAIN_ADMIN_PASSWORD`. For the self-hosted model also set `COMPAIN_MODEL_BASE_URL=http://llm-mistral:8081/v1` and `LLM_THREADS=6`.
+3. Model (about 14 GB): `./scripts/download-models.sh mistral` (or `gemma`, or `all`).
+4. Start: `docker compose --profile llm-mistral up -d --build`
+5. Open `http://<server-ip>:8080`, log in as `admin`, then in Server Management, Models, press "Run speed test".
+6. Optional HTTPS: point a domain to the server, set `COMPAIN_DOMAIN` in `.env`, open ports 80 and 443, and add `--profile https` to the start command. Then turn on "HTTPS is set up" in Server Management, Domain & HTTPS.
+7. Backups run every night (Server Management, Backups). They are stored in the `compain-data` volume; copy them off the server from time to time.
+
+Update later: `git pull && docker compose --profile llm-mistral up -d --build`

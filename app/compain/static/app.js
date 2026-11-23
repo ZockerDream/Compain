@@ -1025,7 +1025,8 @@
     var result = el("p", { class: "muted small", text: last.at ? ("Last test " + last.at + ": " + last.pieces_per_second + " pieces per second, first piece after " + last.first_piece_seconds + " s") : "No speed test yet." });
     body.appendChild(panel("Models", settingsForm([
       { key: "self_hosted_model_name", label: "Name of the self-hosted model", type: "text", help: "Shown in chats. Start: Mistral Small 3.2 abliteration (Q4_K_M)." },
-      { key: "default_model", label: "Default for new chats", type: "select", options: [["self", "Self-hosted model"], ["hosted", "Hosted API"]] }
+      { key: "default_model", label: "Default for new chats", type: "select", options: [["self", "Self-hosted model"], ["hosted", "Hosted API"]] },
+      { key: "context_tokens", label: "Context window per request (tokens)", type: "int", help: "Must fit the model server. Compose starts it with 16384 tokens for 2 slots, so 8192 each." }
     ])));
     body.appendChild(panel("Speed test", el("div", null,
       el("p", { class: "muted small", text: "Measures how fast the self-hosted model writes. Run it after changing the model or the server." }),

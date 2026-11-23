@@ -36,6 +36,7 @@ SCHEMA: dict[str, tuple[str, object]] = {
     "hosted_api_key": ("str", ""),  # encrypted, see secret.py
     # Models
     "default_model": ("str", "self"),
+    "context_tokens": ("int", 8192),  # context window per request of the self-hosted model
     "self_hosted_model_name": ("str", "Mistral Small 3.2 abliteration"),
     "last_speed_test": ("json", {}),
     # Backups
