@@ -33,7 +33,7 @@ def load_settings() -> Settings:
         admin_username=os.environ.get("COMPAIN_ADMIN_USERNAME", "admin"),
         admin_password=os.environ.get("COMPAIN_ADMIN_PASSWORD", ""),
         self_hosted_url=os.environ.get("COMPAIN_MODEL_BASE_URL", "mock"),
-        self_hosted_model=os.environ.get("COMPAIN_MODEL_NAME", "mistral-small-3.2"),
+        self_hosted_model=os.environ.get("COMPAIN_MODEL_NAME", "gemma-4-26b-a4b"),
         hosted_url=os.environ.get("COMPAIN_HOSTED_API_BASE_URL", "mock"),
         hosted_api_key=os.environ.get("COMPAIN_HOSTED_API_KEY", ""),
         hosted_model=os.environ.get("COMPAIN_HOSTED_MODEL", "llama-3.1-8b-instant"),

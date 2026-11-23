@@ -29,7 +29,7 @@ Requirements: Docker with Compose.
 
 The model is `mock` by default, so the app answers with a test reply. To use a real model:
 
-- **Self-hosted (free, unlimited):** put a GGUF file in `models/` (see technical.md for the tested files), set `COMPAIN_MODEL_BASE_URL=http://llm-mistral:8081/v1` in `.env`, and start with `docker compose --profile llm-mistral up -d`. Use `llm-gemma` for the Gemma model.
+- **Self-hosted (free, unlimited):** download the model with `./scripts/download-models.sh` (Gemma 4, about 17 GB), set `COMPAIN_MODEL_BASE_URL=http://llm-gemma:8081/v1` in `.env`, and start with `docker compose --profile llm-gemma up -d`. For Mistral use `mistral` and `llm-mistral` instead.
 - **Hosted (free tier or paid):** choose the provider in Server Management, Hosted API, enter the key, and press "Test connection".
 
 For HTTPS from outside your home network: point a domain to the server, set `COMPAIN_DOMAIN` in `.env`, open ports 80 and 443, and start with `docker compose --profile https up -d`.
@@ -43,11 +43,11 @@ Run the browser tests against the running stack: `cd app/e2e && npm install && B
 ## Install on the server
 
 1. Get the code: `git clone -b develop git@github.com:ZockerDream/Compain.git /opt/docker/Compain && cd /opt/docker/Compain`
-2. Settings: `cp .env.example .env`, then set real values for `POSTGRES_PASSWORD`, `COMPAIN_SECRET_KEY` (long random text, keep it safe) and `COMPAIN_ADMIN_PASSWORD`. For the self-hosted model also set `COMPAIN_MODEL_BASE_URL=http://llm-mistral:8081/v1` and `LLM_THREADS=6`.
-3. Model (about 14 GB): `./scripts/download-models.sh mistral` (or `gemma`, or `all`).
-4. Start: `docker compose --profile llm-mistral up -d --build`
+2. Settings: `cp .env.example .env`, then set real values for `POSTGRES_PASSWORD`, `COMPAIN_SECRET_KEY` (long random text, keep it safe) and `COMPAIN_ADMIN_PASSWORD`. The model settings in `.env.example` already point to Gemma 4.
+3. Model (about 17 GB, roughly an hour): `./scripts/download-models.sh` (Gemma 4; `mistral` or `all` for the others).
+4. Start: `docker compose --profile llm-gemma up -d --build`
 5. Open `http://<server-ip>:8080`, log in as `admin`, then in Server Management, Models, press "Run speed test".
 6. Optional HTTPS: point a domain to the server, set `COMPAIN_DOMAIN` in `.env`, open ports 80 and 443, and add `--profile https` to the start command. Then turn on "HTTPS is set up" in Server Management, Domain & HTTPS.
 7. Backups run every night (Server Management, Backups). They are stored in the `compain-data` volume; copy them off the server from time to time.
 
-Update later: `git pull && docker compose --profile llm-mistral up -d --build`
+Update later: `git pull && docker compose --profile llm-gemma up -d --build`

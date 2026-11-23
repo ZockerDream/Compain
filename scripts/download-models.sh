@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Downloads the self-hosted models into ./models (resumes if interrupted).
-# Usage: ./scripts/download-models.sh [mistral|gemma|all]   (default: mistral)
+# Usage: ./scripts/download-models.sh [gemma|mistral|all]   (default: gemma, the recommended model)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p models
@@ -13,12 +13,12 @@ get() {
   curl -L --fail -C - -o "models/$2" "$1"
 }
 
-case "${1:-mistral}" in
+case "${1:-gemma}" in
   mistral) get "$MISTRAL_URL" mistral-small-3.2-abliterated-Q4_K_M.gguf ;;
   gemma)   get "$GEMMA_URL" gemma-4-26b-a4b-uncensored-Q4_K_M.gguf ;;
   all)     get "$MISTRAL_URL" mistral-small-3.2-abliterated-Q4_K_M.gguf
            get "$GEMMA_URL" gemma-4-26b-a4b-uncensored-Q4_K_M.gguf ;;
-  *) echo "Usage: $0 [mistral|gemma|all]"; exit 1 ;;
+  *) echo "Usage: $0 [gemma|mistral|all]"; exit 1 ;;
 esac
 echo "Done. Files in ./models:"
 ls -lh models

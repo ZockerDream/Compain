@@ -10,6 +10,19 @@ const EXE = process.env.CHROME_PATH || "/opt/google/chrome/chrome";
 const SHOTS = new URL("./screens/", import.meta.url).pathname;
 mkdirSync(SHOTS, { recursive: true });
 
+const REPLY_TIMEOUT = Number(process.env.REPLY_TIMEOUT || 180000);
+
+// Wait until the conversation shows a finished reply after sending (mock or real model).
+async function waitForReply(p) {
+  await p.waitForFunction(() => {
+    const box = document.querySelector("#messages");
+    if (!box) return false;
+    const typing = box.querySelector(".typing, .bubble.cursor");
+    const last = [...box.querySelectorAll(".msg.char .bubble")].pop();
+    return !typing && last && last.textContent.trim().length > 0 && !document.querySelector(".send[disabled]");
+  }, null, { timeout: REPLY_TIMEOUT });
+}
+
 const results = [];
 function check(name, ok, info = "") {
   results.push({ name, ok, info });
@@ -90,8 +103,10 @@ await page.click("text=Cancel");
 await page.click("#view-characters .char-card .primary:has-text('Chat')");
 await page.waitForSelector("#conv .composer", { timeout: 10000 });
 await page.fill("#conv textarea", "Where were you at five?");
+const before = await page.locator("#messages .msg.char").count();
 await page.keyboard.press("Enter");
-await page.waitForSelector("#messages .msg.char .bubble:has-text('Streaming works')", { timeout: 15000 });
+await page.waitForFunction((n) => document.querySelectorAll("#messages .msg.char").length > n, before, { timeout: REPLY_TIMEOUT });
+await waitForReply(page);
 check("reply streams in and is shown", true);
 await page.screenshot({ path: SHOTS + "02-chat-desktop.png" });
 
@@ -186,11 +201,13 @@ await page.click("#nav-desktop button[data-go=chats]");
 await page.waitForSelector("#view-chats:not(.hidden) #chat-list");
 await page.click("#chat-list .c-row");
 await page.waitForSelector("#conv textarea");
+const listBefore = await second.textContent("#chat-list");
 await page.fill("#conv textarea", "Live sync check");
 await page.keyboard.press("Enter");
-await page.waitForSelector("#messages .msg.char .bubble:has-text('Streaming works')", { timeout: 15000 });
-await second.waitForFunction(() => document.querySelector("#chat-list") && document.querySelector("#chat-list").textContent.indexOf("Streaming works") !== -1, null, { timeout: 15000 }).catch(() => {});
-const liveSeen = (await second.textContent("#chat-list")).includes("Streaming works");
+// The other window must update its chat list by itself, without reloading.
+await second.waitForFunction((b) => document.querySelector("#chat-list") && document.querySelector("#chat-list").textContent !== b, listBefore, { timeout: 30000 }).catch(() => {});
+const liveSeen = (await second.textContent("#chat-list")) !== listBefore;
+await waitForReply(page);
 check("second window updates without reload (live sync)", liveSeen);
 await second.close();
 

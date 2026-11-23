@@ -136,7 +136,20 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 
 ## Model test results
 
-See the section below; filled in after measuring on this development machine.
+Measured on 2026-11-24 on the development machine (WSL2, 15 GB RAM, llama.cpp CPU build, 6 threads, Q4_K_M files, one German and one English roleplay prompt). The owner's server (i7-8700, 64 GB RAM) has a slower CPU but enough memory to keep the whole model in RAM, so expect numbers in the same range.
+
+| Model | File | Size | Writing speed | Reading the prompt | Roleplay quality |
+| --- | --- | --- | --- | --- | --- |
+| **Gemma 4 26B-A4B uncensored** (recommended) | `gemma-4-26B-A4B-it-ultra-uncensored-heretic-Q4_K_M.gguf` (llmfan46 on Hugging Face) | 16.8 GB | **9.8–12.8 tokens/s** | 9–19 tokens/s | Very good: stays in character, rich German and English, follows the length guide |
+| Mistral Small 3.2 24B abliterated | `huihui-mistral-small-3.2-24b-instruct-2506-abliterated-q4_k_m.gguf` (maerong3 on Hugging Face) | 14.3 GB | 1.9–3.5 tokens/s | 2–6.5 tokens/s | Good, but short replies and slow |
+
+Notes:
+- Gemma 4 is a mixture-of-experts model: only about 4B parameters work per token, so it is about four times faster on CPU. A medium reply (about 150 tokens) takes 15–25 seconds.
+- Gemma 4 "thinks" before answering by default. The model servers start with `--reasoning off`; without it, replies come back empty.
+- Reading a long history is the slow part on CPU. llama.cpp reuses the unchanged start of the prompt between turns, so only new messages are read.
+- Content limits were not tested beyond normal roleplay. Test adult scenarios yourself before relying on either model.
+
+Decision: **Gemma 4 26B-A4B uncensored is the default self-hosted model** (`--profile llm-gemma`). Mistral stays available as `--profile llm-mistral`.
 
 ## Decisions log
 
@@ -147,3 +160,4 @@ See the section below; filled in after measuring on this development machine.
 - Backend v0 built and tested: API, Docker Compose with PostgreSQL, 14 tests passing.
 - Version 1 features built: Server Management (all sections), live sync, story memory, card import, backups with restore, German interface, provider picker. PostgreSQL moved to 17.
 - Hosted provider list added (Groq, OpenRouter, Cerebras, Mistral, Google AI Studio, Venice, DeepSeek).
+- 2026-11-24: models measured; Gemma 4 26B-A4B uncensored chosen as the default self-hosted model.

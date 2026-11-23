@@ -37,7 +37,7 @@ SCHEMA: dict[str, tuple[str, object]] = {
     # Models
     "default_model": ("str", "self"),
     "context_tokens": ("int", 8192),  # context window per request of the self-hosted model
-    "self_hosted_model_name": ("str", "Mistral Small 3.2 abliteration"),
+    "self_hosted_model_name": ("str", "Gemma 4 26B-A4B uncensored"),
     "last_speed_test": ("json", {}),
     # Backups
     "backup_time": ("str", "03:00"),

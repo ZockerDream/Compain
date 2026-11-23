@@ -126,16 +126,15 @@ Hardware: Intel Core i7-8700 (6 cores, 12 threads), 64 GB RAM, 1 TB disk, no GPU
 
 | Order | Model | Why | Status |
 | --- | --- | --- | --- |
-| 1 | Mistral Small 3.2 abliteration (about 24B) | Widely cited as a roleplay favorite. Expected to run at about 1–2 tokens per second on this CPU. | to test |
-| 2 | Gemma 4 26B-A4B uncensored (mixture-of-experts, about 4B active) | Only about 4B parameters are active per token, so it may run faster on CPU. | to test |
+| 1 | **Gemma 4 26B-A4B uncensored** (mixture-of-experts, about 4B active) | Tested: 10–13 tokens per second, very good roleplay in German and English. | **default** |
+| 2 | Mistral Small 3.2 abliteration (about 24B) | Tested: 2–3.5 tokens per second, good but slow. | alternative |
 
-Both models will be compared on speed and on how well they keep a roleplay character consistent. Quantization level to be decided during testing.
+Quantization: Q4_K_M for both. Details in [technical.md](technical.md), "Model test results".
 
 Reference: "Eternal o1" is the name Chai uses for its model. The owner wants the same level of freedom and reply quality. The real model name is unknown.
 
 ## Open questions
 
-- Which model and quantization win the speed and consistency test?
 - Which hosted provider does the owner pick first? (Recommended: Groq for the free start, Venice for uncensored paid use. See [technical.md](technical.md).)
 
 ## Appendix: owner's original notes

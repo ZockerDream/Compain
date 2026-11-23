@@ -47,9 +47,11 @@ Done (version 1, verified with tests):
 - Docker Compose: app, PostgreSQL 17, optional `llm-mistral` / `llm-gemma` (llama.cpp) and `https` (Caddy) profiles.
 - Tests: 30 API tests (`app/tests`), 31 browser checks against the Docker build (`app/e2e`, desktop and phone, German interface).
 
+- Models measured (technical.md, "Model test results"): Gemma 4 26B-A4B uncensored is the default (10–13 tokens/s here), Mistral Small 3.2 the alternative (2–3.5 tokens/s). The browser tests also pass against the real Gemma model.
+
 Open:
-1. Model measurements (see technical.md "Model test results"). The models are in `models/` (not in git).
-2. Android app (later, by design).
+1. Android app (later, by design).
+2. Test adult scenarios with Gemma on the server before relying on it.
 3. Real-person rule is not checked by code; the admin review is the safeguard.
 4. Alembic migrations: for now `db.py` adds new columns on start (`ADDED_COLUMNS`). Move to Alembic before the data model changes a lot.
 5. Unread counts are per chat, not per device.
@@ -94,6 +96,7 @@ Known risks:
 - Browser tests: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs`
 - Run with Docker: `docker compose up --build -d`
 - Health check: `curl http://localhost:8080/api/health`
-- With a model: put the GGUF file in `models/`, set `COMPAIN_MODEL_BASE_URL=http://llm-mistral:8081/v1` in `.env`, then `docker compose --profile llm-mistral up -d`
+- With the model: `./scripts/download-models.sh`, set `COMPAIN_MODEL_BASE_URL=http://llm-gemma:8081/v1` in `.env`, then `docker compose --profile llm-gemma up -d`
+- Browser tests with a real model: add `REPLY_TIMEOUT=300000` (milliseconds) before `node run.mjs`
 - With HTTPS: set `COMPAIN_DOMAIN` in `.env`, then `docker compose --profile https up -d`
 - Stop: `docker compose down` (keeps the database volume; add `-v` only to delete all data)
