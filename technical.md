@@ -26,7 +26,7 @@ Decisions from the owner's answers and the approved mockup. Items marked **open*
 | Area | Decision | Status |
 | --- | --- | --- |
 | Deployment | Docker Compose with app and PostgreSQL now. Model runtime, backup job and reverse proxy to be added. | app + db built, rest open |
-| Database | PostgreSQL 16 in Docker. Tables created on start for now; Alembic later. | decided, built |
+| Database | PostgreSQL 17 in Docker (same major version as `pg_dump` in the app image). Tables created on start; new columns added by `db.py` (`ADDED_COLUMNS`); Alembic later. | decided, built |
 | Backend | Python 3.12 with FastAPI, SQLAlchemy 2, httpx. Password hashing with scrypt from the standard library. | decided, built |
 | Model client | OpenAI-compatible streaming via httpx. `mock` URL for tests. | built |
 | Realtime | WebSocket for live sync between devices. | recommended, open |
@@ -121,20 +121,22 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - **Hosted provider policies:** free providers can change limits or policies at any time. Check the content policy of the chosen provider before relying on it for adult roleplay.
 - **Mockup vs. build:** the mockup uses canned replies and no real login. Every behaviour (lockout, limits, sync, backups) must be built and tested for real.
 
-## Backend v0 (built)
+## Built (version 1)
 
-- Login with a session cookie (`compain_session`, HTTP-only) or a Bearer token (for the Android app later). "Stay logged in" sets the longer lifetime.
-- Lockout: after 5 failed logins the account is locked for 15 minutes.
-- Characters: owner-only edit and delete, admins can do all. Publish sends a character to a review queue; the admin approves or hides it.
-- Chats: streaming replies over Server-Sent Events. Context = character, summary, important messages, last 60 messages.
-- Hosted limit: per user per day and a total per day, read from Server Management first, then from environment defaults.
-- Admin API: overview, users, settings (limits), community review queue. Other Server Management sections are not built yet.
-- Web UI: plain JavaScript served by the API from `compain/static/`, built on the mockup's CSS. Uses only the API.
-- Pictures: PNG, JPG or WebP up to 10 MB, checked by file content, stored in the data volume.
-- Export: JSON of characters, chats, everything, and one chat.
-- Tests: 14 API tests and 23 browser checks (desktop and phone) pass against the Docker build.
+- **Auth:** session cookie (`compain_session`, HTTP-only, `Secure` behind HTTPS) or Bearer token (for the Android app later). Session lengths, lockout and password length come from Server Management. Sign-up only with an invite code when the admin allows it.
+- **Characters:** owner-only edit and delete, admins all. Adults-only check on save and import. Pictures checked by file content. Card import: SillyTavern JSON V1/V2, PNG with an embedded card (the PNG becomes the picture), plain text.
+- **Chats:** streaming over Server-Sent Events. Context = system prompt (character, roleplay rules, reply length, reply language) + story summary + important messages + the last N messages. Turns are merged and start with a user turn, because Mistral and Gemma chat templates need alternating roles. The greeting is the first message.
+- **Story memory:** after every 40 new messages, a background task asks the same model for a summary of at most 180 words and stores it.
+- **Live sync:** WebSocket `/ws`. The server sends `{"type": "chats"}` to all devices of a user when their chats change; the client reloads from the API.
+- **Hosted API:** provider, endpoint, model and key set in Server Management (key encrypted with a key derived from `COMPAIN_SECRET_KEY`), or from `.env`. Limits per user and in total per day.
+- **Backups:** `pg_dump --clean` plus pictures in one `.tar.gz` under the data volume. Nightly at the configured time, retention in days, restore in one transaction with a 30-second lock timeout.
+- **Maintenance mode:** blocks everyone except admins with HTTP 503 and shows the notice.
+- **Web UI:** plain JavaScript served by the API from `compain/static/`, built on the mockup's CSS. German via `i18n.js` (translates interface strings only, never user text).
+- **Tests:** 30 API tests and 31 browser checks (desktop and phone, German interface) pass against the Docker build.
 
-Environment variables are listed in `.env.example`.
+## Model test results
+
+See the section below; filled in after measuring on this development machine.
 
 ## Decisions log
 
@@ -143,4 +145,5 @@ Environment variables are listed in `.env.example`.
 - First model test set: Mistral Small 3.2 abliteration, Gemma 4 26B-A4B uncensored.
 - Design approved: `design/mockup.html` is the reference for all screens (version 6 of the mockup).
 - Backend v0 built and tested: API, Docker Compose with PostgreSQL, 14 tests passing.
+- Version 1 features built: Server Management (all sections), live sync, story memory, card import, backups with restore, German interface, provider picker. PostgreSQL moved to 17.
 - Hosted provider list added (Groq, OpenRouter, Cerebras, Mistral, Google AI Studio, Venice, DeepSeek).

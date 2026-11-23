@@ -33,38 +33,41 @@ A private, self-hosted, multi-user AI roleplay chat app. It replaces a paid char
 
 ## Current status
 
-Last updated: 2026-11-23.
+Last updated: 2026-11-23 (night).
 
-Done:
-- Planning and design: concept, technical notes, approved mockup (`design/mockup.html`, mockup version 6).
-- Backend (FastAPI, SQLAlchemy, PostgreSQL): login with 48-hour and "stay logged in" sessions, lockout, characters (owner rules, adults-only check, picture upload, publish and review, add from Community), chats with streaming replies, important messages (max 10), per-chat model choice, hosted daily limits (per user and total), JSON export (characters, chats, everything, one chat), profile name, admin users, admin limits, review queue.
-- Real web UI served by the API at `/` (`app/compain/static/`): login, Home, Chats (list, filters, streaming conversation, important, pin, model, export), Characters (create, edit, delete, picture, publish, chat), Community (featured, add, chat), Profile (name, exports), Settings (five themes, System/Light/Dark, reply length, context, log out), Server Management (overview, users, characters review, hosted API limits; other sections show a "planned" note).
-- Tests: 14 API tests (`app/tests`), 23 browser checks (`app/e2e`) against the Docker build, desktop and phone.
-- Docker Compose runs the app and PostgreSQL. Data (pictures) is in a volume.
+Done (version 1, verified with tests):
+- Login with 48-hour and "stay logged in" sessions, lockout, invite-code sign-up, maintenance mode with a notice, log out everywhere. Secure cookie behind HTTPS.
+- Characters: create, edit, delete (owner rules), adults-only check, pictures (PNG/JPG/WebP, size limit from settings), card import (SillyTavern JSON V1/V2, PNG cards, plain text), publish to Community with admin review, add from Community.
+- Chats: greeting opens the chat, streaming replies, roleplay system prompt with reply length and reply language, important messages (max 10, always in context), story summary every 40 messages, unread counts, pinning, search and filters, per-chat model, export (one chat, all chats, characters, everything).
+- Live sync between devices (WebSocket at `/ws`).
+- Per-user preferences on the server (theme, appearance, reply length, context, reply language, interface language).
+- German and English interface (`static/i18n.js`).
+- Server Management, all ten sections: overview (disk, endpoints), users, characters (review queue, card import switch), hosted API (provider presets, encrypted key, connection test, limits), access and security (sign-up, invite codes, sessions, lockout, password length, log out everyone), domain and HTTPS, models (default model, name, speed test), backups (nightly, retention, pictures, run now, download, restore), storage (upload limit, disk warning, cleanup), logs and maintenance (maintenance mode, notice, audit log).
+- Backups: `pg_dump` + pictures as `.tar.gz`; restore tested end to end on PostgreSQL 17.
+- Docker Compose: app, PostgreSQL 17, optional `llm-mistral` / `llm-gemma` (llama.cpp) and `https` (Caddy) profiles.
+- Tests: 30 API tests (`app/tests`), 31 browser checks against the Docker build (`app/e2e`, desktop and phone, German interface).
 
-Not done yet (next, in this order):
-1. Measure Mistral Small 3.2 and Gemma 4 26B-A4B on the server (tokens per second, memory). Set `COMPAIN_MODEL_BASE_URL` to the real runtime (llama.cpp or Ollama). Not in Compose yet.
-2. Story memory: generate `chats.summary` automatically (every 40 messages). Only the field exists.
-3. Server Management sections still missing: Domain and HTTPS (Caddy), Access and security controls (sign-up, sessions, lockout settings), Models, Backups (nightly pg_dump, restore), Storage cleanup, Logs and maintenance.
-4. Live sync between devices (WebSocket). Right now a second device sees new messages only after reloading.
-5. Character card import (SillyTavern V1/V2 JSON, PNG V2, plain text).
-6. Unread counts and "Summary updated" in the UI (the mockup shows them; the API does not track them yet).
-7. Alembic migrations instead of `create_all`.
-8. Settings for reply length and context are stored per device (localStorage), not on the server yet.
+Open:
+1. Model measurements (see technical.md "Model test results"). The models are in `models/` (not in git).
+2. Android app (later, by design).
+3. Real-person rule is not checked by code; the admin review is the safeguard.
+4. Alembic migrations: for now `db.py` adds new columns on start (`ADDED_COLUMNS`). Move to Alembic before the data model changes a lot.
+5. Unread counts are per chat, not per device.
 
-Known gaps and risks:
-- The adults-only check is a keyword and age heuristic in `app/compain/content.py`. It is not complete. Admin review of community characters is the second layer.
-- The real-person rule is not checked by code yet.
-- Sessions use a cookie without `Secure` until HTTPS is set up.
-- The Compose file uses the `mock` model by default, so replies are test text.
-- Browser tests need Chromium at `/opt/google/chrome/chrome` (linked to the Playwright download) and its system libraries (installed with dnf on this machine).
+Known risks:
+- The adults-only check is a keyword and age heuristic (`app/compain/content.py`). Admin review is the second layer.
+- Changing `COMPAIN_SECRET_KEY` makes the stored hosted API key unreadable (enter it again).
+- Restoring a backup replaces all data and logs out sessions created after the backup.
+- Free hosted providers change limits and policies without notice.
 
 ## Layout
 
-- `docker-compose.yml`: `db` (PostgreSQL 16) and `app` (the API on port 8080). Reads `.env`.
+- `docker-compose.yml`: `db` (PostgreSQL 17), `app` (API and web UI on port 8080), optional profiles `llm-mistral`, `llm-gemma` (llama.cpp on port 8081 inside Docker) and `https` (Caddy on 80/443). Reads `.env`.
+- `Caddyfile`: HTTPS reverse proxy for `COMPAIN_DOMAIN`.
+- `models/`: GGUF model files (git-ignored, several GB).
 - `.env.example`: all variables. Copy to `.env` and set real passwords.
 - `app/`: the FastAPI service and the web UI.
-  - `compain/static/`: `index.html`, `app.js` (plain JavaScript, no build), `style.css` and `sprite.svg` (taken from the mockup).
+  - `compain/static/`: `index.html`, `app.js` (plain JavaScript, no build), `i18n.js` (German), `style.css` and `sprite.svg` (from the mockup).
   - `e2e/`: browser tests (`node run.mjs`, needs `npm install` in that folder). Screenshots go to `e2e/screens/` (not committed).
   - `Dockerfile`, `requirements.txt`, `requirements-dev.txt`.
   - `compain/config.py`: settings from environment variables.
@@ -73,6 +76,11 @@ Known gaps and risks:
   - `compain/security.py`: scrypt password hashing, hashed session tokens.
   - `compain/deps.py`: database session, current user, admin check.
   - `compain/content.py`: adults-only check.
+  - `compain/settings.py`: server settings (Server Management) with validation.
+  - `compain/secret.py`: encryption of the stored API key.
+  - `compain/backup.py`: backup, restore, retention, nightly schedule check.
+  - `compain/cards.py`: character card import.
+  - `compain/ws.py`: live sync hub and `/ws` endpoint.
   - `compain/llm.py`: OpenAI-compatible streaming client. `mock` URL gives a test reply.
   - `compain/routes/`: `auth.py`, `characters.py`, `chats.py` (streaming replies), `admin.py`.
   - `compain/main.py`: app factory, router wiring, first admin from environment.
@@ -86,4 +94,6 @@ Known gaps and risks:
 - Browser tests: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs`
 - Run with Docker: `docker compose up --build -d`
 - Health check: `curl http://localhost:8080/api/health`
+- With a model: put the GGUF file in `models/`, set `COMPAIN_MODEL_BASE_URL=http://llm-mistral:8081/v1` in `.env`, then `docker compose --profile llm-mistral up -d`
+- With HTTPS: set `COMPAIN_DOMAIN` in `.env`, then `docker compose --profile https up -d`
 - Stop: `docker compose down` (keeps the database volume; add `-v` only to delete all data)

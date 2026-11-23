@@ -393,3 +393,9 @@
 /* Build fix: palette cards are buttons; let their grid fill the whole card. */
 .palette-card { justify-content: stretch; align-items: stretch; }
 .palette-card .preview { display: block; width: 100%; }
+/* Phones: number tiles two per row, so overviews stay short. */
+@media (max-width: 900px) {
+  #view-home .grid-3, #view-admin .admin-panel > .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  #view-home .stat-card, #view-admin .stat-card { padding: 14px; }
+  #view-home .stat, #view-admin .stat { font-size: 24px; }
+}
