@@ -20,6 +20,7 @@ from .deps import get_db
 from .models import User
 from .routes import admin, auth, characters, chats, export, legal, media
 from .security import hash_password
+from .loginguard import LoginGuard
 from .ws import Hub, router as ws_router
 
 log = logging.getLogger("compain")
@@ -41,12 +42,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = make_engine(settings.database_url)
     app.state.session_factory = make_session_factory(app.state.engine)
     app.state.hub = Hub()
+    app.state.login_guard = LoginGuard()
 
     app.include_router(auth.router)
     app.include_router(characters.router)
     app.include_router(chats.router)
     app.include_router(admin.router)
     app.include_router(media.router)
+    app.include_router(media.users_router)
     app.include_router(export.router)
     app.include_router(legal.router)
     app.include_router(ws_router)

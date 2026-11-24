@@ -25,7 +25,9 @@ class Settings:
     hosted_daily_total: int
     data_dir: str
     impressum_file: str
+    datenschutz_file: str
     changelog_file: str
+    offsite_dir: str
 
 
 def load_settings() -> Settings:
@@ -48,5 +50,7 @@ def load_settings() -> Settings:
         data_dir=os.environ.get("COMPAIN_DATA_DIR", "./data"),
         # The real Impressum lives in .impressum (not in git); .impressum-example is the template.
         impressum_file=os.environ.get("COMPAIN_IMPRESSUM_FILE", "../.impressum"),
+        datenschutz_file=os.environ.get("COMPAIN_DATENSCHUTZ_FILE", "../.datenschutz"),
         changelog_file=os.environ.get("COMPAIN_CHANGELOG_FILE", "../CHANGELOG.md"),
+        offsite_dir=os.environ.get("COMPAIN_OFFSITE_DIR", ""),
     )

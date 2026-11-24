@@ -230,7 +230,8 @@ def test_greeting_opens_the_chat_and_turns_alternate(tmp_path):
     chat = client.post("/api/chats", json={"character_id": cid}, headers=h).json()
     assert chat["message_count"] == 1 and chat["unread"] == 0
     detail = client.get(f"/api/chats/{chat['id']}", headers=h).json()
-    assert detail["messages"][0] == {"id": detail["messages"][0]["id"], "role": "assistant", "content": "*Rain.* You're late.", "important": False}
+    first = detail["messages"][0]
+    assert (first["role"], first["content"], first["character_name"]) == ("assistant", "*Rain.* You're late.", "Mara")
 
     with app.state.session_factory() as db:
         db.add(Message(chat_id=chat["id"], role="user", content="one"))
@@ -294,7 +295,8 @@ def test_long_history_is_trimmed_to_the_context_window(tmp_path):
     total_chars = sum(len(m["content"]) for m in msgs)
     assert total_chars / 3.5 <= 2048
     assert msgs[1]["role"] == "user"  # still starts with a user turn
-    assert msgs[-1]["content"].startswith("turn 59")  # the newest turn is kept
+    # The newest turn is kept; it is the character's, so a short stage direction lets the model go on.
+    assert msgs[-2]["content"].startswith("turn 59") and msgs[-1]["content"] == "(Continue the scene.)"
     client.__exit__(None, None, None)
 
 

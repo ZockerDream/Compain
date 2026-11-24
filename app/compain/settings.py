@@ -43,6 +43,7 @@ SCHEMA: dict[str, tuple[str, object]] = {
     "backup_time": ("str", "03:00"),
     "backup_keep_days": ("int", 14),
     "backup_include_pictures": ("bool", True),
+    "backup_offsite": ("bool", False),  # also copy each backup to the second place (COMPAIN_OFFSITE_DIR)
     "backup_last_run": ("str", ""),
     "backup_last_status": ("str", "never"),
     # Storage

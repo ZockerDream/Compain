@@ -117,3 +117,15 @@ async def import_card(
             c.picture_path = str(target)
             db.commit()
     return {"id": c.id, "name": c.name}
+
+
+users_router = APIRouter(prefix="/api/users", tags=["media"])
+
+
+@users_router.get("/{user_id}/avatar")
+def user_avatar(user_id: int, _: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Profile pictures of users are visible to everyone who is logged in (they appear in the Community)."""
+    u = db.get(User, user_id)
+    if u is None or not u.avatar_path or not Path(u.avatar_path).exists():
+        raise HTTPException(status_code=404, detail="No picture")
+    return FileResponse(u.avatar_path, headers={"Cache-Control": "private, no-cache"})

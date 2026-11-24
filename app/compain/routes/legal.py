@@ -1,4 +1,4 @@
-"""Public pages: Impressum (legal notice) and the changelog.
+"""Public pages: Impressum (legal notice), Datenschutzerklärung (privacy policy) and the changelog.
 
 The Impressum text comes from the file .impressum in the project folder (not in git, it holds
 real names and addresses). .impressum-example is the template. Lines starting with "# " become
@@ -83,6 +83,22 @@ def impressum_page(settings: Settings = Depends(get_settings)):
 @router.get("/api/legal/impressum", response_class=PlainTextResponse)
 def impressum_text(settings: Settings = Depends(get_settings)):
     text = _read(settings.impressum_file)
+    return PlainTextResponse(text or "", status_code=200 if text else 404)
+
+
+@router.get("/datenschutz", response_class=HTMLResponse)
+def privacy_page(settings: Settings = Depends(get_settings)):
+    text = _read(settings.datenschutz_file)
+    if text is None:
+        body = ("<h1>Datenschutzerklärung</h1><p>Die Datenschutzerklärung ist noch nicht eingerichtet. "
+                "Der Betreiber muss die Datei <code>.datenschutz</code> anlegen (Vorlage: <code>.datenschutz-example</code>).</p>")
+        return HTMLResponse(PAGE.format(title="Datenschutz", body=body), status_code=503)
+    return HTMLResponse(PAGE.format(title="Datenschutz", body=_to_html(text)))
+
+
+@router.get("/api/legal/datenschutz", response_class=PlainTextResponse)
+def privacy_text(settings: Settings = Depends(get_settings)):
+    text = _read(settings.datenschutz_file)
     return PlainTextResponse(text or "", status_code=200 if text else 404)
 
 

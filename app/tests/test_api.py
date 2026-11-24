@@ -32,6 +32,8 @@ def make_settings(tmp_path, **overrides) -> Settings:
         hosted_daily_total=500,
         data_dir=str(tmp_path / "data"),
         impressum_file=str(tmp_path / ".impressum"),
+        datenschutz_file=str(tmp_path / ".datenschutz"),
+        offsite_dir=str(tmp_path / "offsite"),
         changelog_file=str(Path(__file__).resolve().parents[2] / "CHANGELOG.md"),
     )
     base.update(overrides)

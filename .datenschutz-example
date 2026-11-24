@@ -1,0 +1,42 @@
+# Datenschutzerklärung
+
+Vorlage – vor der Nutzung an den eigenen Betrieb anpassen. Keine Rechtsberatung.
+
+## Verantwortlicher
+Max Mustermann
+Musterstraße 1
+12345 Musterstadt
+E-Mail: kontakt@example.com
+
+## Worum es geht
+Compain ist ein privates, nicht kommerzielles Rollenspiel-Angebot für eingeladene Personen ab 18 Jahren. Es läuft auf einem eigenen Server des Verantwortlichen.
+
+## Welche Daten verarbeitet werden
+- Konto: Benutzername, Anzeigename, Passwort (nur als sicherer Hash), Rolle, Zeitpunkt der Altersbestätigung.
+- Freiwillige Angaben: Profilbild, Hintergrundbild, Persona (Rollenname und Beschreibung).
+- Inhalte: deine Charaktere mit Bildern, Chats und Nachrichten, Story-Zusammenfassungen, Likes in der Community.
+- Einstellungen: Design, Farben, Sprache, Antwortlänge.
+- Technische Daten: IP-Adresse und Browser-Kennung deiner angemeldeten Geräte (für die Geräteliste), Zeitpunkt der letzten Nutzung. Fehlgeschlagene Anmeldeversuche werden nur im Arbeitsspeicher gezählt (Schutz vor Angriffen).
+- Optional bei Zwei-Faktor-Anmeldung: ein verschlüsseltes Geheimnis und gehashte Wiederherstellungscodes.
+
+## Wofür und auf welcher Grundlage
+- Bereitstellung des Dienstes und deines Kontos: Art. 6 Abs. 1 lit. b DSGVO.
+- Sicherheit, Schutz vor Missbrauch, Backups und Fehlersuche: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einem sicheren Betrieb).
+
+## Cookies und Speicher im Browser
+Es gibt nur ein technisch notwendiges Sitzungs-Cookie für die Anmeldung (§ 25 Abs. 2 TDDDG). Einstellungen werden zusätzlich im Speicher deines Browsers (localStorage) abgelegt. Es gibt keine Werbung, kein Tracking und keine Analyse-Dienste.
+
+## KI-Antworten
+Die Antworten der Figuren erzeugt ein Sprachmodell. Standardmäßig läuft es auf demselben Server; deine Nachrichten verlassen ihn dafür nicht.
+Wenn für einen Chat die gehostete API gewählt ist, werden die Nachrichten dieses Chats samt Figurenbeschreibung an den dort eingestellten Anbieter übertragen: [Anbieter, Sitz und Link zu dessen Datenschutzerklärung eintragen]. Dabei kann eine Übermittlung in ein Drittland stattfinden.
+
+## Empfänger
+Keine Weitergabe an Dritte, außer an den KI-Anbieter wie oben beschrieben. Veröffentlichst du einen Charakter in der Community, sehen ihn andere Benutzer nach Freigabe durch einen Admin.
+
+## Speicherdauer
+- Konto und Inhalte: bis du sie löschst. Unter Einstellungen → Konto kannst du dein Konto mit allen Inhalten jederzeit selbst löschen.
+- Backups: werden nach der eingestellten Frist automatisch gelöscht (derzeit [14] Tage).
+- Protokolle der Admin-Aktionen: [30] Tage.
+
+## Deine Rechte
+Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit (Export unter Profil → Deine Daten) und Widerspruch (Art. 15–21 DSGVO). Wende dich dafür an den Verantwortlichen. Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren, zum Beispiel bei der deines Bundeslandes.

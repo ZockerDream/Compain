@@ -147,6 +147,31 @@ def run_and_record(settings: Settings, db: DbSession) -> dict:
         db.commit()
         raise
     removed = prune(settings, int(cfg.get(db, "backup_keep_days")))
-    cfg.set_values(db, {"backup_last_status": "ok", "backup_last_run": datetime.now().strftime("%Y-%m-%d %H:%M")})
+    status = "ok"
+    offsite = None
+    if cfg.get(db, "backup_offsite"):
+        offsite = copy_offsite(settings, path, int(cfg.get(db, "backup_keep_days")))
+        if offsite is None:
+            status = "ok, but the second place is not writable"
+    cfg.set_values(db, {"backup_last_status": status, "backup_last_run": datetime.now().strftime("%Y-%m-%d %H:%M")})
     db.commit()
-    return {"name": path.name, "size_mb": round(path.stat().st_size / 1e6, 1), "removed_old": removed}
+    return {"name": path.name, "size_mb": round(path.stat().st_size / 1e6, 1), "removed_old": removed, "offsite": offsite}
+
+
+def offsite_info(settings: Settings) -> dict:
+    target = Path(settings.offsite_dir) if settings.offsite_dir else None
+    ok = bool(target and target.is_dir() and os.access(target, os.W_OK))
+    return {"configured": bool(settings.offsite_dir), "writable": ok}
+
+
+def copy_offsite(settings: Settings, path: Path, keep_days: int) -> str | None:
+    """Copy the backup to the second place and apply the same retention there."""
+    if not offsite_info(settings)["writable"]:
+        return None
+    target = Path(settings.offsite_dir) / path.name
+    shutil.copy2(path, target)
+    cutoff = datetime.now() - timedelta(days=keep_days)
+    for f in Path(settings.offsite_dir).glob("compain-*.tar.gz"):
+        if datetime.fromtimestamp(f.stat().st_mtime) < cutoff:
+            f.unlink()
+    return str(target)

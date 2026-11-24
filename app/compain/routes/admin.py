@@ -285,6 +285,11 @@ def list_backups(_: User = Depends(require_admin), settings: Settings = Depends(
     return backup_mod.list_backups(settings)
 
 
+@router.get("/backups-offsite")
+def offsite_status(_: User = Depends(require_admin), settings: Settings = Depends(get_settings)):
+    return backup_mod.offsite_info(settings)
+
+
 @router.post("/backups/run")
 def run_backup(admin: User = Depends(require_admin), db: DbSession = Depends(get_db), settings: Settings = Depends(get_settings)):
     try:

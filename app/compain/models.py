@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, false, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -25,6 +25,15 @@ class User(Base):
     preferences: Mapped[str] = mapped_column(Text, default="{}")  # JSON: theme, reply length, context
     # When the user confirmed being 18 or older (asked once, at the first login). None = not yet.
     age_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Two-factor login (TOTP). The secret is encrypted (secret.py); recovery codes are stored as hashes (JSON list).
+    totp_secret: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    recovery_codes: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
+    # Persona: who the user plays in roleplays; the model knows it.
+    persona_name: Mapped[str] = mapped_column(String(128), default="", server_default="")
+    persona_description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    avatar_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    background_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -38,6 +47,11 @@ class Session(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     remember: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Waiting for the second factor: such a session can only finish the login (5 minutes).
+    mfa_pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    user_agent: Mapped[str] = mapped_column(String(256), default="", server_default="")
+    ip: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -91,6 +105,11 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String(16))  # "user" | "assistant"
     content: Mapped[str] = mapped_column(Text)
     important: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Who spoke (characters can be switched in a running chat). None = the chat's character.
+    character_id: Mapped[int | None] = mapped_column(ForeignKey("characters.id", ondelete="SET NULL"), nullable=True)
+    # Alternative replies from "regenerate" (JSON list of texts); content is the chosen one.
+    variants: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
+    variant_index: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     chat: Mapped[Chat] = relationship(back_populates="messages")
@@ -125,3 +144,15 @@ class AuditLog(Base):
     user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     action: Mapped[str] = mapped_column(String(64))
     detail: Mapped[str] = mapped_column(Text, default="")
+
+
+class CharacterLike(Base):
+    """A user likes a Community character (one like per user and character)."""
+
+    __tablename__ = "character_likes"
+    __table_args__ = (UniqueConstraint("user_id", "character_id", name="uq_like_user_character"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -1,14 +1,18 @@
 """Chats and messages. Replies stream as Server-Sent Events.
 
 Rules (concept.md):
-- A chat belongs to one user and one character.
+- A chat belongs to one user. Its character can be switched while the story runs; every reply
+  remembers which character wrote it.
 - Up to 10 important messages per chat, always included in the model context.
+- Replies can be stopped (the part written so far is kept), regenerated (all versions are kept and
+  can be flipped through), continued, and every message can be edited or deleted.
 - Hosted model: a per-user daily message limit (and a total daily cap). Self-hosted: unlimited.
 """
 
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -31,6 +35,7 @@ SUMMARY_EVERY = 40  # new messages between two story summaries
 # Token caps per reply length. Generous on purpose: the length guide in the prompt sets the size,
 # the cap only stops runaway replies (a cut-off reply reads badly).
 REPLY_TOKENS = {"short": 90, "medium": 220, "long": 420, "xlong": 800}
+CONTINUE_PROMPT = "(Continue the scene.)"
 
 # Model keys the user can pick per chat. "self" = self-hosted, "hosted" = hosted API.
 MODEL_KINDS = {"self", "hosted"}
@@ -45,17 +50,30 @@ class ChatPatch(BaseModel):
     title: str | None = Field(default=None, max_length=256)
     pinned: bool | None = None
     model: str | None = None
+    character_id: int | None = None  # switch the character in the running chat
 
 
-class ImportantIn(BaseModel):
-    important: bool
+class MessagePatch(BaseModel):
+    important: bool | None = None
+    content: str | None = Field(default=None, min_length=1, max_length=8000)
 
 
-class MessageIn(BaseModel):
-    content: str = Field(min_length=1, max_length=8000)
+class ReplyOptions(BaseModel):
     reply_length: str = "medium"  # short | medium | long | xlong
     context_messages: int = Field(default=CONTEXT_MESSAGES, ge=4, le=200)
     language: str = "auto"  # auto | en | de
+
+
+class MessageIn(ReplyOptions):
+    content: str = Field(min_length=1, max_length=8000)
+
+
+class ReplyIn(ReplyOptions):
+    mode: str = "next"  # next = the character writes again / continues; regenerate = new version of the last reply
+
+
+class VariantIn(BaseModel):
+    index: int = Field(ge=0)
 
 
 def chat_out(c: Chat) -> dict:
@@ -77,8 +95,29 @@ def chat_out(c: Chat) -> dict:
     }
 
 
-def message_out(m: Message) -> dict:
-    return {"id": m.id, "role": m.role, "content": m.content, "important": m.important}
+def _variants(m: Message) -> list[str]:
+    try:
+        v = json.loads(m.variants or "[]")
+        return v if isinstance(v, list) else []
+    except ValueError:
+        return []
+
+
+def message_out(m: Message, names: dict[int, tuple[str, bool]] | None = None, chat: Chat | None = None) -> dict:
+    char_id = m.character_id if m.character_id is not None else (chat.character_id if chat and m.role == "assistant" else None)
+    name, pic = (names or {}).get(char_id, (None, False)) if char_id else (None, False)
+    variants = _variants(m)
+    return {
+        "id": m.id, "role": m.role, "content": m.content, "important": m.important,
+        "character_id": char_id, "character_name": name, "character_has_picture": pic,
+        "variant_count": max(1, len(variants)), "variant_index": m.variant_index if variants else 0,
+    }
+
+
+def character_names(db: DbSession, chat: Chat) -> dict[int, tuple[str, bool]]:
+    ids = {m.character_id for m in chat.messages if m.character_id} | {chat.character_id}
+    rows = db.query(Character).filter(Character.id.in_(ids)).all()
+    return {c.id: (c.name, bool(c.picture_path)) for c in rows}
 
 
 def owned_chat(db: DbSession, chat_id: int, user: User) -> Chat:
@@ -114,6 +153,19 @@ def total_usage_today(db: DbSession) -> int:
     return db.query(func.coalesce(func.sum(ApiUsage.count), 0)).filter(ApiUsage.day == date.today()).scalar() or 0
 
 
+def charge_hosted(db: DbSession, user: User, settings: Settings, kind: str) -> None:
+    """Every reply from the hosted API counts against the daily limits (also continue and regenerate)."""
+    if kind != "hosted":
+        return
+    per_user, total = effective_limits(db, settings)
+    if usage_today(db, user) >= per_user:
+        raise HTTPException(status_code=429, detail="Daily limit for the hosted API reached")
+    if total_usage_today(db) >= total:
+        raise HTTPException(status_code=429, detail="Total daily limit for the hosted API reached")
+    bump_usage(db, user)
+    db.commit()
+
+
 LENGTH_GUIDE = {
     "short": "Reply very briefly: one short action in *asterisks* and at most one short line of speech, "
              "no more than 25 words in total. Example: *she laughs heartily and whispers* Thank you for the night.",
@@ -130,7 +182,8 @@ LANGUAGE_GUIDE = {
 
 
 def system_prompt(
-    c: Character, summary: str, important_texts: list[str], reply_length: str = "medium", language: str = "auto"
+    c: Character, summary: str, important_texts: list[str], reply_length: str = "medium", language: str = "auto",
+    persona_name: str = "", persona_description: str = "", others: list[str] | None = None,
 ) -> str:
     parts = [
         f"You are {c.name}. {c.tagline}".strip(),
@@ -145,6 +198,12 @@ def system_prompt(
         LENGTH_GUIDE.get(reply_length, LENGTH_GUIDE["medium"]),
         LANGUAGE_GUIDE.get(language, LANGUAGE_GUIDE["auto"]),
     ]
+    if persona_name or persona_description:
+        who = persona_name or "the user"
+        parts.append(f"The user plays {who}." + (f" About {who}: {persona_description}" if persona_description else ""))
+    if others:
+        parts.append("Earlier in this story other characters spoke: " + ", ".join(others)
+                     + f". Their lines are marked with their name in brackets. You are {c.name} now; do not write their lines.")
     if summary:
         parts.append(f"Story so far (summary): {summary}")
     if important_texts:
@@ -153,19 +212,27 @@ def system_prompt(
 
 
 def build_context(
-    db: DbSession, chat: Chat, character: Character, limit: int, reply_length: str = "medium", language: str = "auto"
+    db: DbSession, chat: Chat, character: Character, limit: int, reply_length: str = "medium", language: str = "auto",
+    persona_name: str = "", persona_description: str = "", messages: list[Message] | None = None,
 ) -> list[dict]:
-    important = [m.content for m in chat.messages if m.important]
-    recent = chat.messages[-limit:]
+    msgs = chat.messages if messages is None else messages
+    important = [m.content for m in msgs if m.important]
+    recent = msgs[-limit:]
+    names = character_names(db, chat)
+    others = sorted({names[m.character_id][0] for m in recent
+                     if m.role == "assistant" and m.character_id and m.character_id != character.id and m.character_id in names})
     # Many chat templates (Mistral, Gemma) need user and assistant turns to alternate, starting with
     # the user. Merge repeated roles (for example after a failed reply) and open with a user turn.
     history: list[dict] = []
     for m in recent:
+        content = m.content
+        if m.role == "assistant" and m.character_id and m.character_id != character.id and m.character_id in names:
+            content = f"[{names[m.character_id][0]}]: {content}"
         if history and history[-1]["role"] == m.role:
-            history[-1]["content"] += "\n\n" + m.content
+            history[-1]["content"] += "\n\n" + content
         else:
-            history.append({"role": m.role, "content": m.content})
-    system = system_prompt(character, chat.summary, important, reply_length, language)
+            history.append({"role": m.role, "content": content})
+    system = system_prompt(character, chat.summary, important, reply_length, language, persona_name, persona_description, others)
 
     # Stay inside the model's context window: drop the oldest turns first. Rough estimate:
     # about 3.5 characters per token, plus room for the reply.
@@ -176,10 +243,11 @@ def build_context(
 
     while len(history) > 1 and tokens(history) > budget:
         history.pop(0)
-    while history and history[0]["role"] == "assistant" and len(history) > 1 and tokens(history) > budget:
-        history.pop(0)
     if history and history[0]["role"] == "assistant":
         history.insert(0, {"role": "user", "content": "(The scene begins.)"})
+    # The model answers a user turn; to let the character continue, add a short stage direction.
+    if not history or history[-1]["role"] == "assistant":
+        history.append({"role": "user", "content": CONTINUE_PROMPT})
     return build_messages(system, history)
 
 
@@ -235,56 +303,104 @@ async def update_summary(session_factory, settings: Settings, chat_id: int, kind
         db.commit()
 
 
-async def stream_reply(
-    request_settings: Settings,
-    chat_id: int,
-    user_id: int,
-    model_kind: str,
-    body: MessageIn,
-    session_factory,
-    hub=None,
-) -> AsyncIterator[bytes]:
-    def event(payload: dict) -> bytes:
-        return f"data: {json.dumps(payload)}\n\n".encode()
+@dataclass
+class Job:
+    """One reply to write. mode: send (after a new user message), next, regenerate."""
+    chat_id: int
+    user_id: int
+    kind: str
+    mode: str
+    options: ReplyOptions
+    persona_name: str = ""
+    persona_description: str = ""
+    user_text: str | None = None
 
+
+def _event(payload: dict) -> bytes:
+    return f"data: {json.dumps(payload)}\n\n".encode()
+
+
+def _store(session_factory, job: Job, text: str, character_id: int, regenerate_id: int | None) -> int | None:
+    """Save the reply. Regenerating adds a new version to the last message instead of a new message."""
+    if not text:
+        return None
     with session_factory() as db:
-        chat = db.get(Chat, chat_id)
-        character = db.get(Character, chat.character_id)
-        db.add(Message(chat_id=chat_id, role="user", content=body.content))
-        chat.updated_at = utcnow()
-        db.commit()
-        db.refresh(chat)
-        messages = build_context(db, chat, character, body.context_messages, body.reply_length, body.language)
-    await notify(hub, user_id)
-
-    with session_factory() as db:
-        base_url, api_key, model_name = endpoint_for(request_settings, model_kind, db)
-
-    pieces: list[str] = []
-    try:
-        async for piece in stream_chat(
-            base_url, api_key, model_name, messages, REPLY_TOKENS.get(body.reply_length, 400)
-        ):
-            pieces.append(piece)
-            yield event({"delta": piece})
-    except Exception as exc:  # network or model errors are shown to the user, not hidden
-        yield event({"error": f"Model not reachable: {type(exc).__name__}"})
-        return
-
-    text = "".join(pieces).strip()
-    with session_factory() as db:
-        msg = Message(chat_id=chat_id, role="assistant", content=text)
-        db.add(msg)
-        chat = db.get(Chat, chat_id)
+        chat = db.get(Chat, job.chat_id)
+        if chat is None:
+            return None
+        if regenerate_id is not None:
+            msg = db.get(Message, regenerate_id)
+            versions = _variants(msg) or [msg.content]
+            versions.append(text)
+            msg.variants = json.dumps(versions)
+            msg.variant_index = len(versions) - 1
+            msg.content = text
+        else:
+            msg = Message(chat_id=job.chat_id, role="assistant", content=text, character_id=character_id)
+            db.add(msg)
         chat.updated_at = utcnow()
         db.commit()
         db.refresh(msg)
+        return msg.id
+
+
+async def stream_reply(settings: Settings, job: Job, session_factory, hub=None) -> AsyncIterator[bytes]:
+    with session_factory() as db:
+        chat = db.get(Chat, job.chat_id)
+        character = db.get(Character, chat.character_id)
+        if job.mode == "send":
+            db.add(Message(chat_id=job.chat_id, role="user", content=job.user_text))
+            chat.updated_at = utcnow()
+            db.commit()
+            db.refresh(chat)
+        history = list(chat.messages)
+        regenerate_id = None
+        if job.mode == "regenerate":
+            regenerate_id = history[-1].id
+            history = history[:-1]
+        messages = build_context(db, chat, character, job.options.context_messages, job.options.reply_length,
+                                 job.options.language, job.persona_name, job.persona_description, history)
+        character_id = character.id
+        base_url, api_key, model_name = endpoint_for(settings, job.kind, db)
+    if job.mode == "send":
+        await notify(hub, job.user_id)
+
+    pieces: list[str] = []
+    try:
+        async for piece in stream_chat(base_url, api_key, model_name, messages, REPLY_TOKENS.get(job.options.reply_length, 400)):
+            pieces.append(piece)
+            yield _event({"delta": piece})
+    except (asyncio.CancelledError, GeneratorExit):
+        # The user pressed Stop (the browser closed the connection): keep what was written so far.
+        _store(session_factory, job, "".join(pieces).strip(), character_id, regenerate_id)
+        raise
+    except Exception as exc:  # network or model errors are shown to the user, not hidden
+        yield _event({"error": f"Model not reachable: {type(exc).__name__}"})
+        return
+
+    msg_id = _store(session_factory, job, "".join(pieces).strip(), character_id, regenerate_id)
+    with session_factory() as db:
+        chat = db.get(Chat, job.chat_id)
         due = sum(1 for m in chat.messages if m.id > chat.summary_upto) >= SUMMARY_EVERY
-        msg_id = msg.id
-    await notify(hub, user_id)
+    await notify(hub, job.user_id)
     if due:
-        asyncio.create_task(update_summary(session_factory, request_settings, chat_id, model_kind))
-    yield event({"done": True, "message_id": msg_id})
+        asyncio.create_task(update_summary(session_factory, settings, job.chat_id, job.kind))
+    yield _event({"done": True, "message_id": msg_id})
+
+
+def _streaming(settings: Settings, job: Job, request: Request) -> StreamingResponse:
+    return StreamingResponse(
+        stream_reply(settings, job, request.app.state.session_factory, request.app.state.hub),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def _usable_character(db: DbSession, user: User, character_id: int) -> Character:
+    character = db.get(Character, character_id)
+    if character is None or (character.owner_id != user.id and character.visibility != "public"):
+        raise HTTPException(status_code=404, detail="Character not found")
+    return character
 
 
 @router.get("")
@@ -302,15 +418,13 @@ def list_chats(user: User = Depends(current_user), db: DbSession = Depends(get_d
 async def create_chat(body: ChatIn, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     model = body.model or cfg.get(db, "default_model")
     check_model_kind(model)
-    character = db.get(Character, body.character_id)
-    if character is None or (character.owner_id != user.id and character.visibility != "public"):
-        raise HTTPException(status_code=404, detail="Character not found")
+    character = _usable_character(db, user, body.character_id)
     c = Chat(owner_id=user.id, character_id=character.id, title=character.name, model=model)
     db.add(c)
     db.commit()
     if character.greeting:
         # The character opens the scene, like in Chai.
-        greeting = Message(chat_id=c.id, role="assistant", content=character.greeting)
+        greeting = Message(chat_id=c.id, role="assistant", content=character.greeting, character_id=character.id)
         db.add(greeting)
         db.commit()
         c.read_upto = greeting.id
@@ -323,7 +437,8 @@ async def create_chat(body: ChatIn, request: Request, user: User = Depends(curre
 @router.get("/{chat_id}")
 def get_chat(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     c = owned_chat(db, chat_id, user)
-    out = {**chat_out(c), "summary": c.summary, "messages": [message_out(m) for m in c.messages]}
+    names = character_names(db, c)
+    out = {**chat_out(c), "summary": c.summary, "messages": [message_out(m, names, c) for m in c.messages]}
     if c.messages:
         c.read_upto = c.messages[-1].id
         db.commit()
@@ -334,12 +449,23 @@ def get_chat(chat_id: int, user: User = Depends(current_user), db: DbSession = D
 async def update_chat(chat_id: int, body: ChatPatch, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     c = owned_chat(db, chat_id, user)
     changes = body.model_dump(exclude_unset=True)
-    if "model" in changes and changes["model"] is not None:
+    if changes.get("model") is not None:
         check_model_kind(changes["model"])
+    if changes.get("character_id") is not None and changes["character_id"] != c.character_id:
+        new = _usable_character(db, user, changes["character_id"])
+        # Earlier replies keep their author when the character changes.
+        for m in c.messages:
+            if m.role == "assistant" and m.character_id is None:
+                m.character_id = c.character_id
+        c.character_id = new.id
+        changes.pop("character_id")
+    else:
+        changes.pop("character_id", None)
     for key, value in changes.items():
         if value is not None:
             setattr(c, key, value)
     db.commit()
+    db.refresh(c)
     await notify(request.app.state.hub, user.id)
     return chat_out(c)
 
@@ -354,50 +480,96 @@ async def delete_chat(chat_id: int, request: Request, user: User = Depends(curre
 
 
 @router.patch("/{chat_id}/messages/{message_id}")
-async def mark_important(
-    chat_id: int,
-    message_id: int,
-    body: ImportantIn,
-    request: Request,
-    user: User = Depends(current_user),
-    db: DbSession = Depends(get_db),
-):
+async def update_message(chat_id: int, message_id: int, body: MessagePatch, request: Request,
+                         user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Mark as important, or edit the text (own lines and the character's replies)."""
     c = owned_chat(db, chat_id, user)
     msg = next((m for m in c.messages if m.id == message_id), None)
     if msg is None:
         raise HTTPException(status_code=404, detail="Message not found")
-    if body.important and not msg.important:
-        count = sum(1 for m in c.messages if m.important)
-        if count >= MAX_IMPORTANT:
+    if body.important is not None:
+        if body.important and not msg.important and sum(1 for m in c.messages if m.important) >= MAX_IMPORTANT:
             raise HTTPException(status_code=409, detail=f"Limit: {MAX_IMPORTANT} important messages per chat")
-    msg.important = body.important
+        msg.important = body.important
+    if body.content is not None:
+        text = body.content.strip()
+        if msg.role == "assistant" and _variants(msg):
+            versions = _variants(msg)
+            versions[msg.variant_index] = text
+            msg.variants = json.dumps(versions)
+        msg.content = text
     db.commit()
     await notify(request.app.state.hub, user.id)
-    return message_out(msg)
+    return message_out(msg, character_names(db, c), c)
+
+
+@router.delete("/{chat_id}/messages/{message_id}")
+async def delete_message(chat_id: int, message_id: int, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    c = owned_chat(db, chat_id, user)
+    msg = next((m for m in c.messages if m.id == message_id), None)
+    if msg is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+    db.delete(msg)
+    db.commit()
+    await notify(request.app.state.hub, user.id)
+    return {"ok": True}
+
+
+@router.delete("/{chat_id}/messages/{message_id}/after")
+async def delete_after(chat_id: int, message_id: int, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Rewind: delete every message after this one (used for "edit and resend")."""
+    c = owned_chat(db, chat_id, user)
+    if not any(m.id == message_id for m in c.messages):
+        raise HTTPException(status_code=404, detail="Message not found")
+    removed = 0
+    for m in list(c.messages):
+        if m.id > message_id:
+            db.delete(m)
+            removed += 1
+    db.commit()
+    await notify(request.app.state.hub, user.id)
+    return {"ok": True, "removed": removed}
+
+
+@router.post("/{chat_id}/messages/{message_id}/variant")
+async def choose_variant(chat_id: int, message_id: int, body: VariantIn, request: Request,
+                         user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Flip through the versions of a regenerated reply."""
+    c = owned_chat(db, chat_id, user)
+    msg = next((m for m in c.messages if m.id == message_id), None)
+    if msg is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+    versions = _variants(msg)
+    if body.index >= len(versions):
+        raise HTTPException(status_code=422, detail="No such version")
+    msg.variant_index = body.index
+    msg.content = versions[body.index]
+    db.commit()
+    await notify(request.app.state.hub, user.id)
+    return message_out(msg, character_names(db, c), c)
 
 
 @router.post("/{chat_id}/messages")
-async def send_message(
-    chat_id: int,
-    body: MessageIn,
-    request: Request,
-    user: User = Depends(current_user),
-    db: DbSession = Depends(get_db),
-    settings: Settings = Depends(get_settings),
-):
+async def send_message(chat_id: int, body: MessageIn, request: Request, user: User = Depends(current_user),
+                       db: DbSession = Depends(get_db), settings: Settings = Depends(get_settings)):
     c = owned_chat(db, chat_id, user)
     kind = c.model or "self"
-    if kind == "hosted":
-        per_user, total = effective_limits(db, settings)
-        if usage_today(db, user) >= per_user:
-            raise HTTPException(status_code=429, detail="Daily limit for the hosted API reached")
-        if total_usage_today(db) >= total:
-            raise HTTPException(status_code=429, detail="Total daily limit for the hosted API reached")
-        bump_usage(db, user)
-        db.commit()
+    charge_hosted(db, user, settings, kind)
+    job = Job(c.id, user.id, kind, "send", body, user.persona_name, user.persona_description, body.content)
+    return _streaming(settings, job, request)
 
-    return StreamingResponse(
-        stream_reply(settings, c.id, user.id, kind, body, request.app.state.session_factory, request.app.state.hub),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+
+@router.post("/{chat_id}/reply")
+async def reply(chat_id: int, body: ReplyIn, request: Request, user: User = Depends(current_user),
+                db: DbSession = Depends(get_db), settings: Settings = Depends(get_settings)):
+    """Let the character write without a new user message: continue the scene ("next"),
+    or write a new version of the last reply ("regenerate")."""
+    c = owned_chat(db, chat_id, user)
+    if body.mode not in {"next", "regenerate"}:
+        raise HTTPException(status_code=422, detail="Mode must be 'next' or 'regenerate'")
+    if body.mode == "regenerate" and (not c.messages or c.messages[-1].role != "assistant"):
+        raise HTTPException(status_code=409, detail="Only the last reply of the character can be regenerated")
+    kind = c.model or "self"
+    charge_hosted(db, user, settings, kind)
+    job = Job(c.id, user.id, kind, body.mode, body, user.persona_name, user.persona_description)
+    return _streaming(settings, job, request)

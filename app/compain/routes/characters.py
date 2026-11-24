@@ -144,8 +144,48 @@ def publish_character(character_id: int, user: User = Depends(current_user), db:
 
 @router.get("/community")
 def community(user: User = Depends(current_user), db: DbSession = Depends(get_db)):
-    rows = db.query(Character).filter(Character.visibility == "public").order_by(Character.name).all()
-    return [character_out(c, user) for c in rows]
+    """Public characters, most liked first, with likes and how often they were used for a chat."""
+    from sqlalchemy import func
+
+    from ..models import CharacterLike, Chat
+
+    rows = db.query(Character).filter(Character.visibility == "public").all()
+    ids = [c.id for c in rows]
+    likes = dict(db.query(CharacterLike.character_id, func.count(CharacterLike.id))
+                 .filter(CharacterLike.character_id.in_(ids)).group_by(CharacterLike.character_id).all()) if ids else {}
+    mine = {cid for (cid,) in db.query(CharacterLike.character_id)
+            .filter(CharacterLike.user_id == user.id, CharacterLike.character_id.in_(ids)).all()} if ids else set()
+    uses = dict(db.query(Chat.character_id, func.count(Chat.id))
+                .filter(Chat.character_id.in_(ids)).group_by(Chat.character_id).all()) if ids else {}
+    out = []
+    for c in rows:
+        item = character_out(c, user)
+        item.update(likes=likes.get(c.id, 0), liked=c.id in mine, uses=uses.get(c.id, 0))
+        out.append(item)
+    out.sort(key=lambda x: (-x["likes"], -x["uses"], x["name"].lower()))
+    return out
+
+
+@router.post("/community/{character_id}/like")
+def like(character_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    from ..models import CharacterLike
+
+    c = get_character_or_404(db, character_id)
+    if c.visibility != "public":
+        raise HTTPException(status_code=404, detail="Character not found in Community")
+    if not db.query(CharacterLike).filter_by(user_id=user.id, character_id=c.id).first():
+        db.add(CharacterLike(user_id=user.id, character_id=c.id))
+        db.commit()
+    return {"ok": True}
+
+
+@router.delete("/community/{character_id}/like")
+def unlike(character_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    from ..models import CharacterLike
+
+    db.query(CharacterLike).filter_by(user_id=user.id, character_id=character_id).delete()
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/community/{character_id}/add", status_code=201)

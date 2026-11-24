@@ -40,13 +40,24 @@ def _token_from_request(request: Request) -> str | None:
     return request.cookies.get(SESSION_COOKIE)
 
 
+MFA_PATHS = {"/api/auth/login/2fa", "/api/auth/logout"}
+
+
 def current_session(request: Request, db: Session = Depends(get_db)) -> UserSession:
     token = _token_from_request(request)
     if not token:
         raise HTTPException(status_code=401, detail="Not logged in")
     session = db.query(UserSession).filter(UserSession.token_hash == hash_token(token)).one_or_none()
-    if session is None or as_utc(session.expires_at) <= datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    if session is None or as_utc(session.expires_at) <= now:
         raise HTTPException(status_code=401, detail="Session expired, log in again")
+    if session.mfa_pending and request.url.path not in MFA_PATHS:
+        raise HTTPException(status_code=401, detail="mfa_required")
+    # Remember when the device was last seen (for the device list), at most once a minute.
+    last = as_utc(session.last_seen)
+    if last is None or (now - last).total_seconds() > 60:
+        session.last_seen = now
+        db.commit()
     return session
 
 

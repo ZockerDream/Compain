@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 COMPAIN_DATA_DIR=/srv/app/data \
-    COMPAIN_IMPRESSUM_FILE=/srv/app/legal/impressum COMPAIN_CHANGELOG_FILE=/srv/app/CHANGELOG.md
+    COMPAIN_IMPRESSUM_FILE=/srv/app/legal/impressum COMPAIN_DATENSCHUTZ_FILE=/srv/app/legal/datenschutz \
+    COMPAIN_CHANGELOG_FILE=/srv/app/CHANGELOG.md COMPAIN_OFFSITE_DIR=/srv/app/offsite
 WORKDIR /srv/app
 
 # Build context is the project folder (see docker-compose.yml).
