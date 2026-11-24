@@ -6,12 +6,16 @@ Rules (concept.md):
 - Adults only: the content check runs on every save.
 """
 
+import shutil
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
 
 from ..content import minor_violation
-from ..deps import get_db, current_user
+from ..config import Settings
+from ..deps import current_user, get_db, get_settings
 from ..models import Character, User
 
 router = APIRouter(prefix="/api", tags=["characters"])
@@ -137,19 +141,22 @@ def publish_character(character_id: int, user: User = Depends(current_user), db:
     c = get_character_or_404(db, character_id)
     if c.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Only the owner can publish a character")
-    c.visibility = "pending"  # waits for admin review
+    # Admins publish straight into the Community; everyone else waits for an admin's review.
+    c.visibility = "public" if user.role == "admin" else "pending"
     db.commit()
     return character_out(c, user)
 
 
 @router.get("/community")
 def community(user: User = Depends(current_user), db: DbSession = Depends(get_db)):
-    """Public characters, most liked first, with likes and how often they were used for a chat."""
-    from sqlalchemy import func
+    """Public characters, most liked first, with likes and how often they were used for a chat.
+    The viewer's own characters that wait for review are listed too (only for them), marked pending."""
+    from sqlalchemy import func, or_
 
     from ..models import CharacterLike, Chat
 
-    rows = db.query(Character).filter(Character.visibility == "public").all()
+    rows = db.query(Character).filter(or_(Character.visibility == "public",
+                                          (Character.visibility == "pending") & (Character.owner_id == user.id))).all()
     ids = [c.id for c in rows]
     likes = dict(db.query(CharacterLike.character_id, func.count(CharacterLike.id))
                  .filter(CharacterLike.character_id.in_(ids)).group_by(CharacterLike.character_id).all()) if ids else {}
@@ -162,7 +169,7 @@ def community(user: User = Depends(current_user), db: DbSession = Depends(get_db
         item = character_out(c, user)
         item.update(likes=likes.get(c.id, 0), liked=c.id in mine, uses=uses.get(c.id, 0))
         out.append(item)
-    out.sort(key=lambda x: (-x["likes"], -x["uses"], x["name"].lower()))
+    out.sort(key=lambda x: (x["visibility"] != "public", -x["likes"], -x["uses"], x["name"].lower()))
     return out
 
 
@@ -189,7 +196,8 @@ def unlike(character_id: int, user: User = Depends(current_user), db: DbSession 
 
 
 @router.post("/community/{character_id}/add", status_code=201)
-def add_from_community(character_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+def add_from_community(character_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db),
+                       settings: Settings = Depends(get_settings)):
     src = get_character_or_404(db, character_id)
     if src.visibility != "public":
         raise HTTPException(status_code=404, detail="Character not found in Community")
@@ -205,6 +213,14 @@ def add_from_community(character_id: int, user: User = Depends(current_user), db
         visibility="private",
     )
     db.add(copy)
+    db.flush()
+    # The picture comes along: it is a big part of who the character is.
+    if src.picture_path and Path(src.picture_path).exists():
+        from .media import picture_dir
+
+        target = picture_dir(settings) / f"{copy.id}{Path(src.picture_path).suffix}"
+        shutil.copyfile(src.picture_path, target)
+        copy.picture_path = str(target)
     db.commit()
     db.refresh(copy)
     return character_out(copy, user)

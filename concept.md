@@ -66,7 +66,7 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 3. Edit and delete: users only their own characters, admins all characters.
 4. Import character cards: card JSON V1 to V3 (SillyTavern, Chub and others), cards embedded in PNG, lists of cards, and plain text; several files at once or by dropping them. Export a character as a V2 card (PNG with picture, or JSON).
 5. Export characters and chats as JSON: per character, per chat, and everything at once (Profile, Your data; chat header; character cards). One chat also as Markdown to read. The JSON files can be imported again (Chats page, Profile).
-6. Community: a user can publish a character. The admin can approve it, hide it, or leave it in the review queue. Other users add it to their list and chat with it.
+6. Community: a user can publish a character. The admin can approve it, hide it, or leave it in the review queue; until then only its owner sees it in the Community, marked as waiting. Characters an admin publishes go in without review. Other users add it (with its picture) to their list and chat with it.
 
 ## Settings and preferences (version 1)
 

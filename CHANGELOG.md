@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.3.3 – 2026-11-24
+
+- **Publishing:** characters an admin publishes go straight into the Community. Characters of other users still wait for an admin's review; meanwhile their owner sees them in the Community marked *Waiting for review*.
+- **Large pictures:** character cards on the Characters and Community pages show the picture large. A click on a picture (also the one in the chat header) shows it in full size. The character editor shows the current or newly chosen picture.
+- *Add to my characters* in the Community now copies the picture too.
+
 ## 1.3.2 – 2026-11-24
 
 - **The app uses the whole screen.** The page is no longer limited to 1200 pixels; on wide screens the chat, the chat list and the messages grow with the window. The chat panel ends above the bottom edge, so the input field is fully visible.

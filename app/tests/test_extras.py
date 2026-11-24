@@ -198,3 +198,29 @@ def test_reply_reports_its_status_and_admin_sees_the_queue(tmp_path):
     assert client.put("/api/admin/settings", json={"model_slots": 0}, headers=h).status_code == 422
     assert client.put("/api/admin/settings", json={"model_slots": 3}, headers=h).json()["model_slots"] == 3
     client.__exit__(None, None, None)
+
+
+# ---------- community (1.3.3) ----------
+
+def test_publish_goes_to_community_and_the_picture_comes_along(tmp_path):
+    app, client, h = admin_client(tmp_path)
+    # An admin publishes straight into the Community.
+    own = client.post("/api/characters", json={"name": "Nyx"}, headers=h).json()["id"]
+    png = png_with_card({"spec": "chara_card_v2", "data": {"name": "x"}})
+    assert client.put(f"/api/characters/{own}/picture", content=png, headers={**h, "Content-Type": "image/png"}).status_code == 200
+    assert client.post(f"/api/characters/{own}/publish", headers=h).json()["visibility"] == "public"
+
+    # A user's character waits for review; only its owner sees it in the Community meanwhile.
+    create_user(client, h, "rita")
+    rita = auth_headers(client, "rita", USER_PW)
+    mine = client.post("/api/characters", json={"name": "Rook"}, headers=rita).json()["id"]
+    assert client.post(f"/api/characters/{mine}/publish", headers=rita).json()["visibility"] == "pending"
+    seen = {c["name"]: c["visibility"] for c in client.get("/api/community", headers=rita).json()}
+    assert seen == {"Nyx": "public", "Rook": "pending"}
+    assert [c["name"] for c in client.get("/api/community", headers=h).json()] == ["Nyx"]
+
+    # Adding from the Community copies the picture too.
+    copy = client.post(f"/api/community/{own}/add", headers=rita).json()
+    assert copy["has_picture"]
+    assert client.get(f"/api/characters/{copy['id']}/picture", headers=rita).content == png
+    client.__exit__(None, None, None)

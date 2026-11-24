@@ -62,6 +62,28 @@
     return box;
   }
 
+  // The character's picture, large (cards), or null without one. A click shows it full size.
+  function coverPicture(name, characterId, hasPicture, cls) {
+    if (!hasPicture || !characterId) return null;
+    var btn = el("button", { class: "char-cover" + (cls ? " " + cls : ""), type: "button", "aria-label": "Show the picture of " + name + " in full size",
+      onclick: function () { openPicture(name, characterId); } },
+      el("img", { src: "/api/characters/" + characterId + "/picture", alt: "", loading: "lazy" }));
+    btn.querySelector("img").addEventListener("error", function () { btn.remove(); });
+    return btn;
+  }
+
+  // Full-size picture over the page. Click anywhere or Escape closes it.
+  function openPicture(name, characterId) {
+    var box = el("div", { class: "lightbox", role: "dialog", "aria-modal": "true", "aria-label": name },
+      el("img", { src: "/api/characters/" + characterId + "/picture", alt: name }),
+      el("div", { class: "lightbox-name", text: name }));
+    function close() { box.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") close(); }
+    box.addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(box);
+  }
+
   // The user's own profile picture, or initials.
   function userAvatar(u, cls, style) {
     var box = el("span", { class: "avatar alt" + (cls ? " " + cls : ""), style: style || null, text: u.has_avatar ? null : initials(u.display_name || u.username) });
@@ -602,7 +624,10 @@
 
     pane.appendChild(el("header", { class: "conv-head" },
       el("button", { class: "ghost icon-only back-btn", "aria-label": "Back to chat list", onclick: function () { go("chats"); } }, icon("i-back")),
-      avatar(chat.character_name, chat.character_id, chat.character_has_picture),
+      chat.character_has_picture
+        ? el("button", { class: "avatar-btn", type: "button", "aria-label": "Show the picture of " + chat.character_name + " in full size",
+            onclick: function () { openPicture(chat.character_name, chat.character_id); } }, avatar(chat.character_name, chat.character_id, true))
+        : avatar(chat.character_name, chat.character_id, false),
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "name ellipsis", text: chat.character_name }),
         el("div", { class: "meta ellipsis", text: chat.title + (chat.character_tagline ? " · " + chat.character_tagline : "") })),
@@ -994,8 +1019,9 @@
 
   function characterCard(c) {
     var status = c.visibility === "public" ? "Public" : c.visibility === "pending" ? "In review" : "Private";
-    var card = el("article", { class: "card char-card lift" },
-      el("div", { class: "row" }, avatar(c.name, c.id, c.has_picture),
+    var card = el("article", { class: "card char-card lift" + (c.has_picture ? " with-cover" : "") },
+      coverPicture(c.name, c.id, c.has_picture),
+      el("div", { class: "row" }, c.has_picture ? null : avatar(c.name, c.id, false),
         el("div", { class: "grow", style: "min-width:0" }, el("h3", { class: "ellipsis", text: c.name }), el("div", { class: "muted small ellipsis", text: c.tagline || "" }))),
       el("p", { class: "desc", text: c.description || "No description yet." }),
       el("div", { class: "tags" }, el("span", { class: "pill", text: status }), c.tags.map(function (t) { return el("span", { class: "pill", text: t }); })),
@@ -1007,7 +1033,11 @@
         el("button", { class: "ghost", onclick: function () { state.editing = c; renderCharacters(); } }, "Edit"),
         el("a", { class: "btn ghost", href: "/api/characters/" + c.id + "/card", download: "", title: "Download as a character card (PNG with picture, else JSON)" }, "Card"),
         c.visibility === "private" ? el("button", { class: "ghost", onclick: async function () {
-          try { await api("/api/characters/" + c.id + "/publish", { method: "POST" }); toast("Sent to review"); renderCharacters(); }
+          try {
+            var pub = await api("/api/characters/" + c.id + "/publish", { method: "POST" });
+            toast(pub.visibility === "public" ? "Published in the Community" : "Sent to review");
+            renderCharacters();
+          }
           catch (e) { toast(e.message); }
         } }, "Publish") : null));
     return card;
@@ -1024,6 +1054,16 @@
       return el("div", null, el("label", { for: "f-" + key, text: label }), input);
     }
     var pictureInput = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", id: "f-picture", style: "width:auto" });
+    // Large preview: the saved picture, or the chosen file before saving.
+    var picturePreview = el("div", { class: "picture-preview" + (c.has_picture ? "" : " hidden") },
+      c.has_picture ? el("img", { src: "/api/characters/" + c.id + "/picture", alt: "Current picture" }) : null);
+    pictureInput.addEventListener("change", function () {
+      var file = pictureInput.files && pictureInput.files[0];
+      if (!file) return;
+      picturePreview.textContent = "";
+      picturePreview.appendChild(el("img", { src: URL.createObjectURL(file), alt: "Chosen picture" }));
+      picturePreview.classList.remove("hidden");
+    });
     var err = el("p", { class: "small", style: "color:var(--warn);min-height:1.2em" });
 
     async function save() {
@@ -1060,7 +1100,8 @@
       field("greeting", "Greeting", true, c.greeting),
       field("scenario", "Scenario", true, c.scenario),
       field("tags", "Tags (comma-separated)", false, (c.tags || []).join(", ")),
-      el("div", null, el("label", { for: "f-picture", text: "Profile picture" }), pictureInput),
+      el("div", null, el("label", { for: "f-picture", text: "Profile picture" }),
+        el("div", { class: "picture-edit" }, picturePreview, pictureInput)),
       err,
       el("div", { class: "row", style: "flex-wrap:wrap" },
         el("button", { class: "primary", onclick: save }, "Save character"),
@@ -1083,14 +1124,14 @@
     var items = await api("/api/community");
     view.appendChild(el("div", { class: "page-head" },
       el("div", null, el("div", { class: "caps eyebrow", text: "Shared by users" }), el("h1", { text: "Community" }),
-        el("p", { text: "Characters others have published. Add one to your list, then start a chat." }))));
+        el("p", { text: "Published characters. Add one to your list, then start a chat." }))));
 
     if (!items.length) {
       view.appendChild(el("div", { class: "empty-card" }, "Nothing published yet. Publish one of your characters from the Characters page; an admin approves it first."));
       return;
     }
     var top = items[0];
-    view.appendChild(el("div", { class: "featured" },
+    if (top.visibility === "public") view.appendChild(el("div", { class: "featured" },
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "caps", text: top.likes ? "Most liked · ♥ " + top.likes : "Featured" }),
         el("h2", { style: "margin-top:6px;font-size:24px", text: top.name }),
@@ -1098,7 +1139,7 @@
         el("div", { class: "row", style: "margin-top:14px;flex-wrap:wrap" },
           el("button", { class: "primary", onclick: function () { startChat(top.id); } }, "Start chat"),
           el("button", { onclick: function () { addToMine(top.id); } }, "Add to my characters"))),
-      avatar(top.name, top.id, top.has_picture, "lg")));
+      coverPicture(top.name, top.id, top.has_picture, "featured-pic") || avatar(top.name, top.id, false, "lg")));
 
     var filters = el("div", { class: "filter-row", role: "group", "aria-label": "Community filter" });
     ["all", "fantasy", "modern", "drama"].forEach(function (f) {
@@ -1110,12 +1151,14 @@
     var grid = el("div", { class: "grid grid-3" });
     items.filter(function (c) { return state.communityFilter === "all" || c.tags.indexOf(state.communityFilter) !== -1; })
       .forEach(function (c) {
-        grid.appendChild(el("article", { class: "card char-card lift" },
-          el("div", { class: "row" }, avatar(c.name, c.id, c.has_picture, "alt"),
+        var pending = c.visibility !== "public";
+        grid.appendChild(el("article", { class: "card char-card lift" + (c.has_picture ? " with-cover" : "") },
+          coverPicture(c.name, c.id, c.has_picture),
+          el("div", { class: "row" }, c.has_picture ? null : avatar(c.name, c.id, false, "alt"),
             el("div", { class: "grow", style: "min-width:0" }, el("h3", { class: "ellipsis", text: c.name }), el("div", { class: "muted small", text: c.mine ? "Yours" : "Shared by a user" }))),
           el("p", { class: "desc", text: c.description || c.tagline }),
-          el("div", { class: "tags" }, c.tags.map(function (t) { return el("span", { class: "pill", text: t }); })),
-          el("div", { class: "foot" },
+          el("div", { class: "tags" }, pending ? el("span", { class: "pill", text: "Waiting for review" }) : null, c.tags.map(function (t) { return el("span", { class: "pill", text: t }); })),
+          pending ? el("p", { class: "muted small", text: "Only you see it here until an admin approves it." }) : el("div", { class: "foot" },
             el("span", { class: "stats" },
               el("button", { class: "like" + (c.liked ? " on" : ""), "aria-pressed": c.liked ? "true" : "false", "aria-label": c.liked ? "Unlike" : "Like",
                 onclick: async function () {

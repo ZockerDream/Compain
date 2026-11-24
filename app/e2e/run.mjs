@@ -120,8 +120,13 @@ await page.setInputFiles("#f-picture", { name: "mara.png", mimeType: "image/png"
 await page.click("text=Save character");
 await page.waitForSelector("#view-characters .char-card", { timeout: 10000 });
 check("character is created and listed", (await page.textContent("#view-characters")).includes("Mara Stone"));
-await page.waitForSelector("#view-characters .char-card .avatar img", { timeout: 10000 }).catch(() => {});
-check("uploaded picture is shown as the avatar", (await page.locator("#view-characters .char-card .avatar img").count()) > 0);
+await page.waitForSelector("#view-characters .char-card .char-cover img", { timeout: 10000 }).catch(() => {});
+check("uploaded picture is shown large on the card", (await page.locator("#view-characters .char-card .char-cover img").count()) > 0);
+await page.locator("#view-characters .char-cover").first().click();
+await page.waitForSelector(".lightbox img", { timeout: 5000 }).catch(() => {});
+check("a click on the picture shows it in full size", (await page.locator(".lightbox img").count()) === 1);
+await page.keyboard.press("Escape");
+check("Escape closes the full-size picture", (await page.locator(".lightbox").count()) === 0);
 
 // Adults-only rule shows in the UI
 await page.click("#view-characters .new-tile");
@@ -319,7 +324,7 @@ await page.click("#nav-desktop button[data-go=characters]");
 await page.waitForSelector("#view-characters .char-card");
 await page.locator("#view-characters .char-card:has-text('Mara Stone') .ghost:has-text('Publish')").first().click();
 await page.waitForTimeout(500);
-check("publish sends the character to review", (await page.textContent("#view-characters")).includes("In review"));
+check("an admin publishes straight into the Community", (await page.textContent("#view-characters")).includes("Public"));
 
 // Admin: overview and review queue
 await page.click("#nav-desktop button[data-go=admin]");

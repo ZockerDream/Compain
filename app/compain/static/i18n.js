@@ -50,8 +50,8 @@
     "Adults only (18+). Pictures: PNG, JPG or WebP, up to 10 MB.": "Nur Erwachsene (18+). Bilder: PNG, JPG oder WebP, bis 10 MB.",
     "Sent to review": "Zur Prüfung gesendet",
     // community
-    "Shared by users": "Von Benutzern geteilt", "Characters others have published. Add one to your list, then start a chat.":
-      "Charaktere, die andere veröffentlicht haben. Füge einen zu deiner Liste hinzu und starte einen Chat.",
+    "Shared by users": "Von Benutzern geteilt", "Published characters. Add one to your list, then start a chat.":
+      "Veröffentlichte Charaktere. Füge einen zu deiner Liste hinzu und starte einen Chat.",
     "Featured": "Empfohlen", "Start chat": "Chat starten", "Add to my characters": "Zu meinen Charakteren", "Add": "Hinzufügen",
     "Fantasy": "Fantasy", "Modern": "Modern", "Drama": "Drama", "Yours": "Deiner", "Shared by a user": "Von einem Benutzer geteilt",
     "Added to your characters": "Zu deinen Charakteren hinzugefügt",
@@ -195,6 +195,9 @@
     "Send and close": "Senden und schließen", "Internal note (only admins see it)": "Interne Notiz (nur Admins sehen sie)",
     "Ctrl+Enter sends": "Strg+Enter sendet", "Tickets": "Tickets", "waiting for an answer": "warten auf eine Antwort",
     "Set password": "Passwort setzen", "Password set": "Passwort gesetzt",
+    // 1.3.3: Community and pictures
+    "Published in the Community": "In der Community veröffentlicht", "Waiting for review": "Wartet auf Prüfung",
+    "Only you see it here until an admin approves it.": "Nur du siehst ihn hier, bis ein Admin ihn freigibt.",
     // 1.3.0: export, import, cards, search, bookmarks, model queue
     "Export this chat": "Diesen Chat exportieren", "Markdown (to read)": "Markdown (zum Lesen)", "JSON (to import again)": "JSON (zum erneuten Import)",
     "Bookmark": "Lesezeichen", "Bookmarked": "Lesezeichen gesetzt", "Bookmark removed": "Lesezeichen entfernt",
