@@ -75,7 +75,7 @@
     "Overview": "Übersicht", "Users": "Benutzer", "Hosted API": "Gehostete API", "Access & security": "Zugang & Sicherheit",
     "Domain & HTTPS": "Domain & HTTPS", "Models": "Modelle", "Backups": "Backups", "Storage": "Speicher", "Logs & maintenance": "Logs & Wartung",
     "accounts": "Konten", "all users": "alle Benutzer", "stored": "gespeichert", "messages, all users": "Nachrichten, alle Benutzer",
-    "Disk": "Festplatte", "Endpoints and status": "Endpunkte und Status", "Self-hosted model": "Eigenes Modell", "Model runs on": "Modell läuft auf", "Graphics card (GPU)": "Grafikkarte (GPU)", "Processor (CPU)": "Prozessor (CPU)",
+    "Disk": "Festplatte", "Endpoints and status": "Endpunkte und Status", "Self-hosted model": "Eigenes Modell", "Model runs on": "Modell läuft auf", "Turn this on after starting the proxy: set COMPAIN_DOMAIN and COMPOSE_PROFILES=https in .env, then docker compose up -d.": "Einschalten, nachdem der Proxy läuft: COMPAIN_DOMAIN und COMPOSE_PROFILES=https in .env setzen, dann docker compose up -d.", "Graphics card (GPU)": "Grafikkarte (GPU)", "Processor (CPU)": "Prozessor (CPU)",
     "Change it on the server with ./scripts/llm.sh gpu or ./scripts/llm.sh cpu.": "Umstellen auf dem Server mit ./scripts/llm.sh gpu oder ./scripts/llm.sh cpu.", "Database": "Datenbank",
     "Maintenance mode": "Wartungsmodus", "On": "An", "Off": "Aus", "Save": "Speichern", "Saved": "Gespeichert", "Nothing changed.": "Nichts geändert.",
     "Role": "Rolle", "Status": "Status", "Disable": "Sperren", "Enable": "Freigeben", "Disabled": "Gesperrt", "Add user": "Benutzer hinzufügen",

@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.4.0 – 2026-11-24
+
+- **Install and update with two commands.** `git pull` and `docker compose up -d` are enough: the app is rebuilt, the database is updated, and the model server always starts with it. On the first start it downloads the model by itself (Gemma 4, about 17 GB); no profile and no download script needed any more.
+- The model is chosen with `LLM_MODEL` in `.env` (`gemma`, `mistral` or `none`). HTTPS is turned on with `COMPOSE_PROFILES=https` in `.env`.
+- The graphics card is now an add-on file (`docker-compose.gpu.yml`); `./scripts/llm.sh gpu` turns it on, `./scripts/llm.sh cpu` off.
+
 ## 1.3.5 – 2026-11-24
 
 - **The model can run on the graphics card.** `./scripts/llm.sh gpu` starts the model with an NVIDIA graphics card, `./scripts/llm.sh cpu` back on the processor only, for servers without a card. Replies come much faster on the graphics card. The choice is kept in `.env`; `./scripts/update.sh` keeps it too.

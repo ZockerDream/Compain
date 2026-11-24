@@ -1,0 +1,17 @@
+# Runs the model on an NVIDIA graphics card. Turn it on with ./scripts/llm.sh gpu, which adds this file
+# through COMPOSE_FILE in .env; needs the NVIDIA Container Toolkit (see README, "Graphics card").
+# llama.cpp puts as much of the model into graphics memory as fits and keeps the rest in RAM;
+# LLM_GPU_RESERVE_MB (default 1024) stays free for the desktop.
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    environment:
+      LLM_DEVICE: gpu
+      LLM_GPU_RESERVE_MB: ${LLM_GPU_RESERVE_MB:-1024}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

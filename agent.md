@@ -72,7 +72,7 @@ Known risks:
 
 ## Layout
 
-- `docker-compose.yml`: `db` (PostgreSQL 17), `app` (API and web UI on port 8080), optional profiles `llm-mistral`, `llm-gemma` (llama.cpp on port 8081 inside Docker; `llm-gemma-gpu` and `llm-mistral-gpu` are the same on an NVIDIA card with the `server-cuda` image and the network alias of the CPU service, chosen with `scripts/llm.sh`) and `https` (Caddy on 80/443). Reads `.env`.
+- `docker-compose.yml`: `db` (PostgreSQL 17), `app` (API and web UI on port 8080), `llm` (llama.cpp on port 8081 inside Docker, aliases `llm-gemma` and `llm-mistral`; `scripts/llm-start.sh` downloads the model named by `LLM_MODEL` on the first start, file names and addresses in `scripts/models.sh`), optional profile `https` (Caddy on 80/443). The app has `pull_policy: build`, so `docker compose up -d` rebuilds it after `git pull`. `docker-compose.gpu.yml` puts `llm` on an NVIDIA card (`server-cuda` image), added through `COMPOSE_FILE` by `scripts/llm.sh gpu`. Reads `.env`.
 - `Caddyfile`: HTTPS reverse proxy for `COMPAIN_DOMAIN`.
 - `models/`: GGUF model files (git-ignored, several GB).
 - `.env.example`: all variables. Copy to `.env` and set real passwords.
@@ -105,7 +105,7 @@ Known risks:
 - Browser tests: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs` (the admin login comes from `.env`; `ADMIN_USER`/`ADMIN_PW` override it)
 - Run with Docker: `docker compose up --build -d`
 - Health check: `curl http://localhost:8080/api/health`
-- With the model: `./scripts/download-models.sh`, set `COMPAIN_MODEL_BASE_URL=http://llm-gemma:8081/v1` in `.env`, then `docker compose --profile llm-gemma up -d`
+- Start everything, including the model (downloaded on the first start): `docker compose up -d`
 - On the graphics card: `./scripts/llm.sh gpu` (needs the NVIDIA Container Toolkit, see README); back: `./scripts/llm.sh cpu`
 - Browser tests with a real model: add `REPLY_TIMEOUT=300000` (milliseconds) before `node run.mjs`
 - With HTTPS: set `COMPAIN_DOMAIN` in `.env`, then `docker compose --profile https up -d`

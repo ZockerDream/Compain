@@ -1,29 +1,5 @@
 # Compain: app + PostgreSQL. Secrets come from .env (never committed).
 
-# Shared settings of the self-hosted model servers (see the llm-* services below).
-x-llm-cpu: &llm-cpu
-  image: ghcr.io/ggml-org/llama.cpp:server
-  restart: unless-stopped
-  volumes:
-    - ./models:/models:ro
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-    interval: 30s
-    timeout: 5s
-    retries: 3
-    start_period: 120s
-
-x-llm-gpu: &llm-gpu
-  <<: *llm-cpu
-  image: ghcr.io/ggml-org/llama.cpp:server-cuda
-  deploy:
-    resources:
-      reservations:
-        devices:
-          - driver: nvidia
-            count: all
-            capabilities: [gpu]
-
 services:
   db:
     image: postgres:17-alpine
@@ -44,6 +20,8 @@ services:
     build:
       context: .
       dockerfile: app/Dockerfile
+    # Build on every "docker compose up", so after "git pull" the new code runs (unchanged layers come from the cache).
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       db:
@@ -53,8 +31,8 @@ services:
       COMPAIN_SECRET_KEY: ${COMPAIN_SECRET_KEY:?set COMPAIN_SECRET_KEY in .env}
       COMPAIN_ADMIN_USERNAME: ${COMPAIN_ADMIN_USERNAME:-admin}
       COMPAIN_ADMIN_PASSWORD: ${COMPAIN_ADMIN_PASSWORD:?set COMPAIN_ADMIN_PASSWORD in .env}
-      COMPAIN_MODEL_BASE_URL: ${COMPAIN_MODEL_BASE_URL:-mock}
-      COMPAIN_MODEL_NAME: ${COMPAIN_MODEL_NAME:-mistral-small-3.2}
+      COMPAIN_MODEL_BASE_URL: ${COMPAIN_MODEL_BASE_URL:-http://llm:8081/v1}
+      COMPAIN_MODEL_NAME: ${COMPAIN_MODEL_NAME:-gemma-4-26b-a4b}
       COMPAIN_MODEL_DEVICE: ${LLM_DEVICE:-cpu}
       COMPAIN_HOSTED_API_BASE_URL: ${COMPAIN_HOSTED_API_BASE_URL:-mock}
       COMPAIN_HOSTED_API_KEY: ${COMPAIN_HOSTED_API_KEY:-}
@@ -80,37 +58,33 @@ services:
     ports:
       - "8080:8080"
 
-  # Self-hosted model servers (llama.cpp, OpenAI-compatible). Pick model and device with
-  #   ./scripts/llm.sh gpu gemma      (or: cpu gemma, gpu mistral, cpu mistral)
-  # The script sets COMPOSE_PROFILES and LLM_DEVICE in .env and restarts the model server.
-  # The GPU variants need an NVIDIA card and the NVIDIA Container Toolkit; llama.cpp puts as much of
-  # the model into the graphics memory as fits (--fit) and keeps the rest in RAM. Both variants of a
-  # model answer under the same name (llm-gemma, llm-mistral), so COMPAIN_MODEL_BASE_URL stays the same.
-  llm-mistral:
-    <<: *llm-cpu
-    profiles: ["llm-mistral"]
-    command: ["-m", "/models/mistral-small-3.2-abliterated-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "${LLM_CONTEXT:-16384}", "-np", "${LLM_SLOTS:-2}", "-t", "${LLM_THREADS:-6}", "--reasoning", "off"]
-
-  llm-mistral-gpu:
-    <<: *llm-gpu
-    profiles: ["llm-mistral-gpu"]
+  # Self-hosted model server (llama.cpp, OpenAI-compatible), always started with the app.
+  # On the first start it downloads the model into ./models (about 17 GB, resumes if interrupted).
+  # LLM_MODEL in .env: gemma (default), mistral, or none for no self-hosted model.
+  # It runs on the processor. For an NVIDIA graphics card add docker-compose.gpu.yml (./scripts/llm.sh gpu).
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    restart: unless-stopped
+    entrypoint: ["sh", "/scripts/llm-start.sh"]
+    environment:
+      LLM_MODEL: ${LLM_MODEL:-gemma}
+      LLM_CONTEXT: ${LLM_CONTEXT:-16384}
+      LLM_SLOTS: ${LLM_SLOTS:-2}
+      LLM_THREADS: ${LLM_THREADS:-6}
+    volumes:
+      - ./models:/models
+      - ./scripts/llm-start.sh:/scripts/llm-start.sh:ro
+      - ./scripts/models.sh:/scripts/models.sh:ro
     networks:
       default:
-        aliases: [llm-mistral]
-    command: ["-m", "/models/mistral-small-3.2-abliterated-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "${LLM_CONTEXT:-16384}", "-np", "${LLM_SLOTS:-2}", "-t", "${LLM_THREADS:-6}", "--reasoning", "off", "--fit-target", "${LLM_GPU_RESERVE_MB:-1024}"]
-
-  llm-gemma:
-    <<: *llm-cpu
-    profiles: ["llm-gemma"]
-    command: ["-m", "/models/gemma-4-26b-a4b-uncensored-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "${LLM_CONTEXT:-16384}", "-np", "${LLM_SLOTS:-2}", "-t", "${LLM_THREADS:-6}", "--reasoning", "off"]
-
-  llm-gemma-gpu:
-    <<: *llm-gpu
-    profiles: ["llm-gemma-gpu"]
-    networks:
-      default:
-        aliases: [llm-gemma]
-    command: ["-m", "/models/gemma-4-26b-a4b-uncensored-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "${LLM_CONTEXT:-16384}", "-np", "${LLM_SLOTS:-2}", "-t", "${LLM_THREADS:-6}", "--reasoning", "off", "--fit-target", "${LLM_GPU_RESERVE_MB:-1024}"]
+        # older .env files point to http://llm-gemma:8081/v1 or http://llm-mistral:8081/v1
+        aliases: [llm-gemma, llm-mistral]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
 
   # HTTPS in front of the app. Start with: docker compose --profile https up -d
   # Needs COMPAIN_DOMAIN in .env (a domain pointing to this server) and ports 80 and 443 open.

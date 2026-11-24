@@ -163,9 +163,11 @@ Notes:
 - Reading a long history is the slow part on CPU. llama.cpp reuses the unchanged start of the prompt between turns, so only new messages are read.
 - Content limits were not tested beyond normal roleplay. Test adult scenarios yourself before relying on either model.
 
-Decision: **Gemma 4 26B-A4B uncensored is the default self-hosted model** (`--profile llm-gemma`). Mistral stays available as `--profile llm-mistral`.
+Decision: **Gemma 4 26B-A4B uncensored is the default self-hosted model** (`LLM_MODEL=gemma`). Mistral stays available as `LLM_MODEL=mistral`.
 
-Decision (1.3.5): **GPU or CPU is chosen on the server, not in the app.** Each model has a CPU service (`llama.cpp:server`) and a GPU service (`llama.cpp:server-cuda`, NVIDIA device reservation, `--fit` puts as much as fits into graphics memory, `--fit-target LLM_GPU_RESERVE_MB` stays free). The GPU service carries the network alias of the CPU service, so the app URL does not change. `scripts/llm.sh gpu|cpu [model]` writes `LLM_DEVICE` and `COMPOSE_PROFILES` into `.env` and restarts; the app only shows `LLM_DEVICE` (Server Management, Overview). Switching from inside the app would need the Docker socket in the app container, which means root on the host; not worth it for a setting that changes with the machine. A GPU service cannot start without an NVIDIA card, so a server without one uses the CPU service.
+Decision (1.3.5): **GPU or CPU is chosen on the server, not in the app.** The `llm` service runs on the processor (`llama.cpp:server`); `docker-compose.gpu.yml` switches it to `llama.cpp:server-cuda` with an NVIDIA device reservation (`--fit` puts as much as fits into graphics memory, `--fit-target LLM_GPU_RESERVE_MB` stays free). `scripts/llm.sh gpu|cpu` writes `LLM_DEVICE` and `COMPOSE_FILE` into `.env` and restarts; the app only shows `LLM_DEVICE` (Server Management, Overview). Switching from inside the app would need the Docker socket in the app container, which means root on the host; not worth it for a setting that changes with the machine. A GPU reservation cannot start without an NVIDIA card, so the processor is the default.
+
+Decision (1.4.0): **`git pull` and `docker compose up -d` are the whole update.** The model server is no longer behind a profile but always starts; it downloads its model itself on the first start (to `*.part`, renamed when complete, resumes after a restart). The app has `pull_policy: build`, so it is rebuilt on every `up` (cached layers make that quick). Migrations already ran on start. Only `.env`, `.impressum` and `.datenschutz` are set up once by hand, because they hold passwords and personal details.
 
 ## Decisions log
 

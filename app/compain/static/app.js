@@ -2072,7 +2072,7 @@
   function adminDomain(body) {
     body.appendChild(panel("Address", settingsForm([
       { key: "domain", label: "Domain (optional)", type: "text", help: "For example compain.example.com. It must point to this server." },
-      { key: "https_enabled", label: "HTTPS is set up", type: "bool", help: "Turn this on after starting the proxy: docker compose --profile https up -d (set COMPAIN_DOMAIN in .env first)." }
+      { key: "https_enabled", label: "HTTPS is set up", type: "bool", help: "Turn this on after starting the proxy: set COMPAIN_DOMAIN and COMPOSE_PROFILES=https in .env, then docker compose up -d." }
     ])));
     body.appendChild(panel("Where to reach Compain", el("p", { class: "muted small", text: "Now: http://this-server:8080 (home network only). After HTTPS: https://your-domain. Login details are not encrypted over plain HTTP, so do not open port 8080 to the internet." })));
   }
