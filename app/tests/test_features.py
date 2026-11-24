@@ -213,11 +213,11 @@ def test_logout_everyone_ends_all_sessions(tmp_path):
 def test_preferences_are_stored_per_user(tmp_path):
     app, client, h = admin_client(tmp_path)
     assert client.get("/api/auth/preferences", headers=h).json() == {}
-    r = client.put("/api/auth/preferences", json={"palette": "violet", "ctx": 200}, headers=h)
-    assert r.status_code == 200 and r.json() == {"palette": "violet", "ctx": 200}
+    r = client.put("/api/auth/preferences", json={"palette": "indigo", "ctx": 200}, headers=h)
+    assert r.status_code == 200 and r.json() == {"palette": "indigo", "ctx": 200}
     assert client.put("/api/auth/preferences", json={"palette": "neon"}, headers=h).status_code == 422
     assert client.put("/api/auth/preferences", json={"admin": True}, headers=h).status_code == 422
-    assert client.get("/api/auth/preferences", headers=h).json()["palette"] == "violet"
+    assert client.get("/api/auth/preferences", headers=h).json()["palette"] == "indigo"
     client.__exit__(None, None, None)
 
 
@@ -240,7 +240,7 @@ def test_greeting_opens_the_chat_and_turns_alternate(tmp_path):
         msgs = build_context(db, c, db.get(Character, cid), 60, "short", "de")
     roles = [m["role"] for m in msgs]
     assert roles == ["system", "user", "assistant", "user"]
-    assert "German" in msgs[0]["content"] and "one to three sentences" in msgs[0]["content"]
+    assert "German" in msgs[0]["content"] and "25 words" in msgs[0]["content"]
     assert msgs[-1]["content"] == "one\n\ntwo"
     client.__exit__(None, None, None)
 
@@ -295,4 +295,62 @@ def test_long_history_is_trimmed_to_the_context_window(tmp_path):
     assert total_chars / 3.5 <= 2048
     assert msgs[1]["role"] == "user"  # still starts with a user turn
     assert msgs[-1]["content"].startswith("turn 59")  # the newest turn is kept
+    client.__exit__(None, None, None)
+
+
+def test_impressum_page_is_public_and_escaped(tmp_path):
+    app, client = make_client(tmp_path)
+    with client:
+        r = client.get("/impressum")
+        assert r.status_code == 503 and ".impressum-example" in r.text  # not set up yet
+        (tmp_path / ".impressum").write_text("# Impressum\n## Angaben\nMax <script>x</script> Muster\n- Punkt\n", encoding="utf-8")
+        r = client.get("/impressum")
+        assert r.status_code == 200
+        assert "<h1>Impressum</h1>" in r.text and "<li>Punkt</li>" in r.text
+        assert "<script>x</script>" not in r.text and "&lt;script&gt;" in r.text
+        assert client.get("/api/legal/impressum").text.startswith("# Impressum")
+
+
+def test_changelog_lists_the_current_version(tmp_path):
+    app, client = make_client(tmp_path)
+    with client:
+        assert app.version in client.get("/api/changelog").text
+        assert client.get("/changelog").status_code == 200
+
+
+def test_four_reply_lengths(tmp_path):
+    from compain.models import Character, Chat
+    from compain.routes.chats import LENGTH_GUIDE, build_context
+
+    app, client, h = admin_client(tmp_path)
+    assert set(LENGTH_GUIDE) == {"short", "medium", "long", "xlong"}
+    cid = client.post("/api/characters", json={"name": "Mara"}, headers=h).json()["id"]
+    chat = client.post("/api/chats", json={"character_id": cid}, headers=h).json()
+    with app.state.session_factory() as db:
+        msgs = build_context(db, db.get(Chat, chat["id"]), db.get(Character, cid), 60, "xlong", "auto")
+    assert "four paragraphs" in msgs[0]["content"]
+    with client.stream("POST", f"/api/chats/{chat['id']}/messages", json={"content": "hi", "reply_length": "short"}, headers=h) as r:
+        assert r.status_code == 200
+        _stream_events(r)
+    assert client.put("/api/auth/preferences", json={"replyLength": "xlong"}, headers=h).status_code == 200
+    client.__exit__(None, None, None)
+
+
+def test_preferences_reach_other_devices_live(tmp_path):
+    app, client, h = admin_client(tmp_path)
+    with client.websocket_connect("/ws") as ws:
+        assert ws.receive_json()["type"] == "hello"
+        client.put("/api/auth/preferences", json={"palette": "rose", "mode": "dark"}, headers=h)
+        event = ws.receive_json()
+        assert event["type"] == "prefs" and event["prefs"]["palette"] == "rose" and event["prefs"]["mode"] == "dark"
+    client.__exit__(None, None, None)
+
+
+def test_design_preferences_and_ranges(tmp_path):
+    app, client, h = admin_client(tmp_path)
+    ok = {"design": "modern-glass", "bg": "night", "blur": 24, "alpha": 55, "dim": 20, "palette": "emerald", "seenChangelog": "0.3.0"}
+    r = client.put("/api/auth/preferences", json=ok, headers=h)
+    assert r.status_code == 200 and r.json()["design"] == "modern-glass"
+    for bad in ({"design": "neon"}, {"blur": 99}, {"alpha": 5}, {"dim": True}, {"seenChangelog": "<b>"}, {"bg": "space"}):
+        assert client.put("/api/auth/preferences", json=bad, headers=h).status_code == 422, bad
     client.__exit__(None, None, None)

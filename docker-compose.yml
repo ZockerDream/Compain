@@ -16,7 +16,9 @@ services:
       retries: 20
 
   app:
-    build: ./app
+    build:
+      context: .
+      dockerfile: app/Dockerfile
     restart: unless-stopped
     depends_on:
       db:
@@ -33,6 +35,13 @@ services:
       COMPAIN_HOSTED_MODEL: ${COMPAIN_HOSTED_MODEL:-llama-3.1-8b-instant}
     volumes:
       - compain-data:/srv/app/data
+      # Impressum: create it once with  cp .impressum-example .impressum  and fill in your data.
+      - type: bind
+        source: ./.impressum
+        target: /srv/app/legal/impressum
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - "8080:8080"
 

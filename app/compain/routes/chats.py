@@ -28,7 +28,9 @@ router = APIRouter(prefix="/api/chats", tags=["chats"])
 MAX_IMPORTANT = 10
 CONTEXT_MESSAGES = 60
 SUMMARY_EVERY = 40  # new messages between two story summaries
-REPLY_TOKENS = {"short": 150, "medium": 400, "long": 900}
+# Token caps per reply length. Generous on purpose: the length guide in the prompt sets the size,
+# the cap only stops runaway replies (a cut-off reply reads badly).
+REPLY_TOKENS = {"short": 90, "medium": 220, "long": 420, "xlong": 800}
 
 # Model keys the user can pick per chat. "self" = self-hosted, "hosted" = hosted API.
 MODEL_KINDS = {"self", "hosted"}
@@ -51,7 +53,7 @@ class ImportantIn(BaseModel):
 
 class MessageIn(BaseModel):
     content: str = Field(min_length=1, max_length=8000)
-    reply_length: str = "medium"  # short | medium | long
+    reply_length: str = "medium"  # short | medium | long | xlong
     context_messages: int = Field(default=CONTEXT_MESSAGES, ge=4, le=200)
     language: str = "auto"  # auto | en | de
 
@@ -113,9 +115,12 @@ def total_usage_today(db: DbSession) -> int:
 
 
 LENGTH_GUIDE = {
-    "short": "Keep each reply short: one to three sentences.",
-    "medium": "Write one or two paragraphs per reply.",
-    "long": "Write rich, detailed replies of three to five paragraphs.",
+    "short": "Reply very briefly: one short action in *asterisks* and at most one short line of speech, "
+             "no more than 25 words in total. Example: *she laughs heartily and whispers* Thank you for the night.",
+    "medium": "Reply in one paragraph of about 50 to 70 words: an action in *asterisks* and a few lines of speech.",
+    "long": "Reply in two paragraphs, about 100 to 140 words in total, mixing actions in *asterisks* and speech.",
+    "xlong": "Reply in four paragraphs, about 200 to 280 words in total, with rich detail of the scene, "
+             "actions in *asterisks* and speech.",
 }
 LANGUAGE_GUIDE = {
     "de": "Always write in German.",

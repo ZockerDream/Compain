@@ -112,7 +112,22 @@
     "Are you 18 or older?": "Bist du 18 Jahre oder älter?",
     "Compain is for adults only. You answer this once for your account.": "Compain ist nur für Erwachsene. Du beantwortest das einmal für dein Konto.",
     "Yes, I am 18 or older": "Ja, ich bin 18 oder älter", "No": "Nein",
-    "Compain is for adults only (18+).": "Compain ist nur für Erwachsene (18+).", "From .env (default)": "Aus .env (Standard)"
+    "Compain is for adults only (18+).": "Compain ist nur für Erwachsene (18+).",
+    "Extra long": "Extra lang",
+    "Design": "Design", "How Compain looks on all your devices.": "So sieht Compain auf all deinen Geräten aus.",
+    "Classic": "Klassisch", "Sidebar, solid surfaces": "Seitenleiste, feste Flächen", "Glass": "Glass",
+    "Glass panels over a background": "Glas-Flächen über einem Hintergrund", "Modern": "Modern",
+    "Navigation on top, calm surfaces": "Navigation oben, ruhige Flächen", "Modern Glass": "Modern Glass",
+    "Navigation on top, glass over a background": "Navigation oben, Glas über einem Hintergrund",
+    "Background": "Hintergrund", "Dusk": "Abend", "Night": "Nacht", "Forest": "Wald", "None": "Keiner",
+    "Blur": "Unschärfe", "Panel opacity": "Deckkraft", "Dim background": "Hintergrund abdunkeln",
+    "On phones the blur is switched off, so scrolling stays smooth.": "Auf Handys ist die Unschärfe aus, damit das Scrollen flüssig bleibt.",
+    "Accent color and tinted surfaces for the whole app.": "Akzentfarbe und getönte Flächen für die ganze App.",
+    "Ember": "Glut", "Indigo": "Indigo", "Emerald": "Smaragd", "Ocean": "Ozean", "Rose": "Rose", "Amber": "Bernstein", "Mono": "Mono",
+    "Close": "Schließen", "Changelog": "Changelog", "Impressum": "Impressum",
+    "The Impressum is not set up yet. The operator creates the file .impressum (template: .impressum-example).":
+      "Das Impressum ist noch nicht eingerichtet. Der Betreiber legt die Datei .impressum an (Vorlage: .impressum-example).",
+    "No changelog found.": "Kein Changelog gefunden.", "About Compain": "Über Compain", "What changed, and who runs this server.": "Was sich geändert hat und wer diesen Server betreibt.", "From .env (default)": "Aus .env (Standard)"
   };
 
   var lang = "en";

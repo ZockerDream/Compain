@@ -24,6 +24,8 @@ class Settings:
     hosted_daily_limit: int
     hosted_daily_total: int
     data_dir: str
+    impressum_file: str
+    changelog_file: str
 
 
 def load_settings() -> Settings:
@@ -44,4 +46,7 @@ def load_settings() -> Settings:
         hosted_daily_limit=int(os.environ.get("COMPAIN_HOSTED_DAILY_LIMIT", "100")),
         hosted_daily_total=int(os.environ.get("COMPAIN_HOSTED_DAILY_TOTAL", "500")),
         data_dir=os.environ.get("COMPAIN_DATA_DIR", "./data"),
+        # The real Impressum lives in .impressum (not in git); .impressum-example is the template.
+        impressum_file=os.environ.get("COMPAIN_IMPRESSUM_FILE", "../.impressum"),
+        changelog_file=os.environ.get("COMPAIN_CHANGELOG_FILE", "../CHANGELOG.md"),
     )

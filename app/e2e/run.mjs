@@ -83,6 +83,13 @@ await page.click("#login-form button[type=submit]");
 const gateShown = await passAgeGate(page);
 check("age question is shown at the first login, or was answered before", true, gateShown ? "shown and answered" : "answered earlier");
 check("login with the right password opens the app", true);
+// Start from the default look, whatever this account used before (preferences are per account).
+await page.evaluate(() => fetch("/api/auth/preferences", { method: "PUT", credentials: "same-origin",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ design: "classic", palette: "ember", mode: "system", uiLanguage: "en" }) }));
+await page.reload();
+await page.waitForSelector("#app:not(.hidden)");
+await page.waitForFunction(() => document.documentElement.getAttribute("data-design") === "classic", null, { timeout: 10000 });
 await page.screenshot({ path: SHOTS + "01-home-desktop.png" });
 check("home shows the hosted quota", (await page.textContent("#view-home")).includes("Hosted API today"));
 
@@ -139,11 +146,38 @@ check("chat export link is present", (await page.getAttribute("#conv a[download]
 // Settings: theme and appearance
 await page.click("#nav-desktop button[data-go=settings]");
 await page.waitForSelector("#view-settings:not(.hidden)");
-await page.click("#view-settings .palette-card:has-text('Violet')");
+await page.click("#view-settings .palette-card:has-text('Indigo')");
 const palette = await page.getAttribute("html", "data-palette");
-check("color theme switches", palette === "violet", palette);
+check("color theme switches", palette === "indigo", palette);
 await page.click("#view-settings .segmented button:has-text('Dark')");
 check("dark mode is set", (await page.getAttribute("html", "data-mode")) === "dark");
+check("four reply lengths incl. Extra long", (await page.locator("#len option").count()) === 4);
+const impressum = await page.request.get(BASE + "/impressum");
+check("Impressum page is reachable", impressum.status() === 200 || impressum.status() === 503, String(impressum.status()));
+check("Changelog page is reachable", (await page.request.get(BASE + "/changelog")).status() === 200);
+
+// Designs: modern puts the navigation on top, glass shows the background picture
+await page.click("#view-settings .design-card[data-design-id='modern']");
+await page.waitForTimeout(400);
+check("modern design: navigation on top, no sidebar", (await page.isVisible("#topnav-pills")) && !(await page.isVisible(".sidebar")));
+await page.click("#view-settings .design-card[data-design-id='glass']");
+await page.waitForSelector("#g-blur", { timeout: 5000 });
+check("glass design: background and sliders", (await page.isVisible("#bg-layer")) && (await page.isVisible("#g-blur")));
+await page.screenshot({ path: SHOTS + "11-settings-glass.png" });
+await page.click("#view-settings .design-card[data-design-id='classic']");
+await page.waitForTimeout(300);
+
+// Changelog and Impressum as popovers
+await page.click("#tb-changelog");
+await page.waitForSelector(".popover .md li", { timeout: 5000 });
+check("changelog opens as a popover", await page.isVisible(".popover"));
+check("changelog dot is gone after reading", await page.locator("#tb-dot").isHidden());
+await page.keyboard.press("Escape");
+await page.click("#tb-impressum");
+await page.waitForSelector(".popover h2", { timeout: 5000 });
+check("Impressum opens as a popover", (await page.textContent(".popover")).includes("Impressum"));
+await page.mouse.click(5, 400);
+check("popover closes with a click outside", (await page.locator(".popover").count()) === 0);
 await page.screenshot({ path: SHOTS + "03-settings-desktop.png" });
 // German interface: switch, check, switch back
 await page.selectOption("#ui-lang", "de");
@@ -196,7 +230,7 @@ await page.waitForSelector("#view-characters:not(.hidden)");
 await page.setInputFiles("input[type=file][aria-label='Import a character card']", {
   name: "iris.json", mimeType: "application/json",
   buffer: Buffer.from(JSON.stringify({ name: "Captain Iris Kade", description: "Airship captain.", first_mes: "Report!" })) });
-await page.waitForSelector("text=Imported Captain Iris Kade", { timeout: 10000 }).catch(() => {});
+await page.waitForSelector("#view-characters .char-card:has-text('Captain Iris Kade')", { timeout: 15000 }).catch(() => {});
 check("character card import works", (await page.textContent("#view-characters")).includes("Captain Iris Kade"));
 
 // Live sync: a second window of the same user sees the new message without reloading
@@ -221,6 +255,15 @@ await second.waitForFunction((b) => document.querySelector("#chat-list") && docu
 const liveSeen = (await second.textContent("#chat-list")) !== listBefore;
 await waitForReply(page);
 check("second window updates without reload (live sync)", liveSeen);
+
+// Theme belongs to the account: a change in one window reaches the other one live.
+await page.evaluate(() => fetch("/api/auth/preferences", { method: "PUT", credentials: "same-origin",
+  headers: { "Content-Type": "application/json" }, body: JSON.stringify({ palette: "emerald", design: "modern" }) }));
+await second.waitForFunction(() => document.documentElement.getAttribute("data-palette") === "emerald", null, { timeout: 15000 }).catch(() => {});
+check("theme change reaches the other window live", (await second.getAttribute("html", "data-palette")) === "emerald");
+check("design change reaches the other window live", (await second.getAttribute("html", "data-design")) === "modern");
+await page.evaluate(() => fetch("/api/auth/preferences", { method: "PUT", credentials: "same-origin",
+  headers: { "Content-Type": "application/json" }, body: JSON.stringify({ palette: "ember", design: "classic" }) }));
 await second.close();
 
 // Admin: backup, speed test, invite code

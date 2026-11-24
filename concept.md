@@ -66,7 +66,9 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 
 ## Settings and preferences (version 1)
 
-- **Color theme:** five palettes (Ember, Ocean, Forest, Violet, Rose). The accent color changes across the app.
+- **Design:** Classic, Glass (with background picture, blur, opacity and dimming), Modern, Modern Glass.
+- **Color theme:** seven themes (Ember, Indigo, Emerald, Ocean, Rose, Amber, Mono) with tinted surfaces.
+- All of these belong to the account and update live on every device and browser.
 - **Appearance:** System, Light, or Dark.
 - **Language:** interface in English or German. Replies in English or German. Default in Profile: "Reply in German by default".
 - **Reply length:** Short, Medium, or Long.

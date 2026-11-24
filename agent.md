@@ -37,6 +37,9 @@ Last updated: 2026-11-23 (night).
 
 Done (version 1, verified with tests):
 - One-time age question ("Are you 18 or older?") at the first login of every account, enforced by the API.
+- Four designs (classic, glass, modern, modern-glass; modelled on the RP-Management-Board V1–V4) and seven colour themes, all per account and live on every device (`static/designs.css`, `static/designs-palettes.css`, preferences `design`, `bg`, `blur`, `alpha`, `dim`, `palette`).
+- Changelog (`CHANGELOG.md`) and Impressum (`.impressum`, not in git; template `.impressum-example`) as popovers from the top bar and as pages `/changelog`, `/impressum`. Compose refuses to start without `.impressum`.
+- Four reply lengths: short, medium, long, xlong (`LENGTH_GUIDE` in `routes/chats.py`), measured with Gemma: about 18, 65, 105 and 270 words.
 - Login with 48-hour and "stay logged in" sessions, lockout, invite-code sign-up, maintenance mode with a notice, log out everywhere. Secure cookie behind HTTPS.
 - Characters: create, edit, delete (owner rules), adults-only check, pictures (PNG/JPG/WebP, size limit from settings), card import (SillyTavern JSON V1/V2, PNG cards, plain text), publish to Community with admin review, add from Community.
 - Chats: greeting opens the chat, streaming replies, roleplay system prompt with reply length and reply language, important messages (max 10, always in context), story summary every 40 messages, unread counts, pinning, search and filters, per-chat model, export (one chat, all chats, characters, everything).
@@ -46,7 +49,7 @@ Done (version 1, verified with tests):
 - Server Management, all ten sections: overview (disk, endpoints), users, characters (review queue, card import switch), hosted API (provider presets, encrypted key, connection test, limits), access and security (sign-up, invite codes, sessions, lockout, password length, log out everyone), domain and HTTPS, models (default model, name, speed test), backups (nightly, retention, pictures, run now, download, restore), storage (upload limit, disk warning, cleanup), logs and maintenance (maintenance mode, notice, audit log).
 - Backups: `pg_dump` + pictures as `.tar.gz`; restore tested end to end on PostgreSQL 17.
 - Docker Compose: app, PostgreSQL 17, optional `llm-mistral` / `llm-gemma` (llama.cpp) and `https` (Caddy) profiles.
-- Tests: 33 API tests (`app/tests`), 34 browser checks against the Docker build (`app/e2e`, desktop and phone, German interface).
+- Tests: 38 API tests (`app/tests`), 45 browser checks against the Docker build (`app/e2e`, desktop and phone, German interface).
 
 - Models measured (technical.md, "Model test results"): Gemma 4 26B-A4B uncensored is the default (10–13 tokens/s here), Mistral Small 3.2 the alternative (2–3.5 tokens/s). The browser tests also pass against the real Gemma model.
 

@@ -1,12 +1,15 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 COMPAIN_DATA_DIR=/srv/app/data
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 COMPAIN_DATA_DIR=/srv/app/data \
+    COMPAIN_IMPRESSUM_FILE=/srv/app/legal/impressum COMPAIN_CHANGELOG_FILE=/srv/app/CHANGELOG.md
 WORKDIR /srv/app
 
-COPY requirements.txt .
+# Build context is the project folder (see docker-compose.yml).
+COPY app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY compain ./compain
+COPY app/compain ./compain
+COPY CHANGELOG.md ./CHANGELOG.md
 
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/* \
  && useradd --create-home --uid 10001 compain && mkdir -p /srv/app/data && chown compain /srv/app/data

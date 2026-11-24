@@ -1,6 +1,7 @@
 """API tests. Run from the app folder: python -m pytest -q"""
 
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,6 +31,8 @@ def make_settings(tmp_path, **overrides) -> Settings:
         hosted_daily_limit=100,
         hosted_daily_total=500,
         data_dir=str(tmp_path / "data"),
+        impressum_file=str(tmp_path / ".impressum"),
+        changelog_file=str(Path(__file__).resolve().parents[2] / "CHANGELOG.md"),
     )
     base.update(overrides)
     return Settings(**base)

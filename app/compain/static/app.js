@@ -94,20 +94,31 @@
   /* ---------- preferences (per device) ---------- */
   var PALETTES = [
     { id: "ember", name: "Ember", color: "#e8703a" },
-    { id: "ocean", name: "Ocean", color: "#2f8fd8" },
-    { id: "forest", name: "Forest", color: "#2f9e74" },
-    { id: "violet", name: "Violet", color: "#8b6cf0" },
-    { id: "rose", name: "Rose", color: "#e0517e" }
+    { id: "indigo", name: "Indigo", color: "#6366f1" },
+    { id: "emerald", name: "Emerald", color: "#10b981" },
+    { id: "ocean", name: "Ocean", color: "#0ea5e9" },
+    { id: "rose", name: "Rose", color: "#f43f5e" },
+    { id: "amber", name: "Amber", color: "#f59e0b" },
+    { id: "mono", name: "Mono", color: "#52525b" }
   ];
+  var OLD_PALETTES = { forest: "emerald", violet: "indigo" };
+  var DESIGNS = [
+    { id: "classic", name: "Classic", sub: "Sidebar, solid surfaces", glassy: false, top: false },
+    { id: "glass", name: "Glass", sub: "Glass panels over a background", glassy: true, top: false },
+    { id: "modern", name: "Modern", sub: "Navigation on top, calm surfaces", glassy: false, top: true },
+    { id: "modern-glass", name: "Modern Glass", sub: "Navigation on top, glass over a background", glassy: true, top: true }
+  ];
+  var BACKGROUNDS = [["dusk", "Dusk"], ["night", "Night"], ["forest", "Forest"], ["none", "None"]];
   var MODELS = [
     { value: "self", label: "Self-hosted model (unlimited)" },
     { value: "hosted", label: "Hosted API (daily limit)" }
   ];
-  var REPLY_LENGTHS = [["short", "Short"], ["medium", "Medium"], ["long", "Long"]];
+  var REPLY_LENGTHS = [["short", "Short"], ["medium", "Medium"], ["long", "Long"], ["xlong", "Extra long"]];
   var CONTEXTS = [[20, "Last 20 messages"], [60, "Last 60 messages + summary"], [200, "Last 200 messages + summary"]];
 
   function loadPrefs() {
-    var p = { palette: "ember", mode: "system", replyLength: "medium", ctx: 60, language: "auto", uiLanguage: "en" };
+    var p = { palette: "ember", mode: "system", replyLength: "medium", ctx: 60, language: "auto", uiLanguage: "en",
+      design: "classic", bg: "dusk", blur: 22, alpha: 52, dim: 20 };
     try {
       var raw = localStorage.getItem("compain-prefs");
       if (raw) Object.assign(p, JSON.parse(raw));
@@ -121,6 +132,13 @@
   }
   function applyPrefs() {
     if (window.CompainI18n) window.CompainI18n.setLanguage(prefs.uiLanguage);
+    if (OLD_PALETTES[prefs.palette]) prefs.palette = OLD_PALETTES[prefs.palette];
+    var root = document.documentElement;
+    root.setAttribute("data-design", prefs.design || "classic");
+    root.setAttribute("data-bg", prefs.bg || "dusk");
+    root.style.setProperty("--g-blur", (prefs.blur == null ? 22 : prefs.blur) + "px");
+    root.style.setProperty("--g-alpha", String((prefs.alpha == null ? 52 : prefs.alpha) / 100));
+    root.style.setProperty("--g-dim", String((prefs.dim == null ? 20 : prefs.dim) / 100));
     document.documentElement.setAttribute("data-palette", prefs.palette);
     if (prefs.mode === "system") document.documentElement.removeAttribute("data-mode");
     else document.documentElement.setAttribute("data-mode", prefs.mode);
@@ -155,6 +173,11 @@
     NAV.slice(0, 5).forEach(function (n) {
       bar.appendChild(el("button", { "data-go": n.id, onclick: function () { go(n.id); } }, icon(n.icon), el("span", { text: n.label })));
     });
+    var pills = $("topnav-pills");
+    pills.textContent = "";
+    NAV.concat(me && me.role === "admin" ? [{ id: "admin", label: "Server Management", icon: "i-shield" }] : []).forEach(function (n) {
+      pills.appendChild(el("button", { "data-go": n.id, onclick: function () { go(n.id); } }, icon(n.icon, "sm"), el("span", { text: n.label })));
+    });
   }
 
   function go(route) {
@@ -168,7 +191,8 @@
 
     state.route = name;
     VIEWS.forEach(function (v) { $("view-" + v).classList.toggle("hidden", v !== name); });
-    document.querySelectorAll(".nav button, .bottombar button").forEach(function (b) {
+    closePopover();
+    document.querySelectorAll(".nav button, .bottombar button, .topnav-pills button").forEach(function (b) {
       if (b.getAttribute("data-go") === name) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
     });
@@ -726,10 +750,41 @@
     CONTEXTS.forEach(function (c) { ctx.appendChild(el("option", { value: String(c[0]), selected: prefs.ctx === c[0], text: c[1] })); });
     ctx.addEventListener("change", function () { prefs.ctx = Number(ctx.value); savePrefs(); toast("Context saved"); });
 
+    var designs = el("div", { class: "design-grid", role: "radiogroup", "aria-label": "Design" });
+    DESIGNS.forEach(function (d) {
+      var mini = el("span", { class: "mini" + (d.glassy ? " glassy" : "") },
+        d.top ? el("span", { class: "bar" }, el("b")) : el("span", { class: "side" }),
+        el("span", { class: "panel", style: d.top ? "left:6px;top:26px" : "left:calc(22% + 12px);top:6px" }));
+      designs.appendChild(el("button", { class: "design-card", role: "radio", "aria-checked": prefs.design === d.id ? "true" : "false", "data-design-id": d.id,
+        onclick: function () { prefs.design = d.id; savePrefs(); applyPrefs(); renderSettings(); } },
+        mini,
+        el("span", { class: "name" }, el("span", { text: d.name }), prefs.design === d.id ? el("span", { class: "pill accent", text: "Active" }) : null),
+        el("span", { class: "sub", text: d.sub })));
+    });
+    var glassCard = null;
+    if (prefs.design === "glass" || prefs.design === "modern-glass") {
+      var bgs = el("div", { class: "segmented", role: "group", "aria-label": "Background" });
+      BACKGROUNDS.forEach(function (b) {
+        bgs.appendChild(el("button", { "aria-pressed": prefs.bg === b[0] ? "true" : "false", onclick: function () { prefs.bg = b[0]; savePrefs(); applyPrefs(); renderSettings(); } }, b[1]));
+      });
+      var slider = function (key, label, min, max, unit) {
+        var out = el("output", { text: prefs[key] + unit });
+        var input = el("input", { type: "range", min: String(min), max: String(max), value: String(prefs[key]), id: "g-" + key, "aria-label": label });
+        input.addEventListener("input", function () { prefs[key] = Number(input.value); out.textContent = input.value + unit; applyPrefs(); });
+        input.addEventListener("change", function () { savePrefs(); });
+        return el("div", { class: "slider-row" }, el("label", { for: "g-" + key, text: label }), input, out);
+      };
+      glassCard = el("div", { class: "card form" }, el("h2", { text: "Glass" }),
+        el("div", null, el("label", { text: "Background" }), bgs),
+        slider("blur", "Blur", 0, 40, " px"), slider("alpha", "Panel opacity", 20, 95, " %"), slider("dim", "Dim background", 0, 80, " %"),
+        el("p", { class: "muted small", text: "On phones the blur is switched off, so scrolling stays smooth." }));
+    }
     view.appendChild(el("div", { class: "page-head" }, el("div", null, el("div", { class: "caps eyebrow", text: "Preferences" }), el("h1", { text: "Settings" }),
       el("p", { text: "Changes apply at once on all your devices." }))));
     view.appendChild(el("div", { class: "grid", style: "gap:18px" },
-      el("div", { class: "card" }, el("h2", { text: "Color theme" }), el("p", { class: "muted small", style: "margin:6px 0 16px", text: "The accent color for the whole app." }), swatches),
+      el("div", { class: "card" }, el("h2", { text: "Design" }), el("p", { class: "muted small", style: "margin:6px 0 16px", text: "How Compain looks on all your devices." }), designs),
+      glassCard,
+      el("div", { class: "card" }, el("h2", { text: "Color theme" }), el("p", { class: "muted small", style: "margin:6px 0 16px", text: "Accent color and tinted surfaces for the whole app." }), swatches),
       el("div", { class: "card" }, el("div", { class: "row", style: "justify-content:space-between;flex-wrap:wrap;gap:14px" },
         el("div", null, el("h2", { text: "Appearance" }), el("p", { class: "muted small", text: "System follows your device." })), modes)),
       languageCard(),
@@ -737,10 +792,23 @@
         el("div", { class: "two" },
           el("div", null, el("label", { for: "len", text: "Reply length" }), len),
           el("div", null, el("label", { for: "ctx", text: "Context sent to the model" }), ctx))),
+      aboutCard(),
       el("div", { class: "card" }, el("h2", { text: "Account" }),
         el("div", { class: "row", style: "flex-wrap:wrap;margin-top:12px" },
           el("button", { onclick: logout }, "Log out on this device"),
           el("button", { class: "ghost", onclick: logoutAll }, "Log out on all devices")))));
+  }
+
+  function aboutCard() {
+    var version = el("span", { class: "pill", text: "…" });
+    fetch("/api/health").then(function (r) { return r.json(); }).then(function (h) { version.textContent = "Version " + h.version; }).catch(function () {});
+    return el("div", { class: "card" },
+      el("div", { class: "row", style: "justify-content:space-between;flex-wrap:wrap;gap:12px" },
+        el("div", null, el("h2", { text: "About Compain" }), el("p", { class: "muted small", text: "What changed, and who runs this server." })),
+        version),
+      el("div", { class: "row", style: "flex-wrap:wrap;margin-top:14px" },
+        el("button", { onclick: function () { openPopover("changelog", null); } }, "Changelog"),
+        el("button", { onclick: function () { openPopover("impressum", null); } }, "Impressum")));
   }
 
   function languageCard() {
@@ -1104,6 +1172,86 @@
       })))) : el("p", { class: "muted", text: "Nothing yet." })));
   }
 
+  /* ---------- popovers: Changelog and Impressum ---------- */
+  var popover = null;
+  var appVersion = null;
+
+  // Small Markdown for the two texts: "# ", "## ", "- " and `code`. Built with text nodes only (no HTML from the file).
+  function mdLite(text) {
+    var box = el("div", { class: "md" });
+    var list = null;
+    function inline(line) {
+      var parts = line.split("`");
+      return parts.map(function (part, i) { return i % 2 ? el("code", { text: part }) : part; });
+    }
+    text.split("\n").forEach(function (raw) {
+      var line = raw.replace(/\s+$/, "");
+      if (line.indexOf("- ") === 0) {
+        if (!list) { list = el("ul"); box.appendChild(list); }
+        list.appendChild(el("li", null, inline(line.slice(2))));
+        return;
+      }
+      list = null;
+      if (line.indexOf("## ") === 0) box.appendChild(el("h2", null, inline(line.slice(3))));
+      else if (line.indexOf("# ") === 0) box.appendChild(el("h1", null, inline(line.slice(2))));
+      else if (line) box.appendChild(el("p", null, inline(line)));
+    });
+    return box;
+  }
+
+  function closePopover() {
+    if (!popover) return;
+    popover.node.remove();
+    if (popover.backdrop) popover.backdrop.remove();
+    if (popover.button) popover.button.setAttribute("aria-expanded", "false");
+    popover = null;
+  }
+
+  async function openPopover(kind, button) {
+    var same = popover && popover.kind === kind;
+    closePopover();
+    if (same && button) return; // second click on the same button closes it
+    var title = kind === "changelog" ? "Changelog" : "Impressum";
+    var body = el("div", null, el("p", { class: "muted small", text: "Loading…" }));
+    var node = el("div", { class: "popover" + (button ? "" : " floating"), role: "dialog", "aria-label": title },
+      el("div", { class: "popover-head" }, el("h2", { text: title }),
+        el("button", { class: "ghost icon-only", "aria-label": "Close", onclick: closePopover }, "✕")),
+      body);
+    var backdrop = button ? null : el("div", { class: "popover-backdrop", onclick: closePopover });
+    if (backdrop) document.body.appendChild(backdrop);
+    (button ? $("tb-actions") : document.body).appendChild(node);
+    if (button) button.setAttribute("aria-expanded", "true");
+    popover = { kind: kind, node: node, backdrop: backdrop, button: button };
+    try {
+      var r = await fetch(kind === "changelog" ? "/api/changelog" : "/api/legal/impressum", { credentials: "same-origin" });
+      var text = r.ok ? await r.text() : "";
+      body.textContent = "";
+      if (!text) body.appendChild(el("p", { class: "muted", text: kind === "impressum" ? "The Impressum is not set up yet. The operator creates the file .impressum (template: .impressum-example)." : "No changelog found." }));
+      else body.appendChild(mdLite(kind === "impressum" ? text.replace(/^# Impressum\s*\n/, "") : text.replace(/^# Changelog\s*\n/, "")));
+    } catch (e) { body.textContent = e.message; }
+    if (kind === "changelog" && appVersion && me) {
+      $("tb-dot").hidden = true;
+      if (prefs.seenChangelog !== appVersion) { prefs.seenChangelog = appVersion; savePrefs(); }
+    }
+  }
+
+  function updateChangelogDot() {
+    fetch("/api/health").then(function (r) { return r.json(); }).then(function (h) {
+      appVersion = h.version;
+      $("tb-dot").hidden = !me || prefs.seenChangelog === appVersion;
+    }).catch(function () {});
+  }
+
+  $("tb-changelog").addEventListener("click", function () { openPopover("changelog", this); });
+  $("tb-impressum").addEventListener("click", function () { openPopover("impressum", this); });
+  document.querySelectorAll("[data-pop]").forEach(function (a) {
+    a.addEventListener("click", function (e) { e.preventDefault(); openPopover(a.getAttribute("data-pop"), null); });
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePopover(); });
+  document.addEventListener("click", function (e) {
+    if (popover && popover.button && !popover.node.contains(e.target) && !popover.button.contains(e.target)) closePopover();
+  });
+
   /* ---------- live sync ---------- */
   var liveSocket = null;
   function connectLive() {
@@ -1114,7 +1262,19 @@
     ws.onmessage = function (ev) {
       var msg = null;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
-      if (msg.type !== "chats" || state.sending || !me) return;
+      if (!me) return;
+      if (msg.type === "prefs" && msg.prefs) {
+        // Settings changed on another device or browser of this account: apply them here too.
+        var languageChanged = msg.prefs.uiLanguage && msg.prefs.uiLanguage !== prefs.uiLanguage;
+        Object.assign(prefs, msg.prefs);
+        try { localStorage.setItem("compain-prefs", JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+        applyPrefs();
+        if (appVersion) $("tb-dot").hidden = prefs.seenChangelog === appVersion;
+        if (languageChanged) { location.reload(); return; }
+        if (state.route === "settings") renderSettings();
+        return;
+      }
+      if (msg.type !== "chats" || state.sending) return;
       if (state.route === "chats") renderChats();
       else if (state.route === "home") renderHome();
     };
@@ -1170,12 +1330,15 @@
         Object.assign(prefs, p);
         try { localStorage.setItem("compain-prefs", JSON.stringify(prefs)); } catch (e) { /* ignore */ }
         applyPrefs();
+        if (appVersion) $("tb-dot").hidden = prefs.seenChangelog === appVersion;
+        if (state.route === "settings") renderSettings();
       }
     }).catch(function () { /* keep the local values */ });
     var banner = $("notice-banner");
     if (banner) { banner.textContent = me.notice || ""; banner.classList.toggle("hidden", !me.notice); }
     go(location.hash.slice(1) || "home");
     connectLive();
+    updateChangelogDot();
   }
 
   $("login-form").addEventListener("submit", async function (e) {

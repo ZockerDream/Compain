@@ -400,3 +400,8 @@
   #view-home .stat, #view-admin .stat { font-size: 24px; }
 }
 .avatar { overflow: hidden; }
+/* Links */
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a.btn { color: var(--fg); text-decoration: none; }
+a.btn.primary { color: var(--accent-fg); }

@@ -7,3 +7,4 @@ __pycache__/
 app/e2e/node_modules/
 app/e2e/screens/
 models/
+.impressum

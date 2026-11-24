@@ -133,7 +133,9 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - **Backups:** `pg_dump --clean` plus pictures in one `.tar.gz` under the data volume. Nightly at the configured time, retention in days, restore in one transaction with a 30-second lock timeout.
 - **Maintenance mode:** blocks everyone except admins with HTTP 503 and shows the notice.
 - **Web UI:** plain JavaScript served by the API from `compain/static/`, built on the mockup's CSS. German via `i18n.js` (translates interface strings only, never user text).
-- **Tests:** 33 API tests and 34 browser checks (desktop and phone, German interface) pass against the Docker build.
+- **Designs:** `<html data-design data-palette data-mode data-bg>` plus CSS variables `--g-blur`, `--g-alpha`, `--g-dim`. Glass designs blur panels over `#bg-layer`; on phones the blur is off. Modern designs hide the sidebar and show `#topnav-pills`; phones keep the bottom bar.
+- **Changelog and Impressum:** `routes/legal.py` serves `/api/changelog`, `/api/legal/impressum` and simple pages; the web app shows both as popovers (text rendered with text nodes only). The Impressum file is bind-mounted read-only (`create_host_path: false`).
+- **Tests:** 38 API tests and 45 browser checks (desktop and phone, German interface) pass against the Docker build.
 
 ## Model test results
 

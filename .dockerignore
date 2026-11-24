@@ -1,0 +1,12 @@
+.git
+.env
+.impressum
+models/
+app/.venv/
+app/e2e/
+app/tests/
+**/__pycache__/
+**/*.db
+app/data/
+graphify-out/
+design/

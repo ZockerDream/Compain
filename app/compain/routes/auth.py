@@ -158,34 +158,59 @@ def confirm_age(body: AgeIn, response: Response, session: UserSession = Depends(
     return {"age_confirmed": True}
 
 
+PALETTES = {"ember", "indigo", "emerald", "ocean", "rose", "amber", "mono"}
+OLD_PALETTES = {"forest": "emerald", "violet": "indigo"}  # names before 0.3.0
+
 PREF_KEYS = {
-    "palette": {"ember", "ocean", "forest", "violet", "rose"},
+    "palette": PALETTES,
     "mode": {"system", "light", "dark"},
-    "replyLength": {"short", "medium", "long"},
+    "design": {"classic", "glass", "modern", "modern-glass"},
+    "bg": {"dusk", "night", "forest", "none"},
+    "replyLength": {"short", "medium", "long", "xlong"},
     "ctx": {20, 60, 200},
     "language": {"auto", "en", "de"},
     "uiLanguage": {"en", "de"},
 }
+# Number preferences: allowed range (glass: blur in px, panel opacity and background dimming in %)
+PREF_RANGES = {"blur": (0, 40), "alpha": (20, 95), "dim": (0, 80)}
+
+
+def _valid_pref(key, value) -> bool:
+    if key in PREF_KEYS:
+        return value in PREF_KEYS[key]
+    if key in PREF_RANGES:
+        lo, hi = PREF_RANGES[key]
+        return isinstance(value, int) and not isinstance(value, bool) and lo <= value <= hi
+    if key == "seenChangelog":  # last changelog version the user has opened, e.g. "0.3.0"
+        return isinstance(value, str) and len(value) <= 20 and all(c.isdigit() or c == "." for c in value)
+    return False
 
 
 @router.get("/preferences")
 def get_preferences(user: User = Depends(current_user)):
     try:
-        return json.loads(user.preferences or "{}")
+        prefs = json.loads(user.preferences or "{}")
     except ValueError:
         return {}
+    if prefs.get("palette") in OLD_PALETTES:
+        prefs["palette"] = OLD_PALETTES[prefs["palette"]]
+    return prefs
 
 
 @router.put("/preferences")
-def put_preferences(values: dict, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
-    """Per-user settings, so the phone and the computer look and behave the same."""
+async def put_preferences(values: dict, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Per-account settings (theme, appearance, languages, reply length, context).
+    Every open browser and device of the account gets them at once over the live connection."""
     current = get_preferences(user)
     for key, value in values.items():
-        if key not in PREF_KEYS or value not in PREF_KEYS[key]:
+        if not _valid_pref(key, value):
             raise HTTPException(status_code=422, detail=f"Invalid preference: {key}")
         current[key] = value
     user.preferences = json.dumps(current)
     db.commit()
+    hub = getattr(request.app.state, "hub", None)
+    if hub is not None:
+        await hub.publish(user.id, {"type": "prefs", "prefs": current})
     return current
 
 

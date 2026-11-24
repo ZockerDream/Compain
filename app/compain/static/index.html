@@ -10,9 +10,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/designs-palettes.css">
+<link rel="stylesheet" href="/static/designs.css">
 <link rel="icon" href="data:,">
 </head>
 <body data-chat="0">
+<div id="bg-layer" aria-hidden="true"><i class="bg-sun"></i><i class="bg-m1"></i><i class="bg-m2"></i><i class="bg-m3"></i><i class="bg-dim"></i></div>
 
 <div id="boot" class="login-wrap"><p class="muted">Loading…</p></div>
 
@@ -45,6 +48,7 @@
       <button class="primary" type="submit">Create account</button>
     </form>
   </details>
+  <p class="small muted" style="text-align:center"><a href="/impressum" data-pop="impressum">Impressum</a> · <a href="/changelog" data-pop="changelog">Changelog</a></p>
 </div>
 
 <!-- AGE CHECK (asked once per account) -->
@@ -74,6 +78,15 @@
   </aside>
 
   <main class="content" id="main">
+    <div class="topbar" id="topbar">
+      <a class="brand" href="#home"><i></i>Compain</a>
+      <nav class="topnav" id="topnav" aria-label="Main navigation"><div class="topnav-pills" id="topnav-pills"></div></nav>
+      <span class="spacer"></span>
+      <div id="tb-actions" style="display:flex;gap:8px;position:relative">
+        <button class="tb-btn" id="tb-changelog" aria-haspopup="dialog" aria-expanded="false" title="Changelog"><svg class="ic sm"><use href="#i-bolt"/></svg><span>Changelog</span><i class="tb-dot" id="tb-dot" hidden></i></button>
+        <button class="tb-btn" id="tb-impressum" aria-haspopup="dialog" aria-expanded="false" title="Impressum"><svg class="ic sm"><use href="#i-info"/></svg><span>Impressum</span></button>
+      </div>
+    </div>
     <div id="notice-banner" class="card hidden" style="margin-bottom:16px;padding:12px 16px;font-size:14px"></div>
     <section id="view-home" class="view hidden"></section>
     <section id="view-chats" class="view hidden"></section>
