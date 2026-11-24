@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Update Compain on the server: get the newest code, check the files that are not in git, rebuild, check health.
-# Usage: ./scripts/update.sh [profile]   (default profile: llm-gemma; use "none" without a self-hosted model)
+# Usage: ./scripts/update.sh [profile]   (default: the model server chosen with scripts/llm.sh, else llm-gemma;
+#                                        use "none" without a self-hosted model)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-PROFILE="${1:-llm-gemma}"
+CHOSEN="$(grep -E '^COMPOSE_PROFILES=' .env 2>/dev/null | cut -d= -f2 | tr ',' '\n' | grep '^llm-' | head -1 || true)"
+PROFILE="${1:-${CHOSEN:-llm-gemma}}"
 ARGS=()
 [ "$PROFILE" != "none" ] && ARGS+=(--profile "$PROFILE")
 grep -q '^COMPAIN_DOMAIN=.\+' .env 2>/dev/null && ARGS+=(--profile https)

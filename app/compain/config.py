@@ -13,6 +13,7 @@ class Settings:
     # Self-hosted model (llama.cpp or Ollama, OpenAI-compatible). "mock" = built-in test reply.
     self_hosted_url: str
     self_hosted_model: str
+    # Where the self-hosted model runs: "gpu" (graphics card) or "cpu". Set by scripts/llm.sh (LLM_DEVICE).
     # Hosted API (OpenAI-compatible). "mock" = built-in test reply.
     hosted_url: str
     hosted_api_key: str
@@ -28,6 +29,8 @@ class Settings:
     datenschutz_file: str
     changelog_file: str
     offsite_dir: str
+    # Where the self-hosted model runs: "gpu" (graphics card) or "cpu". Set by scripts/llm.sh (LLM_DEVICE).
+    self_hosted_device: str = "cpu"
 
 
 def load_settings() -> Settings:
@@ -38,6 +41,7 @@ def load_settings() -> Settings:
         admin_password=os.environ.get("COMPAIN_ADMIN_PASSWORD", ""),
         self_hosted_url=os.environ.get("COMPAIN_MODEL_BASE_URL", "mock"),
         self_hosted_model=os.environ.get("COMPAIN_MODEL_NAME", "gemma-4-26b-a4b"),
+        self_hosted_device=os.environ.get("COMPAIN_MODEL_DEVICE", "cpu").strip().lower() or "cpu",
         hosted_url=os.environ.get("COMPAIN_HOSTED_API_BASE_URL", "mock"),
         hosted_api_key=os.environ.get("COMPAIN_HOSTED_API_KEY", ""),
         hosted_model=os.environ.get("COMPAIN_HOSTED_MODEL", "llama-3.1-8b-instant"),

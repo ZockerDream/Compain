@@ -1,4 +1,29 @@
 # Compain: app + PostgreSQL. Secrets come from .env (never committed).
+
+# Shared settings of the self-hosted model servers (see the llm-* services below).
+x-llm-cpu: &llm-cpu
+  image: ghcr.io/ggml-org/llama.cpp:server
+  restart: unless-stopped
+  volumes:
+    - ./models:/models:ro
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 120s
+
+x-llm-gpu: &llm-gpu
+  <<: *llm-cpu
+  image: ghcr.io/ggml-org/llama.cpp:server-cuda
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
 services:
   db:
     image: postgres:17-alpine
@@ -30,6 +55,7 @@ services:
       COMPAIN_ADMIN_PASSWORD: ${COMPAIN_ADMIN_PASSWORD:?set COMPAIN_ADMIN_PASSWORD in .env}
       COMPAIN_MODEL_BASE_URL: ${COMPAIN_MODEL_BASE_URL:-mock}
       COMPAIN_MODEL_NAME: ${COMPAIN_MODEL_NAME:-mistral-small-3.2}
+      COMPAIN_MODEL_DEVICE: ${LLM_DEVICE:-cpu}
       COMPAIN_HOSTED_API_BASE_URL: ${COMPAIN_HOSTED_API_BASE_URL:-mock}
       COMPAIN_HOSTED_API_KEY: ${COMPAIN_HOSTED_API_KEY:-}
       COMPAIN_HOSTED_MODEL: ${COMPAIN_HOSTED_MODEL:-llama-3.1-8b-instant}
@@ -54,36 +80,37 @@ services:
     ports:
       - "8080:8080"
 
-  # Self-hosted model servers (llama.cpp, OpenAI-compatible). Start one with its profile:
-  #   docker compose --profile llm-mistral up -d
-  # and set COMPAIN_MODEL_BASE_URL=http://llm-mistral:8081/v1 in .env.
+  # Self-hosted model servers (llama.cpp, OpenAI-compatible). Pick model and device with
+  #   ./scripts/llm.sh gpu gemma      (or: cpu gemma, gpu mistral, cpu mistral)
+  # The script sets COMPOSE_PROFILES and LLM_DEVICE in .env and restarts the model server.
+  # The GPU variants need an NVIDIA card and the NVIDIA Container Toolkit; llama.cpp puts as much of
+  # the model into the graphics memory as fits (--fit) and keeps the rest in RAM. Both variants of a
+  # model answer under the same name (llm-gemma, llm-mistral), so COMPAIN_MODEL_BASE_URL stays the same.
   llm-mistral:
-    image: ghcr.io/ggml-org/llama.cpp:server
+    <<: *llm-cpu
     profiles: ["llm-mistral"]
-    restart: unless-stopped
-    volumes:
-      - ./models:/models:ro
     command: ["-m", "/models/mistral-small-3.2-abliterated-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "${LLM_CONTEXT:-16384}", "-np", "${LLM_SLOTS:-2}", "-t", "${LLM_THREADS:-6}", "--reasoning", "off"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 120s
+
+  llm-mistral-gpu:
+    <<: *llm-gpu
+    profiles: ["llm-mistral-gpu"]
+    networks:
+      default:
+        aliases: [llm-mistral]
+    command: ["-m", "/models/mistral-small-3.2-abliterated-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "${LLM_CONTEXT:-16384}", "-np", "${LLM_SLOTS:-2}", "-t", "${LLM_THREADS:-6}", "--reasoning", "off", "--fit-target", "${LLM_GPU_RESERVE_MB:-1024}"]
 
   llm-gemma:
-    image: ghcr.io/ggml-org/llama.cpp:server
+    <<: *llm-cpu
     profiles: ["llm-gemma"]
-    restart: unless-stopped
-    volumes:
-      - ./models:/models:ro
     command: ["-m", "/models/gemma-4-26b-a4b-uncensored-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "${LLM_CONTEXT:-16384}", "-np", "${LLM_SLOTS:-2}", "-t", "${LLM_THREADS:-6}", "--reasoning", "off"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 120s
+
+  llm-gemma-gpu:
+    <<: *llm-gpu
+    profiles: ["llm-gemma-gpu"]
+    networks:
+      default:
+        aliases: [llm-gemma]
+    command: ["-m", "/models/gemma-4-26b-a4b-uncensored-Q4_K_M.gguf", "--host", "0.0.0.0", "--port", "8081", "-c", "${LLM_CONTEXT:-16384}", "-np", "${LLM_SLOTS:-2}", "-t", "${LLM_THREADS:-6}", "--reasoning", "off", "--fit-target", "${LLM_GPU_RESERVE_MB:-1024}"]
 
   # HTTPS in front of the app. Start with: docker compose --profile https up -d
   # Needs COMPAIN_DOMAIN in .env (a domain pointing to this server) and ports 80 and 443 open.

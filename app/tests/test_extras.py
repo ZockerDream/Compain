@@ -195,6 +195,7 @@ def test_reply_reports_its_status_and_admin_sees_the_queue(tmp_path):
     assert st["state"] == "ok" and st["slots"] == 2 and st["running"] == 0 and st["waiting"] == 0
     overview = client.get("/api/admin/overview", headers=h).json()
     assert overview["model_queue"] == {"running": 0, "waiting": 0, "slots": 2}
+    assert overview["self_hosted_device"] == "cpu"  # LLM_DEVICE not set: the processor
     assert client.put("/api/admin/settings", json={"model_slots": 0}, headers=h).status_code == 422
     assert client.put("/api/admin/settings", json={"model_slots": 3}, headers=h).json()["model_slots"] == 3
     client.__exit__(None, None, None)

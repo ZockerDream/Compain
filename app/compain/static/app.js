@@ -1915,6 +1915,9 @@
         el("div", { class: "meter", style: "margin-top:8px" }, el("span", { style: "width:" + disk.percent + "%" })))));
     body.appendChild(panel("Endpoints and status", el("div", { class: "form" },
       el("div", { class: "switch" }, el("span", { text: "Self-hosted model" }), el("span", { class: "muted small", text: o.self_hosted_url })),
+      el("div", { class: "switch", id: "admin-device" }, el("span", { text: "Model runs on" }),
+        el("span", { class: "pill " + (o.self_hosted_device === "gpu" ? "ok" : ""), text: o.self_hosted_device === "gpu" ? "Graphics card (GPU)" : "Processor (CPU)" })),
+      el("p", { class: "muted small", text: "Change it on the server with ./scripts/llm.sh gpu or ./scripts/llm.sh cpu." }),
       el("div", { class: "switch" }, el("span", { text: "Hosted API" }), el("span", { class: "muted small", text: o.hosted_url })),
       el("div", { class: "switch" }, el("span", { text: "Database" }), el("span", { class: "muted small", text: o.database })),
       el("div", { class: "switch" }, el("span", { text: "Maintenance mode" }), el("span", { class: "pill " + (o.maintenance_mode ? "accent" : "ok"), text: o.maintenance_mode ? "On" : "Off" })))));

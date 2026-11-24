@@ -30,6 +30,7 @@ Requirements: Docker with Compose.
 The model is `mock` by default, so the app answers with a test reply. To use a real model:
 
 - **Self-hosted (free, unlimited):** download the model with `./scripts/download-models.sh` (Gemma 4, about 17 GB), set `COMPAIN_MODEL_BASE_URL=http://llm-gemma:8081/v1` in `.env`, and start with `docker compose --profile llm-gemma up -d`. For Mistral use `mistral` and `llm-mistral` instead.
+- **Graphics card (much faster):** with an NVIDIA card run `./scripts/llm.sh gpu` (back to the processor: `./scripts/llm.sh cpu`). See *Graphics card* below.
 - **Hosted (free tier or paid):** choose the provider in Server Management, Hosted API, enter the key, and press "Test connection".
 
 For HTTPS from outside your home network: point a domain to the server, set `COMPAIN_DOMAIN` in `.env`, open ports 80 and 443, and start with `docker compose --profile https up -d`.
@@ -50,6 +51,22 @@ Run the browser tests against the running stack: `cd app/e2e && npm install && B
 6. Open `http://<server-ip>:8080`, log in as `admin`, then in Server Management, Models, press "Run speed test".
 7. Optional HTTPS: point a domain to the server, set `COMPAIN_DOMAIN` in `.env`, open ports 80 and 443, and add `--profile https` to the start command. Then turn on "HTTPS is set up" in Server Management, Domain & HTTPS.
 8. Backups run every night (Server Management, Backups). They are stored in the `compain-data` volume; copy them off the server from time to time.
+
+## Graphics card
+
+A reply is much faster when the model runs on an NVIDIA graphics card. llama.cpp puts as much of the model into the graphics memory as fits and keeps the rest in RAM, so a card with less memory than the model (Gemma: 17 GB) still helps a lot.
+
+1. Once, install the NVIDIA Container Toolkit so Docker can use the card (Rocky/RHEL; on Debian/Ubuntu see NVIDIA's guide):
+   ```
+   curl -sL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo
+   sudo dnf install -y nvidia-container-toolkit
+   sudo nvidia-ctk runtime configure --runtime=docker
+   sudo systemctl restart docker
+   ```
+   Under WSL the Windows NVIDIA driver is enough; do not install a driver inside WSL.
+2. Switch: `./scripts/llm.sh gpu` (Gemma) or `./scripts/llm.sh gpu mistral`. Back to the processor: `./scripts/llm.sh cpu`. `./scripts/llm.sh status` shows the current choice.
+
+The script writes the choice into `.env` (`LLM_DEVICE`, `COMPOSE_PROFILES`), so `docker compose up -d` and `./scripts/update.sh` keep it. Server Management, Overview shows where the model runs. `LLM_GPU_RESERVE_MB` (default 1024) is the graphics memory left free for the desktop.
 
 Update later: `./scripts/update.sh` (pulls, checks `.env`, `.impressum` and `.datenschutz`, rebuilds, runs the migrations, checks health).
 

@@ -359,6 +359,7 @@ await page.waitForSelector("#view-admin:not(.hidden)");
 await page.waitForSelector("#view-admin .stat-card, #view-admin .card", { timeout: 10000 });
 check("Server Management overview loads", (await page.textContent("#view-admin")).includes("Hosted API today"));
 check("overview shows the model queue", (await page.textContent("#admin-queue")).includes("waiting"));
+check("overview shows where the model runs", /\((GPU|CPU)\)/.test(await page.textContent("#admin-device")));
 await page.click("#view-admin .subtabs button:has-text('Characters')");
 await page.waitForSelector("#view-admin .card:has-text('review queue')");
 // Approve everything waiting in the queue (earlier runs may have left items).

@@ -165,6 +165,8 @@ Notes:
 
 Decision: **Gemma 4 26B-A4B uncensored is the default self-hosted model** (`--profile llm-gemma`). Mistral stays available as `--profile llm-mistral`.
 
+Decision (1.3.5): **GPU or CPU is chosen on the server, not in the app.** Each model has a CPU service (`llama.cpp:server`) and a GPU service (`llama.cpp:server-cuda`, NVIDIA device reservation, `--fit` puts as much as fits into graphics memory, `--fit-target LLM_GPU_RESERVE_MB` stays free). The GPU service carries the network alias of the CPU service, so the app URL does not change. `scripts/llm.sh gpu|cpu [model]` writes `LLM_DEVICE` and `COMPOSE_PROFILES` into `.env` and restarts; the app only shows `LLM_DEVICE` (Server Management, Overview). Switching from inside the app would need the Docker socket in the app container, which means root on the host; not worth it for a setting that changes with the machine. A GPU service cannot start without an NVIDIA card, so a server without one uses the CPU service.
+
 ## Decisions log
 
 - Project folder created at `/opt/docker/Compain`.

@@ -72,7 +72,7 @@ Known risks:
 
 ## Layout
 
-- `docker-compose.yml`: `db` (PostgreSQL 17), `app` (API and web UI on port 8080), optional profiles `llm-mistral`, `llm-gemma` (llama.cpp on port 8081 inside Docker) and `https` (Caddy on 80/443). Reads `.env`.
+- `docker-compose.yml`: `db` (PostgreSQL 17), `app` (API and web UI on port 8080), optional profiles `llm-mistral`, `llm-gemma` (llama.cpp on port 8081 inside Docker; `llm-gemma-gpu` and `llm-mistral-gpu` are the same on an NVIDIA card with the `server-cuda` image and the network alias of the CPU service, chosen with `scripts/llm.sh`) and `https` (Caddy on 80/443). Reads `.env`.
 - `Caddyfile`: HTTPS reverse proxy for `COMPAIN_DOMAIN`.
 - `models/`: GGUF model files (git-ignored, several GB).
 - `.env.example`: all variables. Copy to `.env` and set real passwords.
@@ -106,6 +106,7 @@ Known risks:
 - Run with Docker: `docker compose up --build -d`
 - Health check: `curl http://localhost:8080/api/health`
 - With the model: `./scripts/download-models.sh`, set `COMPAIN_MODEL_BASE_URL=http://llm-gemma:8081/v1` in `.env`, then `docker compose --profile llm-gemma up -d`
+- On the graphics card: `./scripts/llm.sh gpu` (needs the NVIDIA Container Toolkit, see README); back: `./scripts/llm.sh cpu`
 - Browser tests with a real model: add `REPLY_TIMEOUT=300000` (milliseconds) before `node run.mjs`
 - With HTTPS: set `COMPAIN_DOMAIN` in `.env`, then `docker compose --profile https up -d`
 - Stop: `docker compose down` (keeps the database volume; add `-v` only to delete all data)

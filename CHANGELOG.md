@@ -2,6 +2,11 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.3.5 – 2026-11-24
+
+- **The model can run on the graphics card.** `./scripts/llm.sh gpu` starts the model with an NVIDIA graphics card, `./scripts/llm.sh cpu` back on the processor only, for servers without a card. Replies come much faster on the graphics card. The choice is kept in `.env`; `./scripts/update.sh` keeps it too.
+- Server Management, Overview shows whether the model runs on the graphics card or the processor.
+
 ## 1.3.4 – 2026-11-24
 
 - **Replies go on without you.** A reply is now written on the server on its own. Leaving the chat, switching to another tab or app, or losing the connection no longer stops it: the reply is finished and saved, and the chat list shows it as unread. Coming back while it is still being written shows the text so far and follows it.

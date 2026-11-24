@@ -80,6 +80,7 @@ def overview(_: User = Depends(require_admin), db: DbSession = Depends(get_db), 
         .scalar()
         or 0,
         "self_hosted_url": settings.self_hosted_url,
+        "self_hosted_device": settings.self_hosted_device,
         "hosted_url": settings.hosted_url,
         "hosted_daily_limit": int(cfg.get(db, "hosted_daily_limit")),
         "hosted_daily_total": int(cfg.get(db, "hosted_daily_total")),
