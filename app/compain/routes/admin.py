@@ -17,7 +17,7 @@ from .. import settings as cfg
 from ..config import Settings
 from ..deps import get_db, get_settings, require_admin
 from ..llm import stream_chat
-from ..models import ApiUsage, AuditLog, Character, Chat, Message, User
+from ..models import ApiUsage, AuditLog, Character, Chat, Message, Ticket, User
 from ..secret import MASK, encrypt
 from ..security import hash_password
 
@@ -72,6 +72,7 @@ def overview(_: User = Depends(require_admin), db: DbSession = Depends(get_db), 
         "characters": db.query(func.count(Character.id)).scalar(),
         "chats": db.query(func.count(Chat.id)).scalar(),
         "messages": db.query(func.count(Message.id)).scalar(),
+        "tickets_waiting": db.query(Ticket).filter(Ticket.status == "open").count(),
         "hosted_used_today": db.query(func.coalesce(func.sum(ApiUsage.count), 0))
         .filter(ApiUsage.day == date.today())
         .scalar()

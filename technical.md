@@ -76,6 +76,8 @@ Test both on the same roleplay prompt. Measure tokens per second, memory use, an
 - `api_usage`: user, date, message count (hosted API only).
 - `settings`: key and value for server-wide options set in Server Management.
 - `audit_log`: time, user, action, detail.
+- `tickets`: id, user, subject, category (question, bug, idea, account, other), priority (low, normal, high), status (open, in_progress, answered, closed), assigned admin, created, updated, read markers for the user and the admins.
+- `ticket_messages`: id, ticket, author, from admin, internal note, content, created.
 - `backups`: time, size, type (daily or weekly), location, encrypted flag.
 
 ## Architecture (draft)
@@ -126,7 +128,7 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - **Age check:** `users.age_confirmed_at`. Until it is set, every API call except `/api/auth/me`, `/confirm-age`, `/logout`, `/logout-all` and `/preferences` returns 403 `age_confirmation_required`. The web app shows the question once; "No" ends the session. Both answers go into the audit log.
 - **Auth:** session cookie (`compain_session`, HTTP-only, `Secure` behind HTTPS) or Bearer token (for the Android app later). Session lengths, lockout and password length come from Server Management. Sign-up only with an invite code when the admin allows it.
 - **Characters:** owner-only edit and delete, admins all. Adults-only check on save and import. Pictures checked by file content. Card import: SillyTavern JSON V1/V2, PNG with an embedded card (the PNG becomes the picture), plain text.
-- **Chats:** streaming over Server-Sent Events. Context = system prompt (character, roleplay rules, reply length, reply language) + story summary + important messages + the last N messages. Turns are merged and start with a user turn, because Mistral and Gemma chat templates need alternating roles. The greeting is the first message.
+- **Chats:** streaming over Server-Sent Events. Context = system prompt (character, roleplay rules, reply length, reply language) + story summary + important messages (own lines and replies, each with its speaker: persona name or "User", or the character) + the last N messages. Turns are merged and start with a user turn, because Mistral and Gemma chat templates need alternating roles. The greeting is the first message.
 - **Story memory:** after every 40 new messages, a background task asks the same model for a summary of at most 180 words and stores it.
 - **Live sync:** WebSocket `/ws`. The server sends `{"type": "chats"}` to all devices of a user when their chats change; the client reloads from the API.
 - **Hosted API:** provider, endpoint, model and key set in Server Management (key encrypted with a key derived from `COMPAIN_SECRET_KEY`), or from `.env`. Limits per user and in total per day.
@@ -135,12 +137,13 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - **Web UI:** plain JavaScript served by the API from `compain/static/`, built on the mockup's CSS. German via `i18n.js` (translates interface strings only, never user text).
 - **Designs:** `<html data-design data-palette data-mode data-bg>` plus CSS variables `--g-blur`, `--g-alpha`, `--g-dim`. Glass designs blur panels over `#bg-layer`; on phones the blur is off. Modern designs hide the sidebar and show `#topnav-pills`; phones keep the bottom bar.
 - **Changelog and Impressum:** `routes/legal.py` serves `/api/changelog`, `/api/legal/impressum` and simple pages; the web app shows both as popovers (text rendered with text nodes only). The Impressum file is bind-mounted read-only (`create_host_path: false`).
-- **Migrations:** Alembic in `app/compain/migrations` (0001 = schema 0.3.0, 0002 = 0.4.0). `db.init_db` runs `upgrade head` on every start; a database without `alembic_version` gets the old extra columns and is stamped 0001 first. New revision: change `models.py`, then run Alembic's `revision --autogenerate` against a database at head (see the snippet in the 0.4.0 commit), and fix booleans (`sa.false()`) and constraint names by hand.
+- **Migrations:** Alembic in `app/compain/migrations` (0001 = schema 0.3.0, 0002 = 0.4.0, 0003 = help tickets in 1.1.0). `db.init_db` runs `upgrade head` on every start; a database without `alembic_version` gets the old extra columns and is stamped 0001 first. New revision: change `models.py`, then run Alembic's `revision --autogenerate` against a database at head (see the snippet in the 0.4.0 commit), and fix booleans (`sa.false()`) and constraint names by hand.
 - **Chat tools:** `POST /api/chats/{id}/reply` with `mode` `next` (continue) or `regenerate` (new version stored in `messages.variants`); `POST .../messages/{id}/variant`; `PATCH .../messages/{id}` (text, important); `DELETE .../messages/{id}` and `.../after`. Stop = the browser aborts the request; the stream generator catches the cancellation and saves the part written so far.
 - **Account security:** TOTP (`totp.py`, RFC 6238, secret encrypted with `COMPAIN_SECRET_KEY`), recovery codes as SHA-256 hashes, sessions with `mfa_pending` (5 minutes, only `/login/2fa`), device data (`user_agent`, `ip`, `last_seen`), login guard in memory (`loginguard.py`).
 - **PWA:** manifest and service worker at the root (`/manifest.webmanifest`, `/sw.js`); static files cache-first with background refresh, the page network-first, the API never cached. Service workers need HTTPS or localhost.
 - **Replies:** copied speaker marks ("[Name]:", "Name:") are removed before saving; a stop before the first real word saves nothing.
-- **Tests:** 53 API tests and 57 browser checks (desktop and phone, German interface) pass against the Docker build.
+- **Help and tickets:** `routes/help.py` under `/api/tickets` (list with `scope=mine|all` and `status`, `summary` for the badge, `admins`, create, get (sets the read marker), `POST .../messages` (admins: `internal`, `status`), `PATCH` (owner: close or reopen; admins: status, priority, category, `assigned_to`/`unassign`), `DELETE` (admins)). Others' tickets return 404. Up to 10 open tickets per user, 5000 characters per post. A user's post reopens an answered or closed ticket; an admin's post sets "answered" and assigns the ticket if nobody has it. Live event `{"type": "tickets"}` to the owner and all admins. Admin actions go to the audit log. Help texts (FAQ, guide, Markdown) are in `static/help.js` in English and German, written in Markdown and shown with the chat renderer. Migration 0003.
+- **Tests:** 59 API tests and 72 browser checks (desktop and phone, German interface) pass against the Docker build.
 
 ## Model test results
 

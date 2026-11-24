@@ -166,34 +166,43 @@
     { id: "characters", label: "Characters", icon: "i-users" },
     { id: "community", label: "Community", icon: "i-globe" },
     { id: "profile", label: "Profile", icon: "i-user" },
-    { id: "settings", label: "Settings", icon: "i-gear" }
+    { id: "settings", label: "Settings", icon: "i-gear" },
+    { id: "help", label: "Help", icon: "i-help" }
   ];
-  var VIEWS = ["home", "chats", "characters", "community", "profile", "settings", "admin"];
+  var VIEWS = ["home", "chats", "characters", "community", "profile", "settings", "help", "admin"];
 
   function buildNav() {
     var desk = $("nav-desktop"), bar = $("bottombar");
     desk.textContent = "";
     bar.textContent = "";
     NAV.forEach(function (n) {
-      desk.appendChild(el("button", { "data-go": n.id, onclick: function () { go(n.id); } }, icon(n.icon), el("span", { text: n.label })));
+      desk.appendChild(el("button", { "data-go": n.id, onclick: function () { go(n.id); } }, icon(n.icon), el("span", { text: n.label }),
+        n.id === "help" ? el("i", { class: "badge nav-badge help-badge", hidden: true }) : null));
     });
     if (me && me.role === "admin") {
       desk.appendChild(el("button", { "data-go": "admin", onclick: function () { go("admin"); } }, icon("i-shield"), el("span", { text: "Server Management" })));
     }
     NAV.slice(0, 5).forEach(function (n) {
-      bar.appendChild(el("button", { "data-go": n.id, onclick: function () { go(n.id); } }, icon(n.icon), el("span", { text: n.label })));
+      bar.appendChild(el("button", { "data-go": n.id, onclick: function () { go(n.id); } }, icon(n.icon), el("span", { text: n.label }),
+        n.id === "profile" ? el("i", { class: "badge nav-badge help-badge", hidden: true }) : null));
     });
     var pills = $("topnav-pills");
     pills.textContent = "";
     NAV.concat(me && me.role === "admin" ? [{ id: "admin", label: "Server Management", icon: "i-shield" }] : []).forEach(function (n) {
-      pills.appendChild(el("button", { "data-go": n.id, onclick: function () { go(n.id); } }, icon(n.icon, "sm"), el("span", { text: n.label })));
+      pills.appendChild(el("button", { "data-go": n.id, onclick: function () { go(n.id); } }, icon(n.icon, "sm"), el("span", { text: n.label }),
+        n.id === "help" ? el("i", { class: "badge nav-badge help-badge", hidden: true }) : null));
     });
+    updateHelpBadge();
   }
 
   function go(route) {
     var parts = String(route || "home").split("/");
     var name = parts[0];
     if (name === "chat") { name = "chats"; if (parts[1]) state.chatId = Number(parts[1]); }
+    if (name === "help") {
+      if (parts[1] && HELP_TABS.indexOf(parts[1]) !== -1) state.helpTab = parts[1];
+      state.ticketId = parts[1] === "support" && parts[2] ? Number(parts[2]) : (parts[1] ? null : state.ticketId);
+    }
     if (VIEWS.indexOf(name) === -1) name = "home";
     if (name === "admin" && (!me || me.role !== "admin")) name = "home";
     var openChat = name === "chats" && parts.length > 1;
@@ -207,11 +216,11 @@
       else b.removeAttribute("aria-current");
     });
 
-    var hash = "#" + (name === "chats" && openChat ? "chats/" + state.chatId : name);
+    var hash = "#" + (name === "chats" && openChat ? "chats/" + state.chatId : name === "help" ? helpHash() : name);
     if (location.hash !== hash) history.replaceState(null, "", hash);
     window.scrollTo(0, 0);
 
-    var renderers = { home: renderHome, chats: renderChats, characters: renderCharacters, community: renderCommunity, profile: renderProfile, settings: renderSettings, admin: renderAdmin };
+    var renderers = { home: renderHome, chats: renderChats, characters: renderCharacters, community: renderCommunity, profile: renderProfile, settings: renderSettings, help: renderHelp, admin: renderAdmin };
     Promise.resolve(renderers[name]()).catch(function (e) { toast(e.message); });
   }
 
@@ -574,6 +583,15 @@
     var sendBtn = el("button", { class: "primary send", type: "submit", "aria-label": "Send" }, icon("i-send"));
     var form = el("form", { class: "composer" }, input, sendBtn);
     pane.appendChild(form);
+    // After a reply the chat is drawn again: put the cursor back into the field (and keep what was typed meanwhile).
+    state.drafts = state.drafts || {};
+    if (state.drafts[chatId]) { input.value = state.drafts[chatId]; delete state.drafts[chatId]; }
+    var refocus = state.refocus === chatId;
+    state.refocus = null;
+    if (refocus) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -597,6 +615,7 @@
       var text = input.value.trim();
       if (!text) return;
       input.value = "";
+      input.focus();
       box.appendChild(messageNode({ id: null, role: "user", content: text, important: false }, chat, false, ctx));
       await run("/api/chats/" + chatId + "/messages", { content: text }, null);
     }
@@ -642,7 +661,11 @@
         setBusy(false);
       }
       // Reload so the new messages get their ids and actions. After Stop, give the server a moment to save.
-      setTimeout(function () { renderChats(); }, stopped ? 600 : 0);
+      state.refocus = chatId;
+      setTimeout(function () {
+        if (input.value.trim()) { state.drafts = state.drafts || {}; state.drafts[chatId] = input.value; }
+        renderChats();
+      }, stopped ? 600 : 0);
     }
     box.scrollTop = box.scrollHeight;
   }
@@ -659,13 +682,14 @@
     if (m.id && ctx) {
       var line = el("div", { class: "meta-line" });
       var act = async function (fn) { if (ctx.busy()) return; try { await fn(); } catch (e) { toast(e.message); } };
+      // Both sides can be marked: a reply worth remembering, or your own line with important context.
+      line.appendChild(el("button", { class: "mark", "aria-pressed": m.important ? "true" : "false", title: "Always keep this in mind",
+        onclick: function () { act(async function () {
+          await api("/api/chats/" + chat.id + "/messages/" + m.id, { method: "PATCH", body: { important: !m.important } });
+          toast(!m.important ? "Marked important" : "Unmarked");
+          await renderChats();
+        }); } }, icon("i-star", "sm"), m.important ? " Important" : " Mark important"));
       if (!mine) {
-        line.appendChild(el("button", { class: "mark", "aria-pressed": m.important ? "true" : "false", title: "Always keep this in mind",
-          onclick: function () { act(async function () {
-            await api("/api/chats/" + chat.id + "/messages/" + m.id, { method: "PATCH", body: { important: !m.important } });
-            toast(!m.important ? "Marked important" : "Unmarked");
-            await renderChats();
-          }); } }, icon("i-star", "sm"), m.important ? " Important" : " Mark important"));
         if (m.variant_count > 1) {
           var flip = function (d) { act(async function () {
             var i = (m.variant_index + d + m.variant_count) % m.variant_count;
@@ -959,6 +983,7 @@
             el("div", { class: "muted small", text: (me.role === "admin" ? "Admin" : "User") + " · " + chars.length + " characters · " + chats.length + " chats" })),
           el("div", { class: "actions" },
             el("button", { onclick: function () { go("settings"); } }, "Settings"),
+            el("button", { onclick: function () { go("help"); } }, "Help"),
             me.role === "admin" ? el("button", { onclick: function () { go("admin"); } }, "Server Management") : null)),
         el("div", { class: "kpis" },
           kpi(chars.length, "characters"), kpi(chats.length, "chats"), kpi(msgs, "messages")))));
@@ -1005,6 +1030,278 @@
           el("a", { class: "btn primary", href: "/api/export/all", download: "" }, "Everything")))));
   }
   function kpi(n, label) { return el("div", { class: "kpi" }, el("b", { text: String(n) }), el("span", { text: label })); }
+
+  /* ---------- help: FAQ, guide, Markdown, support tickets ---------- */
+  var HELP_TABS = ["faq", "guide", "md", "support"];
+  var TICKET_STATUS = { open: "Open", in_progress: "In progress", answered: "Answered", closed: "Closed" };
+  var TICKET_CATEGORY = { question: "Question", bug: "Bug", idea: "Idea", account: "Account", other: "Other" };
+  var TICKET_PRIORITY = { low: "Low", normal: "Normal", high: "High" };
+  state.helpTab = "faq";
+  state.ticketId = null;
+  state.ticketScope = null; // "mine" or "all"; admins start with all
+  state.ticketStatus = "active";
+  state.ticketDrafts = {};
+
+  function helpText() {
+    var h = window.CompainHelp || {};
+    return (prefs.uiLanguage === "de" ? h.de : h.en) || h.en;
+  }
+  function helpHash() {
+    return "help/" + state.helpTab + (state.helpTab === "support" && state.ticketId ? "/" + state.ticketId : "");
+  }
+  function setHelpHash() { var h = "#" + helpHash(); if (location.hash !== h) history.replaceState(null, "", h); }
+  function md(text) { var d = el("div", { class: "md", "data-no-i18n": "" }); d.appendChild(mdRender(text)); return d; }
+  function statusPill(s) {
+    var cls = s === "answered" ? " ok" : s === "open" ? " accent" : "";
+    return el("span", { class: "pill t-status t-" + s + cls, text: TICKET_STATUS[s] || s });
+  }
+  function optionsOf(map, current) {
+    return Object.keys(map).map(function (k) { return el("option", { value: k, selected: k === current, text: map[k] }); });
+  }
+
+  async function updateHelpBadge() {
+    if (!me) return;
+    var n = 0;
+    try {
+      var s = await api("/api/tickets/summary");
+      n = s.unread + (s.admin_unread || 0);
+      state.ticketSummary = s;
+    } catch (e) { return; }
+    document.querySelectorAll(".help-badge").forEach(function (b) { b.textContent = String(n); b.hidden = n === 0; });
+  }
+
+  async function renderHelp() {
+    var view = $("view-help");
+    // A live update must not eat a reply that is being written.
+    var draft = $("ticket-reply");
+    if (draft && state.ticketId) state.ticketDrafts[state.ticketId] = draft.value;
+    var T = helpText();
+    view.textContent = "";
+    view.appendChild(el("div", { class: "page-head" }, el("div", null,
+      el("div", { class: "caps eyebrow", text: T.ui.eyebrow }), el("h1", { text: T.ui.title }), el("p", { text: T.ui.lead }))));
+    var tabs = el("div", { class: "subtabs", role: "tablist", id: "help-tabs" });
+    HELP_TABS.forEach(function (t) {
+      tabs.appendChild(el("button", { role: "tab", "data-tab": t, "aria-selected": state.helpTab === t ? "true" : "false",
+        onclick: function () { state.helpTab = t; if (t !== "support") state.ticketId = null; setHelpHash(); renderHelp(); } },
+        T.ui.tabs[t], t === "support" ? el("i", { class: "badge nav-badge help-badge", hidden: true, style: "margin-left:6px" }) : null));
+    });
+    view.appendChild(tabs);
+    var body = el("div", { class: "help-body" });
+    view.appendChild(body);
+    updateHelpBadge();
+    if (state.helpTab === "faq") return helpFaq(body, T);
+    if (state.helpTab === "guide") return helpGuide(body, T);
+    if (state.helpTab === "md") return helpMarkdown(body, T);
+    if (state.ticketId) return helpTicket(body, state.ticketId);
+    return helpTickets(body);
+  }
+
+  function helpFaq(body, T) {
+    var search = el("input", { id: "faq-search", placeholder: T.ui.faqSearch, "aria-label": T.ui.faqSearch });
+    var list = el("div", { class: "faq-list" });
+    function draw() {
+      var q = search.value.trim().toLowerCase();
+      list.textContent = "";
+      var hits = T.faq.filter(function (f) { return !q || (f.q + " " + f.a).toLowerCase().indexOf(q) !== -1; });
+      hits.forEach(function (f) {
+        list.appendChild(el("details", { class: "card faq" }, el("summary", { "data-no-i18n": "", text: f.q }), md(f.a)));
+      });
+      if (!hits.length) list.appendChild(el("p", { class: "muted", text: T.ui.noFaq }));
+    }
+    search.addEventListener("input", draw);
+    body.appendChild(el("div", { class: "search", style: "margin-bottom:14px" }, icon("i-search", "sm"), search));
+    body.appendChild(list);
+    draw();
+    body.appendChild(el("div", { class: "card row", style: "margin-top:18px;flex-wrap:wrap;justify-content:space-between" },
+      el("span", { text: "Didn't find an answer?" }),
+      el("button", { class: "primary", onclick: function () { state.helpTab = "support"; state.ticketId = null; state.newTicket = true; setHelpHash(); renderHelp(); } }, "Open a ticket")));
+  }
+
+  function helpGuide(body, T) {
+    var toc = el("div", { class: "row guide-toc", style: "flex-wrap:wrap;gap:6px;margin-bottom:16px" });
+    var grid = el("div", { class: "grid grid-2" });
+    T.guide.forEach(function (g, i) {
+      var id = "guide-" + i;
+      toc.appendChild(el("button", { class: "ghost", onclick: function () { var t = $(id); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); } }, g.title));
+      grid.appendChild(el("div", { class: "card guide-card", id: id }, el("h2", { text: g.title }), md(g.body)));
+    });
+    body.appendChild(toc);
+    body.appendChild(grid);
+  }
+
+  function helpMarkdown(body, T) {
+    var M = T.md;
+    var table = el("table", { class: "md-table" },
+      el("thead", null, el("tr", null, el("th", { text: "You write" }), el("th", { text: "You see" }), el("th", { text: "Meaning" }))),
+      el("tbody", null, M.rows.map(function (r) {
+        return el("tr", null, el("td", null, el("pre", { class: "md-src", text: r[0] })), el("td", null, md(r[0])), el("td", { class: "muted small", text: r[1] }));
+      })));
+    body.appendChild(el("div", { class: "card" }, md(M.intro), el("div", { class: "table-wrap", style: "margin-top:14px" }, table), el("div", { style: "margin-top:14px" }, md(M.notes))));
+    var input = el("textarea", { id: "md-try", rows: "7", "aria-label": M.tryLabel });
+    input.value = M.tryText;
+    var preview = el("div", { class: "bubble md-preview", id: "md-preview" });
+    function draw() { setBubble(preview, input.value); }
+    input.addEventListener("input", draw);
+    draw();
+    body.appendChild(el("div", { class: "card", style: "margin-top:18px" }, el("h2", { text: M.tryLabel }),
+      el("div", { class: "grid grid-2", style: "margin-top:12px" }, input, el("div", { class: "msg char md-try-out" }, preview))));
+  }
+
+  async function helpTickets(body) {
+    var admin = me.role === "admin";
+    if (!state.ticketScope) state.ticketScope = admin ? "all" : "mine";
+    var scope = admin ? state.ticketScope : "mine";
+    var tickets = await api("/api/tickets?scope=" + scope + (state.ticketStatus !== "all" ? "&status=" + state.ticketStatus : ""));
+
+    // New ticket form
+    var subject = el("input", { id: "ticket-subject", maxlength: "200", placeholder: "Short summary, e.g. Replies stop mid sentence" });
+    var category = el("select", { id: "ticket-category", "aria-label": "Category" }, optionsOf(TICKET_CATEGORY, "question"));
+    var text = el("textarea", { id: "ticket-text", rows: "6", maxlength: "5000", placeholder: "What did you do, what did you expect, what happened? Markdown works." });
+    var form = el("div", { class: "card form" + (state.newTicket ? "" : " hidden"), id: "ticket-form" },
+      el("h2", { text: "New ticket" }),
+      el("div", null, el("label", { for: "ticket-subject", text: "Subject" }), subject),
+      el("div", null, el("label", { for: "ticket-category", text: "Category" }), category),
+      el("div", null, el("label", { for: "ticket-text", text: "Message" }), text),
+      el("div", { class: "row", style: "flex-wrap:wrap" },
+        el("button", { class: "primary", id: "ticket-send", onclick: async function () {
+          try {
+            var t = await api("/api/tickets", { method: "POST", body: { subject: subject.value, category: category.value, content: text.value } });
+            state.newTicket = false; state.ticketId = t.id; setHelpHash(); toast("Ticket sent"); renderHelp();
+          } catch (e) { toast(e.message); }
+        } }, "Send ticket"),
+        el("button", { class: "ghost", onclick: function () { state.newTicket = false; form.classList.add("hidden"); } }, "Cancel")));
+
+    var bar = el("div", { class: "row", style: "flex-wrap:wrap;gap:8px;margin-bottom:14px" },
+      el("button", { class: "primary", id: "ticket-new", onclick: function () { state.newTicket = true; form.classList.remove("hidden"); subject.focus(); } }, icon("i-plus", "sm"), " New ticket"));
+    if (admin) {
+      bar.appendChild(el("div", { class: "segmented", role: "group" }, [["all", "All tickets"], ["mine", "My tickets"]].map(function (o) {
+        return el("button", { "aria-pressed": scope === o[0] ? "true" : "false", "data-scope": o[0],
+          onclick: function () { state.ticketScope = o[0]; renderHelp(); } }, o[1]);
+      })));
+    }
+    var filter = el("select", { id: "ticket-filter", "aria-label": "Show", onchange: function () { state.ticketStatus = filter.value; renderHelp(); } },
+      [["active", "Not closed"], ["open", "Open"], ["in_progress", "In progress"], ["answered", "Answered"], ["closed", "Closed"], ["all", "All"]].map(function (o) {
+        return el("option", { value: o[0], selected: state.ticketStatus === o[0], text: o[1] });
+      }));
+    bar.appendChild(el("span", { class: "spacer", style: "flex:1" }));
+    bar.appendChild(filter);
+
+    body.appendChild(bar);
+    body.appendChild(form);
+    var list = el("div", { class: "ticket-list", id: "ticket-list" });
+    if (!tickets.length) {
+      list.appendChild(el("div", { class: "card empty" }, el("h2", { text: "No tickets here" }),
+        el("p", { class: "muted", text: scope === "all" ? "Nothing to answer right now." : "Questions, problems or ideas? Open a ticket; the admins answer here." })));
+    }
+    tickets.forEach(function (t) {
+      list.appendChild(el("button", { class: "card ticket-row" + (t.unread ? " unread" : ""), "data-id": String(t.id),
+        onclick: function () { state.ticketId = t.id; setHelpHash(); renderHelp(); } },
+        el("div", { class: "row", style: "gap:8px;flex-wrap:wrap" },
+          t.unread ? el("i", { class: "unread-dot", "aria-label": "New answer" }) : null,
+          el("b", { class: "grow ellipsis", "data-no-i18n": "", text: t.subject }),
+          statusPill(t.status)),
+        el("div", { class: "muted small ellipsis", style: "margin-top:6px", text: plain(t.last_message) }),
+        el("div", { class: "row small muted", style: "gap:10px;margin-top:8px;flex-wrap:wrap" },
+          el("span", { text: "#" + t.id }),
+          el("span", { text: TICKET_CATEGORY[t.category] || t.category }),
+          admin && !t.mine ? el("span", { text: t.user_name }) : null,
+          admin && t.priority !== "normal" ? el("span", { class: "pill" + (t.priority === "high" ? " accent" : ""), text: TICKET_PRIORITY[t.priority] }) : null,
+          admin && t.assigned_name ? el("span", { text: "→ " + t.assigned_name }) : null,
+          el("span", { class: "grow" }),
+          el("span", { text: fmtTime(t.updated_at) }))));
+    });
+    body.appendChild(list);
+    if (state.newTicket) subject.focus();
+  }
+
+  async function helpTicket(body, id) {
+    var t;
+    try { t = await api("/api/tickets/" + id); }
+    catch (e) { state.ticketId = null; setHelpHash(); toast(e.message); return helpTickets(body); }
+    updateHelpBadge();
+    var asAdmin = me.role === "admin" && !t.mine;
+    var refresh = function (nt) { if (nt) t = nt; renderHelp(); };
+
+    var head = el("div", { class: "card ticket-head" },
+      el("button", { class: "ghost", id: "ticket-back", onclick: function () { state.ticketId = null; setHelpHash(); renderHelp(); } }, icon("i-back", "sm"), " All tickets"),
+      el("div", { class: "row", style: "gap:10px;flex-wrap:wrap;margin-top:10px" },
+        el("h2", { class: "grow", id: "ticket-title", "data-no-i18n": "", text: t.subject }), statusPill(t.status)),
+      el("div", { class: "row small muted", style: "gap:12px;flex-wrap:wrap;margin-top:6px" },
+        el("span", { text: "#" + t.id }),
+        el("span", { text: TICKET_CATEGORY[t.category] || t.category }),
+        el("span", { text: "From " + t.user_name }),
+        el("span", { text: fmtTime(t.created_at) }),
+        t.assigned_name ? el("span", { text: "Handled by " + t.assigned_name }) : null));
+
+    var controls = el("div", { class: "row ticket-controls", style: "gap:8px;flex-wrap:wrap;margin-top:12px" });
+    async function patch(b) { try { refresh(await api("/api/tickets/" + t.id, { method: "PATCH", body: b })); } catch (e) { toast(e.message); } }
+    if (asAdmin) {
+      var admins = await api("/api/tickets/admins");
+      var lab = function (txt, node) { return el("label", { class: "inline-field small" }, el("span", { class: "muted", text: txt }), node); };
+      var st = el("select", { id: "ticket-status", onchange: function () { patch({ status: st.value }); } }, optionsOf(TICKET_STATUS, t.status));
+      var pr = el("select", { id: "ticket-priority", onchange: function () { patch({ priority: pr.value }); } }, optionsOf(TICKET_PRIORITY, t.priority));
+      var ca = el("select", { id: "ticket-cat", onchange: function () { patch({ category: ca.value }); } }, optionsOf(TICKET_CATEGORY, t.category));
+      var as = el("select", { id: "ticket-assign", onchange: function () { patch(as.value ? { assigned_to: Number(as.value) } : { unassign: true }); } },
+        el("option", { value: "", text: "Nobody", selected: !t.assigned_to }),
+        admins.map(function (a) { return el("option", { value: String(a.id), selected: a.id === t.assigned_to, text: a.name }); }));
+      controls.appendChild(lab("Status", st));
+      controls.appendChild(lab("Priority", pr));
+      controls.appendChild(lab("Category", ca));
+      controls.appendChild(lab("Handled by", as));
+      controls.appendChild(el("button", { class: "ghost danger", id: "ticket-delete", onclick: function () {
+        var b = this;
+        if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Delete?"; setTimeout(function () { b.dataset.armed = ""; b.textContent = "Delete ticket"; }, 3000); return; }
+        api("/api/tickets/" + t.id, { method: "DELETE" }).then(function () { toast("Ticket deleted"); state.ticketId = null; setHelpHash(); renderHelp(); }, function (e) { toast(e.message); });
+      } }, "Delete ticket"));
+    } else {
+      controls.appendChild(t.status === "closed"
+        ? el("button", { id: "ticket-reopen", onclick: function () { patch({ status: "open" }); } }, "Reopen ticket")
+        : el("button", { id: "ticket-close", onclick: function () { patch({ status: "closed" }); } }, "Close ticket"));
+    }
+    head.appendChild(controls);
+    body.appendChild(head);
+
+    var thread = el("div", { class: "ticket-thread", id: "ticket-thread" });
+    t.messages.forEach(function (m) {
+      var cls = "t-msg" + (m.from_admin ? " admin" : " user") + (m.internal ? " internal" : "") + (m.mine ? " mine" : "");
+      thread.appendChild(el("div", { class: cls },
+        el("div", { class: "row small", style: "gap:8px;flex-wrap:wrap" },
+          m.mine ? el("b", { text: "You" }) : el("b", { "data-no-i18n": "", text: m.author_name }),
+          m.from_admin ? el("span", { class: "pill accent", text: "Admin" }) : null,
+          m.internal ? el("span", { class: "pill", text: "Internal note" }) : null,
+          el("span", { class: "grow" }),
+          el("span", { class: "muted", text: fmtTime(m.created_at) })),
+        el("div", { class: "bubble" }, mdRender(m.content))));
+    });
+    body.appendChild(thread);
+
+    var reply = el("textarea", { id: "ticket-reply", rows: "4", maxlength: "5000", placeholder: asAdmin ? "Answer (Markdown works)…" : "Write an answer (Markdown works)…", "aria-label": "Answer" });
+    reply.value = state.ticketDrafts[t.id] || "";
+    var internal = asAdmin ? el("input", { type: "checkbox", id: "ticket-internal", style: "width:auto" }) : null;
+    async function send(status) {
+      var text = reply.value.trim();
+      if (!text) { reply.focus(); return; }
+      var b = { content: text };
+      if (internal && internal.checked) b.internal = true;
+      if (status) b.status = status;
+      try {
+        await api("/api/tickets/" + t.id + "/messages", { method: "POST", body: b });
+        delete state.ticketDrafts[t.id];
+        reply.value = "";
+        toast(b.internal ? "Note saved" : "Answer sent");
+        renderHelp();
+      } catch (e) { toast(e.message); }
+    }
+    reply.addEventListener("keydown", function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } });
+    body.appendChild(el("div", { class: "card form ticket-reply" },
+      t.status === "closed" ? el("p", { class: "muted small", text: "This ticket is closed. Writing an answer opens it again." }) : null,
+      reply,
+      el("div", { class: "row", style: "flex-wrap:wrap;gap:8px" },
+        el("button", { class: "primary", id: "ticket-answer", onclick: function () { send(); } }, icon("i-send", "sm"), " Send"),
+        asAdmin ? el("button", { id: "ticket-answer-close", onclick: function () { send("closed"); } }, "Send and close") : null,
+        internal ? el("label", { class: "row small", style: "gap:6px;cursor:pointer" }, internal, el("span", { text: "Internal note (only admins see it)" })) : null,
+        el("span", { class: "muted small", text: "Ctrl+Enter sends" }))));
+  }
 
   /* ---------- settings ---------- */
   function renderSettings() {
@@ -1353,6 +1650,9 @@
       statCard("i-chat", "Chats", String(o.chats), "all users"),
       statCard("i-chat", "Messages", String(o.messages), "stored"),
       statCard("i-clock", "Hosted API today", String(o.hosted_used_today), "messages, all users"),
+      el("button", { class: "card stat-card lift", style: "text-align:left", id: "admin-tickets", onclick: function () { state.helpTab = "support"; state.ticketId = null; state.ticketScope = "all"; go("help/support"); } },
+        el("div", { class: "ic-wrap" }, icon("i-help")), el("div", { class: "caps", text: "Tickets" }),
+        el("div", { class: "stat", text: String(o.tickets_waiting || 0) }), el("div", { class: "muted small", text: "waiting for an answer" })),
       el("div", { class: "card stat-card" }, el("div", { class: "caps", text: "Disk" }),
         el("div", { class: "stat", text: disk.percent + "%" }),
         el("div", { class: "muted small", text: disk.used_gb + " of " + disk.total_gb + " GB used" }),
@@ -1377,10 +1677,23 @@
           el("td", { text: u.username }),
           el("td", null, el("span", { class: "pill" + (u.role === "admin" ? " accent" : ""), text: u.role })),
           el("td", null, el("span", { class: "pill " + (u.active ? "ok" : ""), text: u.active ? "Active" : "Disabled" })),
-          el("td", null, u.id === me.id ? null : el("button", { class: "ghost", onclick: async function () {
-            try { await api("/api/admin/users/" + u.id, { method: "PATCH", body: { active: !u.active } }); renderAdmin(); }
-            catch (e) { toast(e.message); }
-          } }, u.active ? "Disable" : "Enable")));
+          el("td", null, el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" },
+            u.id === me.id ? null : el("button", { class: "ghost", onclick: async function () {
+              try { await api("/api/admin/users/" + u.id, { method: "PATCH", body: { active: !u.active } }); renderAdmin(); }
+              catch (e) { toast(e.message); }
+            } }, u.active ? "Disable" : "Enable"),
+            // For a user who forgot the password: set a new one and tell them.
+            el("button", { class: "ghost", "data-user": u.username, onclick: function () {
+              var cell = this.parentNode;
+              if (cell.querySelector("input")) return;
+              var pw = el("input", { type: "password", placeholder: "New password", "aria-label": "New password for " + u.username, style: "width:auto;min-width:150px" });
+              cell.appendChild(pw);
+              cell.appendChild(el("button", { class: "primary", onclick: async function () {
+                try { await api("/api/admin/users/" + u.id, { method: "PATCH", body: { password: pw.value } }); toast("Password set"); renderAdmin(); }
+                catch (e) { toast(e.message); }
+              } }, "Save"));
+              pw.focus();
+            } }, "Set password"))));
       })));
     body.appendChild(panel("Users", el("div", null,
       el("div", { class: "table-wrap" }, table),
@@ -1698,6 +2011,11 @@
         if (appVersion) $("tb-dot").hidden = prefs.seenChangelog === appVersion;
         if (languageChanged) { location.reload(); return; }
         if (state.route === "settings") renderSettings();
+        return;
+      }
+      if (msg.type === "tickets") {
+        updateHelpBadge();
+        if (state.route === "help" && state.helpTab === "support") renderHelp();
         return;
       }
       if (msg.type !== "chats" || state.sending) return;

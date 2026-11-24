@@ -40,6 +40,7 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 | Community | Characters published by other users, with a featured character, filters by genre, and "Add" to put one in the user's list. |
 | Profile | Display name, About, profile picture, activity numbers, and preferences. Links to Settings and, for admins, Server Management. |
 | Settings | Color theme, appearance (System, Light, Dark), interface and reply language, reply length, context length, notifications. |
+| Help | FAQ with search, a guide to every feature, a Markdown reference with live preview, and support tickets to the admins. Admins see and answer all tickets there. |
 | Server Management | Admin only. Ten sections, listed below. |
 
 ## Chat features (version 1)
@@ -47,7 +48,7 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 1. **Streaming replies:** a typing indicator appears, then text shows word by word.
 2. **Chat list:** search, filters, pinned chats, unread counts, and grouping.
 3. **Switch character:** start a chat with any of the user's characters or a character added from Community. Each character has its own chat history.
-4. **Important messages:** the user can mark up to 10 messages per chat. They are always kept in the context.
+4. **Important messages:** the user can mark up to 10 messages per chat, their own lines (important context) and the character's replies. They are always kept in the context, each with its speaker.
 5. **Story memory:** long chats (about 500 messages) keep a running summary and key facts so the story stays consistent. The chat header shows when the summary was last updated.
 6. **Quick replies:** one-tap prompts above the input (Continue, Describe the scene, Shorter, Longer, Narrate the weather).
 7. **Live sync:** a message sent on the phone appears on the computer, and the reverse, in real time.

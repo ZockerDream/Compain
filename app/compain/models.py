@@ -156,3 +156,42 @@ class CharacterLike(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Ticket(Base):
+    """A help request from a user. Admins answer it; both sides see the conversation."""
+
+    __tablename__ = "tickets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    subject: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(24), default="question")  # question, bug, idea, account, other
+    priority: Mapped[str] = mapped_column(String(16), default="normal")  # low, normal, high
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)  # open, in_progress, answered, closed
+    assigned_to: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Unread markers: when the owner and when any admin last looked at the ticket.
+    user_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    admin_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship(foreign_keys=[user_id])
+    messages: Mapped[list["TicketMessage"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", order_by="TicketMessage.id")
+
+
+class TicketMessage(Base):
+    """One post in a ticket. Internal notes are seen by admins only."""
+
+    __tablename__ = "ticket_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id", ondelete="CASCADE"), index=True)
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    from_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    internal: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    ticket: Mapped[Ticket] = relationship(back_populates="messages")

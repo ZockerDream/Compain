@@ -2,6 +2,18 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.1.0 – 2026-11-24
+
+- Mark your own messages as important, for example when you give the story important context. The character keeps them in mind like important replies; they count toward the 10 per chat.
+- **Help** page (sidebar, and the Profile page on phones):
+  - **FAQ** with search.
+  - **Guide** to every feature.
+  - **Markdown** reference with a live preview.
+  - **Support tickets**: open a ticket with a subject, category and message, answer, close and reopen it. Admins see all tickets, answer, write internal notes only admins see, set status, priority and category, assign tickets to an admin and delete them. New answers show live with a badge on Help (on phones on Profile).
+- Server Management: the overview shows tickets waiting for an answer; admins can set a new password for a user.
+- Browser tests read the admin login from `.env`.
+- The message field keeps the cursor after sending and after the reply, so you can write on without clicking it. Text you type while the character writes is kept.
+
 ## 1.0.0 – 2026-11-24
 
 - First stable release. It contains everything from 0.1.0 to 0.4.0.

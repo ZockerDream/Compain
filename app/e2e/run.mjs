@@ -1,11 +1,21 @@
 // End-to-end test of the real build (served by the Compain container). Not the mockup.
 // Usage: BASE_URL=http://localhost:8080 ADMIN_PW=... node run.mjs
 import { chromium } from "playwright";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
+// The admin login comes from ADMIN_USER / ADMIN_PW, otherwise from the project's .env (the same values
+// the app uses to create the first admin on a fresh database).
+function dotenv() {
+  try {
+    const text = readFileSync(new URL("../../.env", import.meta.url), "utf8");
+    return Object.fromEntries(text.split("\n").filter((l) => /^\s*[A-Z_]+=/.test(l))
+      .map((l) => { const i = l.indexOf("="); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^["']|["']$/g, "")]; }));
+  } catch { return {}; }
+}
+const ENV = dotenv();
 const BASE = process.env.BASE_URL || "http://localhost:8080";
-const ADMIN_USER = process.env.ADMIN_USER || "admin";
-const ADMIN_PW = process.env.ADMIN_PW || "admin-password-long-1";
+const ADMIN_USER = process.env.ADMIN_USER || ENV.COMPAIN_ADMIN_USERNAME || "admin";
+const ADMIN_PW = process.env.ADMIN_PW || ENV.COMPAIN_ADMIN_PASSWORD || "admin-password-long-1";
 const EXE = process.env.CHROME_PATH || "/opt/google/chrome/chrome";
 const SHOTS = new URL("./screens/", import.meta.url).pathname;
 mkdirSync(SHOTS, { recursive: true });
@@ -132,6 +142,8 @@ await page.keyboard.press("Enter");
 await page.waitForFunction((n) => document.querySelectorAll("#messages .msg.char").length > n, before, { timeout: REPLY_TIMEOUT });
 await waitForReply(page);
 check("reply streams in and is shown", true);
+check("message field keeps the focus after the reply", await page.waitForFunction(
+  () => document.activeElement && document.activeElement.matches(".composer textarea"), null, { timeout: 5000 }).then(() => true, () => false));
 await page.screenshot({ path: SHOTS + "02-chat-desktop.png" });
 
 // Mark the reply important
@@ -139,6 +151,11 @@ await page.click("#messages .msg.char .mark");
 await page.waitForSelector("#messages .msg.char.important", { timeout: 5000 });
 check("a reply can be marked important", true);
 check("important counter updates", (await page.textContent("#conv .conv-stats")).includes("1 of 10"));
+
+// Own lines can carry important context too
+await page.click("#messages .msg.user .mark");
+await page.waitForSelector("#messages .msg.user.important", { timeout: 5000 });
+check("an own message can be marked important", (await page.textContent("#conv .conv-stats")).includes("2 of 10"));
 
 // Per-chat model switch to hosted (mock)
 await page.selectOption("#chat-model", "hosted");
@@ -374,6 +391,71 @@ await page.click("#view-admin button:has-text('New invite code')");
 await page.waitForTimeout(500);
 check("invite code can be created", (await page.textContent("#view-admin")).length > 0);
 await page.screenshot({ path: SHOTS + "08-admin-security-desktop.png" });
+
+// Help: FAQ, guide, Markdown reference, and a ticket between a user and the admin (live, both ways)
+const helpUser = "help" + Date.now().toString(36);
+const helpPw = "help-user-pass-123";
+await page.evaluate(async ([u, p]) => {
+  const r = await fetch("/api/admin/users", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: u, password: p }) });
+  if (!r.ok) throw new Error("user not created: " + r.status);
+}, [helpUser, helpPw]);
+const up = await newPage(1280, 860);
+await up.goto(BASE + "/");
+await up.waitForSelector("#login-form", { state: "visible" });
+await up.fill("#user", helpUser);
+await up.fill("#pw", helpPw);
+await up.click("#login-form button[type=submit]");
+await passAgeGate(up);
+await up.click("#nav-desktop button[data-go=help]");
+await up.waitForSelector("#view-help .faq");
+check("help: FAQ is shown", (await up.locator("#view-help .faq").count()) >= 10);
+await up.click("#view-help .faq summary >> nth=0");
+check("help: a FAQ answer opens", await up.isVisible("#view-help .faq[open] .md"));
+await up.fill("#faq-search", "recovery");
+check("help: FAQ search filters", (await up.locator("#view-help .faq").count()) === 1);
+await up.click("#help-tabs button[data-tab=guide]");
+check("help: guide covers the features", (await up.locator("#view-help .guide-card").count()) >= 8);
+await up.click("#help-tabs button[data-tab=md]");
+await up.fill("#md-try", "*waves* **hello**");
+check("help: Markdown preview renders", (await up.innerHTML("#md-preview")).includes("<em>waves</em>") && !(await up.textContent("#md-preview")).includes("*"));
+await up.screenshot({ path: SHOTS + "11-help-markdown.png" });
+await up.click("#help-tabs button[data-tab=support]");
+await up.click("#ticket-new");
+await up.fill("#ticket-subject", "E2E: reply stops early");
+await up.selectOption("#ticket-category", "bug");
+await up.fill("#ticket-text", "The reply ends **mid sentence**.");
+await up.click("#ticket-send");
+await up.waitForSelector("#ticket-title");
+check("help: user opens a ticket", (await up.textContent("#ticket-title")).includes("E2E: reply stops early"));
+
+// The admin sees it live (badge), answers with an internal note and a reply.
+await page.waitForFunction(() => [...document.querySelectorAll("#nav-desktop .help-badge")].some((b) => !b.hidden), null, { timeout: 10000 })
+  .then(() => check("help: admin gets a badge for the new ticket", true), () => check("help: admin gets a badge for the new ticket", false));
+await page.click("#nav-desktop button[data-go=help]");
+await page.click("#help-tabs button[data-tab=support]");
+await page.waitForSelector("#ticket-list .ticket-row");
+await page.click(`#ticket-list .ticket-row:has-text("E2E: reply stops early")`);
+await page.waitForSelector("#ticket-reply");
+check("help: admin sees the user's ticket", (await page.textContent("#ticket-thread")).includes("mid sentence"));
+await page.fill("#ticket-reply", "Internal: probably the token cap");
+await page.check("#ticket-internal");
+await page.click("#ticket-answer");
+await page.waitForSelector("#ticket-thread .t-msg.internal");
+await page.fill("#ticket-reply", "Set the reply length to *Long*.");
+await page.click("#ticket-answer");
+await page.waitForSelector("#ticket-thread .t-msg.admin:not(.internal)");
+check("help: admin answer marks the ticket answered", (await page.textContent(".ticket-head .t-status")).includes("Answered"));
+await page.screenshot({ path: SHOTS + "12-help-ticket-admin.png" });
+
+// The user sees the answer live, never the internal note, and closes the ticket.
+await up.waitForFunction(() => document.querySelector("#ticket-thread")?.textContent.includes("reply length"), null, { timeout: 10000 })
+  .then(() => true, () => false).then((ok) => check("help: user sees the answer live", ok));
+check("help: internal notes stay hidden from the user", !(await up.textContent("#ticket-thread")).includes("token cap"));
+await up.click("#ticket-close");
+await up.waitForSelector("#ticket-reopen");
+check("help: user can close the ticket", (await up.textContent(".ticket-head .t-status")).includes("Closed"));
+check("help: no layout problems", (await layoutProblems(up)).length === 0, (await layoutProblems(up)).join("; "));
+await up.close();
 
 check("no layout problems on desktop", (await layoutProblems(page)).length === 0, (await layoutProblems(page)).join("; "));
 await page.close();

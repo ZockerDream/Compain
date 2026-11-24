@@ -208,8 +208,26 @@ def system_prompt(
     if summary:
         parts.append(f"Story so far (summary): {summary}")
     if important_texts:
-        parts.append("Important moments that must stay in mind:\n- " + "\n- ".join(important_texts))
+        parts.append("Important moments and facts that must stay in mind (lines from the user are context "
+                     "they gave you and are true in this story):\n- " + "\n- ".join(important_texts))
     return "\n\n".join(p for p in parts if p)
+
+
+def important_lines(msgs: list[Message], names: dict, character: Character, persona_name: str = "") -> list[str]:
+    """Important messages for the system prompt, each with its speaker, so the model knows whether a fact
+    came from the user (context they gave) or from a character."""
+    out = []
+    for m in msgs:
+        if not m.important:
+            continue
+        if m.role == "user":
+            who = persona_name or "User"
+        elif m.character_id and m.character_id in names:
+            who = names[m.character_id][0]
+        else:
+            who = character.name
+        out.append(f"{who}: {m.content}")
+    return out
 
 
 def build_context(
@@ -217,9 +235,9 @@ def build_context(
     persona_name: str = "", persona_description: str = "", messages: list[Message] | None = None,
 ) -> list[dict]:
     msgs = chat.messages if messages is None else messages
-    important = [m.content for m in msgs if m.important]
     recent = msgs[-limit:]
     names = character_names(db, chat)
+    important = important_lines(msgs, names, character, persona_name)
     others = sorted({names[m.character_id][0] for m in recent
                      if m.role == "assistant" and m.character_id and m.character_id != character.id and m.character_id in names})
     # Many chat templates (Mistral, Gemma) need user and assistant turns to alternate, starting with

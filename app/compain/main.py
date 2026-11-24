@@ -18,7 +18,7 @@ from .config import Settings, load_settings
 from .db import init_db, make_engine, make_session_factory
 from .deps import get_db
 from .models import User
-from .routes import admin, auth, characters, chats, export, legal, media
+from .routes import admin, auth, characters, chats, export, help, legal, media
 from .security import hash_password
 from .loginguard import LoginGuard
 from .ws import Hub, router as ws_router
@@ -37,7 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         task.cancel()
 
-    app = FastAPI(title="Compain", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="Compain", version="1.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = make_engine(settings.database_url)
     app.state.session_factory = make_session_factory(app.state.engine)
@@ -52,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(media.users_router)
     app.include_router(export.router)
     app.include_router(legal.router)
+    app.include_router(help.router)
     app.include_router(ws_router)
 
     static_dir = Path(__file__).parent / "static"

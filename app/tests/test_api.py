@@ -193,6 +193,29 @@ def test_important_messages_are_capped_at_ten(client):
     assert client.patch(f"/api/chats/{chat['id']}/messages/{ids[10]}", json={"important": True}, headers=h).status_code == 409
 
 
+def test_own_message_marked_important_reaches_the_prompt(client):
+    from compain.models import Chat, Character
+    from compain.routes.chats import build_context
+
+    h = auth_headers(client, "admin", ADMIN_PW)
+    cid = client.post("/api/characters", json={"name": "Mara"}, headers=h).json()["id"]
+    chat = client.post("/api/chats", json={"character_id": cid}, headers=h).json()
+    with client.stream("POST", f"/api/chats/{chat['id']}/messages", json={"content": "My sister Lena died last winter."}, headers=h) as r:
+        _stream_events(r)
+    mine = [m for m in client.get(f"/api/chats/{chat['id']}", headers=h).json()["messages"] if m["role"] == "user"][0]
+    r = client.patch(f"/api/chats/{chat['id']}/messages/{mine['id']}", json={"important": True}, headers=h)
+    assert r.status_code == 200
+    got = client.get(f"/api/chats/{chat['id']}", headers=h).json()
+    assert got["important_count"] == 1
+    db = client.app.state.session_factory()
+    try:
+        c = db.get(Chat, chat["id"])
+        system = build_context(db, c, db.get(Character, cid), 40, persona_name="Jo")[0]["content"]
+    finally:
+        db.close()
+    assert "Jo: My sister Lena died last winter." in system
+
+
 def test_hosted_daily_limit_is_enforced_and_admin_can_change_it(tmp_path):
     app = create_app(make_settings(tmp_path, hosted_daily_limit=1))
     with TestClient(app) as client:

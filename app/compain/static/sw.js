@@ -2,9 +2,9 @@
    - App files (/static/...) come from the cache and are refreshed in the background.
    - The page itself is loaded fresh when online; offline the last copy is shown.
    - The API (/api/..., /ws) is never cached: chats, settings and logins always come from the server. */
-const CACHE = "compain-v1.0.0";
+const CACHE = "compain-v1.1.0";
 const SHELL = ["/", "/static/style.css", "/static/designs-palettes.css", "/static/designs.css", "/static/app.js",
-  "/static/i18n.js", "/static/sprite.svg", "/static/icons/icon-192.png"];
+  "/static/i18n.js", "/static/help.js", "/static/sprite.svg", "/static/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

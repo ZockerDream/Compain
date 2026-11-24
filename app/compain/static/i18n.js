@@ -174,7 +174,27 @@
     // admin: second place
     "Also copy to a second place": "Zusätzlich an einen zweiten Ort kopieren", "Second place": "Zweiter Ort", "Ready": "Bereit",
     "Not available": "Nicht verfügbar", "Backups can be copied there.": "Backups können dorthin kopiert werden.",
-    "Mount a folder with BACKUP_OFFSITE_DIR in .env and restart.": "Binde einen Ordner mit BACKUP_OFFSITE_DIR in der .env ein und starte neu.", "About Compain": "Über Compain", "What changed, and who runs this server.": "Was sich geändert hat und wer diesen Server betreibt.", "From .env (default)": "Aus .env (Standard)"
+    "Mount a folder with BACKUP_OFFSITE_DIR in .env and restart.": "Binde einen Ordner mit BACKUP_OFFSITE_DIR in der .env ein und starte neu.", "About Compain": "Über Compain", "What changed, and who runs this server.": "Was sich geändert hat und wer diesen Server betreibt.", "From .env (default)": "Aus .env (Standard)",
+    // help and tickets (1.1.0)
+    "Help": "Hilfe", "Didn't find an answer?": "Keine Antwort gefunden?", "Open a ticket": "Ticket öffnen",
+    "You write": "Du schreibst", "You see": "Du siehst", "Meaning": "Bedeutung",
+    "Short summary, e.g. Replies stop mid sentence": "Kurz zusammengefasst, z. B. Antworten brechen mitten im Satz ab",
+    "Category": "Kategorie", "Subject": "Betreff", "Message": "Nachricht", "New ticket": "Neues Ticket",
+    "What did you do, what did you expect, what happened? Markdown works.": "Was hast du gemacht, was hast du erwartet, was ist passiert? Markdown geht.",
+    "Send ticket": "Ticket senden", "Ticket sent": "Ticket gesendet", "All tickets": "Alle Tickets", "My tickets": "Meine Tickets",
+    "Show": "Anzeigen", "Not closed": "Nicht geschlossen", "Open": "Offen", "In progress": "In Bearbeitung", "Answered": "Beantwortet",
+    "Closed": "Geschlossen", "No tickets here": "Hier sind keine Tickets", "Nothing to answer right now.": "Gerade gibt es nichts zu beantworten.",
+    "Questions, problems or ideas? Open a ticket; the admins answer here.": "Fragen, Probleme oder Ideen? Öffne ein Ticket; die Admins antworten hier.",
+    "New answer": "Neue Antwort", "Question": "Frage", "Bug": "Fehler", "Idea": "Idee", "Account": "Konto", "Other": "Sonstiges",
+    "Low": "Niedrig", "Normal": "Normal", "High": "Hoch", "Priority": "Priorität", "Handled by": "Bearbeitet von",
+    "Nobody": "Niemand", "Delete ticket": "Ticket löschen", "Ticket deleted": "Ticket gelöscht",
+    "Reopen ticket": "Ticket wieder öffnen", "Close ticket": "Ticket schließen", "Internal note": "Interne Notiz",
+    "Answer (Markdown works)…": "Antwort (Markdown geht)…", "Write an answer (Markdown works)…": "Antwort schreiben (Markdown geht)…",
+    "Answer": "Antwort", "Note saved": "Notiz gespeichert", "Answer sent": "Antwort gesendet",
+    "This ticket is closed. Writing an answer opens it again.": "Dieses Ticket ist geschlossen. Eine Antwort öffnet es wieder.",
+    "Send and close": "Senden und schließen", "Internal note (only admins see it)": "Interne Notiz (nur Admins sehen sie)",
+    "Ctrl+Enter sends": "Strg+Enter sendet", "Tickets": "Tickets", "waiting for an answer": "warten auf eine Antwort",
+    "Set password": "Passwort setzen", "Password set": "Passwort gesetzt",
   };
 
   var lang = "en";

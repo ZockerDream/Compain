@@ -33,12 +33,13 @@ A private, self-hosted, multi-user AI roleplay chat app. It replaces a paid char
 
 ## Current status
 
-Last updated: 2026-11-24 (version 1.0.0).
+Last updated: 2026-11-24 (version 1.1.0).
 
-Done (release 1.0.0, verified with tests):
+Done (release 1.1.0, verified with tests):
 - Login with 48-hour and "stay logged in" sessions, two-factor login (TOTP, QR code, 8 recovery codes), login guard per address and account (`loginguard.py`, in memory) plus 30 tries per address in 10 minutes, invite-code sign-up, maintenance mode with notice, device list with "Log out", password change, deleting the own account with all data. One-time 18+ question.
 - Characters: owner rules, adults-only check, pictures, card import, publish with admin review, add from Community. Community likes and usage counts (`character_likes`), most liked first.
-- Chats: Markdown in messages (rendered with DOM nodes only), streaming, Stop (the written part is saved when the connection closes; llama.cpp cancels the task), Regenerate with versions (`messages.variants`, `variant_index`), Continue (`POST /api/chats/{id}/reply`), edit and delete messages, rewind (`DELETE .../messages/{id}/after`), search in a chat, switching the character in a running chat (`messages.character_id` keeps the author; other characters' lines are marked `[Name]:` in the prompt), persona (`users.persona_*`) in the system prompt, story summary, important messages, unread counts, export, sound when a reply is complete.
+- Chats: Markdown in messages (rendered with DOM nodes only), streaming, Stop (the written part is saved when the connection closes; llama.cpp cancels the task), Regenerate with versions (`messages.variants`, `variant_index`), Continue (`POST /api/chats/{id}/reply`), edit and delete messages, rewind (`DELETE .../messages/{id}/after`), search in a chat, switching the character in a running chat (`messages.character_id` keeps the author; other characters' lines are marked `[Name]:` in the prompt), persona (`users.persona_*`) in the system prompt, story summary, important messages (own lines and replies, each labelled with its speaker in the prompt), unread counts, export, sound when a reply is complete.
+- Help page: FAQ, guide, Markdown reference with live preview (`static/help.js`, English and German) and support tickets (`routes/help.py`, tables `tickets` and `ticket_messages`, migration 0003) with internal notes, status, priority, category, assignment, unread badge and live updates. Admins can set a user's password in Server Management → Users.
 - Profile picture and own glass background picture per user (`data/avatars`, `data/backgrounds`).
 - Four designs, seven colour themes, per account and live on all devices; German and English interface.
 - Changelog, Impressum (`.impressum`) and Datenschutzerklärung (`.datenschutz`) as popovers and pages; Compose refuses to start without the two files.
@@ -46,7 +47,7 @@ Done (release 1.0.0, verified with tests):
 - Installable web app (PWA): `manifest.webmanifest`, `sw.js` (never caches `/api`), icons in `static/icons/`. Bump `CACHE` in `sw.js` with every release.
 - Database migrations with Alembic (`app/compain/migrations`, run on start by `db.init_db`); databases from before 0.4.0 are completed and stamped as 0001 automatically.
 - Self-hosted model: Gemma 4 26B-A4B uncensored (default), Mistral Small 3.2 as alternative.
-- Tests: 53 API tests (`app/tests`) and 57 browser checks against the Docker build (`app/e2e`), passing with the real Gemma model on a fresh database. Run the browser checks on a fresh database; data left over from many runs makes some checks pick other chats.
+- Tests: 59 API tests (`app/tests`) and 72 browser checks against the Docker build (`app/e2e`), passing with the real Gemma model on a fresh database. Run the browser checks on a fresh database; data left over from many runs makes some checks pick other chats.
 - `scripts/update.sh` for updates on the server, `scripts/download-models.sh` for the models.
 
 Open:
@@ -71,7 +72,7 @@ Known risks:
 - `models/`: GGUF model files (git-ignored, several GB).
 - `.env.example`: all variables. Copy to `.env` and set real passwords.
 - `app/`: the FastAPI service and the web UI.
-  - `compain/static/`: `index.html`, `app.js` (plain JavaScript, no build), `i18n.js` (German), `style.css` and `sprite.svg` (from the mockup).
+  - `compain/static/`: `index.html`, `app.js` (plain JavaScript, no build), `i18n.js` (German), `help.js` (FAQ, guide and Markdown texts in both languages), `style.css` and `sprite.svg` (from the mockup).
   - `e2e/`: browser tests (`node run.mjs`, needs `npm install` in that folder). Screenshots go to `e2e/screens/` (not committed).
   - `Dockerfile`, `requirements.txt`, `requirements-dev.txt`.
   - `compain/config.py`: settings from environment variables.
@@ -86,7 +87,7 @@ Known risks:
   - `compain/cards.py`: character card import.
   - `compain/ws.py`: live sync hub and `/ws` endpoint.
   - `compain/llm.py`: OpenAI-compatible streaming client. `mock` URL gives a test reply.
-  - `compain/routes/`: `auth.py`, `characters.py`, `chats.py` (streaming replies), `admin.py`.
+  - `compain/routes/`: `auth.py`, `characters.py`, `chats.py` (streaming replies), `admin.py`, `help.py` (support tickets).
   - `compain/main.py`: app factory, router wiring, first admin from environment.
   - `tests/test_api.py`: API tests.
   - `.venv/`: local virtualenv (git-ignored).
@@ -95,7 +96,7 @@ Known risks:
 ## Commands
 
 - API tests: `cd app && ./.venv/bin/python -m pytest -q`
-- Browser tests: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs`
+- Browser tests: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs` (the admin login comes from `.env`; `ADMIN_USER`/`ADMIN_PW` override it)
 - Run with Docker: `docker compose up --build -d`
 - Health check: `curl http://localhost:8080/api/health`
 - With the model: `./scripts/download-models.sh`, set `COMPAIN_MODEL_BASE_URL=http://llm-gemma:8081/v1` in `.env`, then `docker compose --profile llm-gemma up -d`
