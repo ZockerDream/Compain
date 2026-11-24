@@ -37,7 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         task.cancel()
 
-    app = FastAPI(title="Compain", version="0.4.0", lifespan=lifespan)
+    app = FastAPI(title="Compain", version="1.0.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = make_engine(settings.database_url)
     app.state.session_factory = make_session_factory(app.state.engine)

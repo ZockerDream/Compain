@@ -2,6 +2,11 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.0.0 – 2026-11-24
+
+- First stable release. It contains everything from 0.1.0 to 0.4.0.
+- Tested: 53 API tests and 57 browser checks against the Docker build with the real Gemma model, on a fresh database.
+
 ## 0.4.0 – 2026-11-24
 
 - Messages show Markdown: *actions* in italics, **bold**, `code`, lists and quotes. No more visible asterisks.
