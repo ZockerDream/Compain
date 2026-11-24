@@ -268,3 +268,25 @@ pre.codes { padding: 12px 14px; border-radius: 12px; background: var(--surface-2
   .t-msg { max-width: 100%; }
   .faq > .md { padding-left: 20px; }
 }
+
+/* ---------- 1.3.0: export menu, bookmarks, search hits, model status ---------- */
+.pop-wrap { position: relative; display: inline-flex; }
+.pop-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; display: flex; flex-direction: column; gap: 2px; min-width: 210px;
+  padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.pop-menu .btn { justify-content: flex-start; text-align: left; white-space: nowrap; }
+.mini-count { font-size: 10px; font-weight: 700; margin-left: 2px; color: var(--accent); }
+.bookmark-box { display: flex; flex-direction: column; align-items: stretch; gap: 2px; max-height: 220px; overflow: auto;
+  padding: 10px 20px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.bm-row { display: flex; gap: 8px; align-items: center; border: 0; background: transparent; box-shadow: none; padding: 6px 8px; border-radius: 10px; text-align: left; color: var(--fg); min-width: 0; }
+.bm-row:hover { background: var(--surface-2); }
+.bm-row .ic { color: var(--accent); flex: none; }
+.msg .mark.bm[aria-pressed="true"] { color: var(--accent); }
+.msg.bookmarked .bubble { border-left: 3px solid var(--accent); }
+.msg.flash .bubble { animation: msg-flash 2.2s ease-out; }
+@keyframes msg-flash { 0%, 40% { box-shadow: 0 0 0 4px var(--accent-ring); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.typing-status { font-size: 12px; color: var(--muted); margin: 4px 0 0 4px; min-height: 1em; }
+.model-state { color: var(--warn); }
+.hit-row .preview { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hit-row mark { background: var(--accent-soft); color: var(--fg); border-radius: 4px; padding: 0 2px; }
+#view-characters.dropping { outline: 2px dashed var(--accent); outline-offset: -8px; border-radius: var(--radius); }
+@media (prefers-reduced-motion: reduce) { .msg.flash .bubble { animation: none; box-shadow: 0 0 0 3px var(--accent-ring); } }

@@ -195,6 +195,30 @@
     "Send and close": "Senden und schließen", "Internal note (only admins see it)": "Interne Notiz (nur Admins sehen sie)",
     "Ctrl+Enter sends": "Strg+Enter sendet", "Tickets": "Tickets", "waiting for an answer": "warten auf eine Antwort",
     "Set password": "Passwort setzen", "Password set": "Passwort gesetzt",
+    // 1.3.0: export, import, cards, search, bookmarks, model queue
+    "Export this chat": "Diesen Chat exportieren", "Markdown (to read)": "Markdown (zum Lesen)", "JSON (to import again)": "JSON (zum erneuten Import)",
+    "Bookmark": "Lesezeichen", "Bookmarked": "Lesezeichen gesetzt", "Bookmark removed": "Lesezeichen entfernt",
+    "Bookmark this scene for yourself": "Diese Szene für dich merken", "Bookmarks": "Lesezeichen", "Bookmarks in this chat": "Lesezeichen in diesem Chat",
+    "No bookmarks yet. Use Bookmark under a message to find a scene again.": "Noch keine Lesezeichen. Mit „Lesezeichen“ unter einer Nachricht findest du eine Szene wieder.",
+    "No bookmarks yet.": "Noch keine Lesezeichen.", "No bookmarks match.": "Keine passenden Lesezeichen.",
+    "Use Bookmark under a message to find a scene again.": "Mit „Lesezeichen“ unter einer Nachricht findest du eine Szene wieder.",
+    "This message is no longer in the chat": "Diese Nachricht ist nicht mehr im Chat",
+    "In messages": "In Nachrichten", "No message contains this text.": "Keine Nachricht enthält diesen Text.",
+    "Waiting in line, place": "Wartet in der Schlange, Platz", "The model is loading…": "Das Modell lädt…",
+    "The model is starting…": "Das Modell startet…", "Reading the story…": "Liest die Geschichte…",
+    "Model not reachable": "Modell nicht erreichbar", "Model busy:": "Modell ausgelastet:", "waiting": "warten",
+    "Model queue": "Modell-Warteschlange", "writing now,": "schreiben gerade,",
+    "Replies at the same time": "Antworten gleichzeitig",
+    "Slots of the self-hosted model (LLM_SLOTS in .env, default 2). More requests wait in line and see their place.":
+      "Slots des selbst gehosteten Modells (LLM_SLOTS in der .env, Standard 2). Weitere Anfragen warten in der Schlange und sehen ihren Platz.",
+    "Import chats": "Chats importieren", "Import a file": "Datei importieren", "Import failed": "Import fehlgeschlagen",
+    "1 chat imported": "1 Chat importiert", "1 character imported": "1 Charakter importiert",
+    "Card": "Karte", "Download as a character card (PNG with picture, else JSON)": "Als Charakterkarte herunterladen (PNG mit Bild, sonst JSON)",
+    "Import a character card": "Charakterkarte importieren",
+    "Characters you created. You can edit and delete only these. Import character cards (SillyTavern, Chub and others: PNG or JSON, V1 to V3) or plain text, also several at once or by dropping files here.":
+      "Charaktere, die du erstellt hast. Nur diese kannst du bearbeiten und löschen. Importiere Charakterkarten (SillyTavern, Chub und andere: PNG oder JSON, V1 bis V3) oder reinen Text, auch mehrere auf einmal oder per Ziehen auf diese Seite.",
+    "Download everything you own as JSON. The files can be imported again, here or on another Compain server.":
+      "Lade alles, was dir gehört, als JSON herunter. Die Dateien lassen sich wieder importieren, hier oder auf einem anderen Compain-Server.",
   };
 
   var lang = "en";

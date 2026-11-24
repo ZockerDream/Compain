@@ -1,48 +1,94 @@
-"""Export of the user's own characters and chats as JSON (concept.md: export is version 1)."""
+"""Export and import of the user's own characters and chats.
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
+Export: JSON (format version 1, concept.md) for everything, one chat as JSON or as Markdown to read.
+Import: the JSON files this export writes (one chat, all chats, or everything). The character of a
+chat is found by name among the user's own characters, then the public ones; if there is none, it
+is created from the copy that the export carries.
+"""
+
+import json
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session as DbSession
 
+from .. import settings as cfg
+from ..content import minor_violation
 from ..deps import current_user, get_db
-from ..models import Character, Chat, User
+from ..models import Character, Chat, Message, User, utcnow
 
 router = APIRouter(prefix="/api/export", tags=["export"])
+
+CHARACTER_FIELDS = ("name", "tagline", "description", "personality", "greeting", "scenario", "tags")
+LIMITS = {"name": 128, "tagline": 256, "description": 8000, "personality": 4000, "greeting": 4000, "scenario": 4000, "tags": 256}
+MAX_IMPORT_CHATS = 200
+MAX_IMPORT_MESSAGES = 5000
+MAX_MESSAGE_CHARS = 20000
+MAX_IMPORTANT = 10
+
+
+def _character_dict(c: Character) -> dict:
+    return {k: getattr(c, k) for k in CHARACTER_FIELDS}
 
 
 def _characters(db: DbSession, user: User) -> list[dict]:
     rows = db.query(Character).filter(Character.owner_id == user.id).order_by(Character.name).all()
-    return [
-        {
-            "name": c.name,
-            "tagline": c.tagline,
-            "description": c.description,
-            "personality": c.personality,
-            "greeting": c.greeting,
-            "scenario": c.scenario,
-            "tags": c.tags,
-        }
-        for c in rows
-    ]
+    return [_character_dict(c) for c in rows]
 
 
-def _chat_dict(c: Chat) -> dict:
+def _chat_dict(db: DbSession, c: Chat) -> dict:
+    ids = {m.character_id for m in c.messages if m.character_id}
+    names = {ch.id: ch.name for ch in db.query(Character).filter(Character.id.in_(ids)).all()} if ids else {}
     return {
         "title": c.title,
         "character": c.character.name,
+        "character_card": _character_dict(c.character),
         "model": c.model or "self",
         "summary": c.summary,
-        "messages": [{"role": m.role, "content": m.content, "important": m.important} for m in c.messages],
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+        "messages": [
+            {
+                "role": m.role,
+                "content": m.content,
+                "important": m.important,
+                "bookmarked": bool(m.bookmarked),
+                "speaker": names.get(m.character_id) if m.role == "assistant" and m.character_id else None,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in c.messages
+        ],
     }
 
 
 def _chats(db: DbSession, user: User) -> list[dict]:
     rows = db.query(Chat).filter(Chat.owner_id == user.id).order_by(Chat.updated_at).all()
-    return [_chat_dict(c) for c in rows]
+    return [_chat_dict(db, c) for c in rows]
 
 
 def _download(payload: dict, filename: str) -> JSONResponse:
     return JSONResponse(payload, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+def _safe_name(text: str) -> str:
+    keep = "".join(ch if ch.isalnum() or ch in "-_ " else "" for ch in text).strip().replace(" ", "-")
+    return keep[:60] or "chat"
+
+
+def chat_markdown(chat: dict, persona: str) -> str:
+    """A chat as Markdown to read or print. *Actions* stay as they are, so the file looks like the chat."""
+    lines = [f"# {chat['title'] or chat['character']}", ""]
+    lines.append(f"Character: **{chat['character']}**  ")
+    lines.append(f"Exported: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    if chat.get("summary"):
+        lines += ["", "> **Story so far:** " + chat["summary"].replace("\n", "\n> ")]
+    lines += ["", "---", ""]
+    me = persona or "You"
+    for m in chat["messages"]:
+        who = me if m["role"] == "user" else (m.get("speaker") or chat["character"])
+        marks = (" ⭐" if m.get("important") else "") + (" 🔖" if m.get("bookmarked") else "")
+        lines += [f"**{who}:**{marks}", "", m["content"].strip(), ""]
+    return "\n".join(lines).rstrip() + "\n"
 
 
 @router.get("/characters")
@@ -66,8 +112,119 @@ def export_all(user: User = Depends(current_user), db: DbSession = Depends(get_d
 
 
 @router.get("/chat/{chat_id}")
-def export_one_chat(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+def export_one_chat(chat_id: int, format: str = "json", user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     chat = db.get(Chat, chat_id)
     if chat is None or chat.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Chat not found")
-    return _download({"format": "compain-chat-v1", "chat": _chat_dict(chat)}, f"compain-chat-{chat_id}.json")
+    data = _chat_dict(db, chat)
+    if format == "md":
+        name = _safe_name(chat.title or chat.character.name)
+        return Response(chat_markdown(data, user.persona_name), media_type="text/markdown; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{name}.md"'})
+    if format != "json":
+        raise HTTPException(status_code=422, detail="Format must be json or md")
+    return _download({"format": "compain-chat-v1", "chat": data}, f"compain-chat-{chat_id}.json")
+
+
+# ---------- import ----------
+
+def _text(value, limit: int) -> str:
+    return str(value or "")[:limit] if not isinstance(value, (dict, list)) else ""
+
+
+def _clean_character(raw: dict) -> dict:
+    out = {k: _text(raw.get(k), LIMITS[k]).strip() if k == "name" else _text(raw.get(k), LIMITS[k]) for k in CHARACTER_FIELDS}
+    if isinstance(raw.get("tags"), list):
+        out["tags"] = ",".join(str(t).strip() for t in raw["tags"] if str(t).strip())[:256]
+    return out
+
+
+class _Importer:
+    def __init__(self, db: DbSession, user: User):
+        self.db, self.user = db, user
+        self.created_characters = 0
+        self.by_name: dict[str, Character] = {}
+        for c in db.query(Character).filter(Character.owner_id == user.id).all():
+            self.by_name.setdefault(c.name.lower(), c)
+        self.public = {c.name.lower(): c for c in db.query(Character).filter(Character.visibility == "public").all()}
+
+    def character(self, name: str, card: dict | None) -> Character:
+        key = name.strip().lower()
+        found = self.by_name.get(key) or self.public.get(key)
+        if found:
+            return found
+        fields = _clean_character({**(card or {}), "name": name})
+        if not fields["name"]:
+            raise HTTPException(status_code=422, detail="A chat in the file has no character name")
+        reason = minor_violation(fields["name"], fields["description"], fields["personality"], fields["scenario"], fields["greeting"])
+        if reason:
+            raise HTTPException(status_code=422, detail=reason)
+        c = Character(owner_id=self.user.id, visibility="private", **fields)
+        self.db.add(c)
+        self.db.flush()
+        self.by_name[key] = c
+        self.created_characters += 1
+        return c
+
+    def chat(self, raw: dict) -> Chat:
+        if not isinstance(raw, dict) or not isinstance(raw.get("messages"), list):
+            raise HTTPException(status_code=422, detail="A chat in the file has no message list")
+        name = _text(raw.get("character") or (raw.get("character_card") or {}).get("name"), 128).strip()
+        card = raw.get("character_card") if isinstance(raw.get("character_card"), dict) else None
+        character = self.character(name, card)
+        messages = raw["messages"][:MAX_IMPORT_MESSAGES]
+        chat = Chat(owner_id=self.user.id, character_id=character.id, title=_text(raw.get("title"), 256) or character.name,
+                    summary=_text(raw.get("summary"), 8000), model="self" if raw.get("model") != "hosted" else "hosted")
+        self.db.add(chat)
+        self.db.flush()
+        important = 0
+        last = 0
+        for m in messages:
+            if not isinstance(m, dict) or m.get("role") not in {"user", "assistant"}:
+                continue
+            content = _text(m.get("content"), MAX_MESSAGE_CHARS).strip()
+            if not content:
+                continue
+            speaker_id = None
+            if m["role"] == "assistant":
+                speaker = _text(m.get("speaker"), 128).strip()
+                speaker_id = self.character(speaker, None).id if speaker and speaker.lower() != character.name.lower() else character.id
+            mark = bool(m.get("important")) and important < MAX_IMPORTANT
+            important += 1 if mark else 0
+            msg = Message(chat_id=chat.id, role=m["role"], content=content, important=mark,
+                          bookmarked=bool(m.get("bookmarked")), character_id=speaker_id)
+            self.db.add(msg)
+            self.db.flush()
+            last = msg.id
+        chat.read_upto = last
+        chat.summary_upto = last if chat.summary else 0
+        chat.updated_at = utcnow()
+        return chat
+
+
+@router.post("/import", status_code=201)
+async def import_file(request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Import a Compain export file (one chat, all chats, or everything). Nothing is replaced: it all comes in new."""
+    data = await request.body()
+    limit = cfg.get(db, "upload_max_mb") * 1024 * 1024 * 5  # chat exports are text; allow five times the picture limit
+    if not data or len(data) > limit:
+        raise HTTPException(status_code=413, detail="The file is empty or too large")
+    try:
+        payload = json.loads(data.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=422, detail="This is not a Compain export file (JSON)")
+    fmt = payload.get("format") if isinstance(payload, dict) else None
+    if fmt not in {"compain-chat-v1", "compain-chats-v1", "compain-all-v1", "compain-characters-v1"}:
+        raise HTTPException(status_code=422, detail="This is not a Compain export file (JSON)")
+
+    imp = _Importer(db, user)
+    for raw in payload.get("characters") or []:
+        if isinstance(raw, dict) and _text(raw.get("name"), 128).strip():
+            imp.character(_text(raw.get("name"), 128).strip(), raw)
+    raws = [payload["chat"]] if fmt == "compain-chat-v1" else (payload.get("chats") or [])
+    if len(raws) > MAX_IMPORT_CHATS:
+        raise HTTPException(status_code=413, detail=f"At most {MAX_IMPORT_CHATS} chats per file")
+    chats = [imp.chat(r) for r in raws]
+    db.commit()
+    await request.app.state.hub.publish(user.id, {"type": "chats"})
+    return {"chats": len(chats), "characters": imp.created_characters, "first_chat_id": chats[0].id if chats else None}

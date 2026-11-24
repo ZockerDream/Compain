@@ -2,6 +2,16 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.3.0 – 2026-11-24
+
+- **Search over all chats:** the search above the chat list also looks inside every message of all your chats (*In messages*, newest first). A click opens the chat at that message.
+- **Bookmarks:** mark a scene for yourself under any message. The bookmark button in the chat header lists the bookmarks of the chat; the filter *Bookmarks* in the chat list shows all of them. Unlike *important*, bookmarks never reach the model.
+- **Chat export and import:** the export button in the chat header offers **Markdown** (to read or print) and **JSON**. JSON files (one chat, all chats, or everything) can be imported again under *Import chats* on the Chats page or Profile → Your data, also on another Compain server. A missing character is created from the copy in the file.
+- **Character cards:** V3 cards (SillyTavern, Chub and others), several cards in one JSON list, several files at once and dropping files on the Characters page. Example dialogue is kept at the end of the personality. **Card** on a character downloads it as a V2 card, inside its PNG picture or as JSON.
+- **Waiting line and status:** replies of the self-hosted model wait in a line when all slots are busy. Under the typing dots you see *Waiting in line, place N*, *The model is loading…* or *Reading the story…* with the seconds. The chat shows when the model is busy or not reachable; the admin overview shows the model queue. New setting *Replies at the same time* (Models, default 2 = LLM_SLOTS).
+- Live updates no longer move the open chat: the scroll position, an open bookmark list or export menu and the typed text stay. Two renders at the same moment (an own action and a live update) no longer show the chat twice.
+- The speed test waits for a free slot of the model, so replies of other users do not distort it.
+
 ## 1.2.0 – 2026-11-24
 
 - Admins may bypass the password policy (minimum length): for their own password, for new users and when they set a password for a user. Normal users still need the minimum length.

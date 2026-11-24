@@ -55,6 +55,7 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 8. **Pinned chats:** the user can pin any chat to the top of the list.
 9. **Chat only:** no voice, no image generation.
 11. **Chat tools (0.4.0):** Markdown in messages, Stop, Regenerate with versions, Continue, edit and delete messages, "Save and resend", search in a chat.
+12. **Search, bookmarks and waiting line (1.3.0):** search over all chats (opens the chat at the message), bookmarks only for the user (per chat and all at once), and a visible waiting line for the self-hosted model (place in line, model loading, reading the story).
 12. **Persona:** your role name and description; every character knows it.
 10. **Model per chat:** the user can choose the model for each chat from the chat header, from the models the admin has allowed. A hosted model counts against the user's daily limit.
 
@@ -63,8 +64,8 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 1. Create and edit a character with name, tagline, description, personality, greeting, scenario, and a profile picture.
 2. Profile pictures are imported by the user (PNG, JPG, WebP, up to 10 MB). No image generation.
 3. Edit and delete: users only their own characters, admins all characters.
-4. Import character cards: SillyTavern/TavernAI JSON (V1 and V2), V2 data embedded in PNG, and plain text.
-5. Export characters and chats as JSON: per character, per chat, and everything at once (Settings, Data and export; chat header; character cards).
+4. Import character cards: card JSON V1 to V3 (SillyTavern, Chub and others), cards embedded in PNG, lists of cards, and plain text; several files at once or by dropping them. Export a character as a V2 card (PNG with picture, or JSON).
+5. Export characters and chats as JSON: per character, per chat, and everything at once (Profile, Your data; chat header; character cards). One chat also as Markdown to read. The JSON files can be imported again (Chats page, Profile).
 6. Community: a user can publish a character. The admin can approve it, hide it, or leave it in the review queue. Other users add it to their list and chat with it.
 
 ## Settings and preferences (version 1)

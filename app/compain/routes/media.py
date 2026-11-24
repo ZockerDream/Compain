@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session as DbSession
 
 from .. import settings as cfg
@@ -87,7 +87,7 @@ async def import_card(
     settings: Settings = Depends(get_settings),
 ):
     """Import a character card: SillyTavern JSON (V1/V2), PNG with an embedded card, or plain text."""
-    from ..cards import CardError, parse_card
+    from ..cards import CardError, parse_cards
     from ..content import minor_violation
     from ..models import Character
 
@@ -99,24 +99,50 @@ async def import_card(
         raise HTTPException(status_code=413, detail=f"The file is empty or larger than {cfg.get(db, 'upload_max_mb')} MB")
     filename = request.headers.get("x-filename", "")
     try:
-        fields, picture = parse_card(filename, data)
+        cards = parse_cards(filename, data)
     except CardError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    reason = minor_violation(fields["name"], fields["description"], fields["personality"], fields["scenario"], fields["greeting"])
-    if reason:
-        raise HTTPException(status_code=422, detail=reason)
-    c = Character(owner_id=user.id, visibility="private", **fields)
-    db.add(c)
-    db.commit()
-    db.refresh(c)
-    if picture is not None:
-        kind = sniff(picture)
-        if kind:
-            target = picture_dir(settings) / f"{c.id}.{kind}"
-            target.write_bytes(picture)
-            c.picture_path = str(target)
-            db.commit()
-    return {"id": c.id, "name": c.name}
+    for fields, _ in cards:
+        reason = minor_violation(fields["name"], fields["description"], fields["personality"], fields["scenario"], fields["greeting"])
+        if reason:
+            raise HTTPException(status_code=422, detail=f"{fields['name']}: {reason}")
+    created = []
+    for fields, picture in cards:
+        c = Character(owner_id=user.id, visibility="private", **fields)
+        db.add(c)
+        db.commit()
+        db.refresh(c)
+        if picture is not None:
+            kind = sniff(picture)
+            if kind:
+                target = picture_dir(settings) / f"{c.id}.{kind}"
+                target.write_bytes(picture)
+                c.picture_path = str(target)
+                db.commit()
+        created.append({"id": c.id, "name": c.name})
+    return {**created[0], "count": len(created), "characters": created}
+
+
+@router.get("/{character_id}/card")
+def export_card(character_id: int, format: str = "auto", user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Download an own character as a V2 card: inside its PNG picture if it has one (auto/png), else as JSON."""
+    from ..cards import card_v2, png_with_card
+
+    c = get_character_or_404(db, character_id)
+    if c.owner_id != user.id and user.role != "admin":
+        raise HTTPException(status_code=404, detail="Character not found")
+    if format not in {"auto", "png", "json"}:
+        raise HTTPException(status_code=422, detail="Format must be auto, png or json")
+    card = card_v2(c)
+    base = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in c.name).strip("-")[:60] or "character"
+    picture = Path(c.picture_path) if c.picture_path else None
+    is_png = bool(picture and picture.exists() and picture.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n")
+    if format == "png" and not is_png:
+        raise HTTPException(status_code=409, detail="This character has no PNG picture; download the card as JSON")
+    if format in {"auto", "png"} and is_png:
+        return Response(png_with_card(picture.read_bytes(), card), media_type="image/png",
+                        headers={"Content-Disposition": f'attachment; filename="{base}.png"'})
+    return JSONResponse(card, headers={"Content-Disposition": f'attachment; filename="{base}.json"'})
 
 
 users_router = APIRouter(prefix="/api/users", tags=["media"])

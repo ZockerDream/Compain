@@ -105,6 +105,8 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String(16))  # "user" | "assistant"
     content: Mapped[str] = mapped_column(Text)
     important: Mapped[bool] = mapped_column(Boolean, default=False)
+    # A bookmark is only for the user (jump back to a scene); unlike "important" it never reaches the model.
+    bookmarked: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     # Who spoke (characters can be switched in a running chat). None = the chat's character.
     character_id: Mapped[int | None] = mapped_column(ForeignKey("characters.id", ondelete="SET NULL"), nullable=True)
     # Alternative replies from "regenerate" (JSON list of texts); content is the chosen one.

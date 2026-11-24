@@ -199,6 +199,8 @@ def test_stop_keeps_the_part_already_written(tmp_path):
     async def stop_after_first_piece():
         gen = stream_reply(app.state.settings, job, app.state.session_factory)
         first = await gen.__anext__()
+        while b"status" in first:  # place in line / loading / thinking come before the text
+            first = await gen.__anext__()
         assert b"delta" in first
         await gen.aclose()  # what happens when the browser closes the connection
 

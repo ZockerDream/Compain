@@ -27,6 +27,7 @@ from ..config import Settings
 from ..deps import current_user, get_db, get_settings
 from ..llm import build_messages, stream_chat
 from ..models import ApiUsage, Chat, Character, Message, User, utcnow
+from ..modelqueue import QUEUE, model_state
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -40,6 +41,8 @@ CONTINUE_PROMPT = "(Continue the scene.)"
 
 # Model keys the user can pick per chat. "self" = self-hosted, "hosted" = hosted API.
 MODEL_KINDS = {"self", "hosted"}
+MODEL_WAIT_SECONDS = 600  # how long a reply waits for a self-hosted model that is loading or restarting
+SEARCH_LIMIT = 50
 
 
 class ChatIn(BaseModel):
@@ -56,6 +59,7 @@ class ChatPatch(BaseModel):
 
 class MessagePatch(BaseModel):
     important: bool | None = None
+    bookmarked: bool | None = None
     content: str | None = Field(default=None, min_length=1, max_length=8000)
 
 
@@ -90,6 +94,7 @@ def chat_out(c: Chat) -> dict:
         "model": c.model or "self",
         "message_count": len(c.messages),
         "important_count": sum(1 for m in c.messages if m.important),
+        "bookmark_count": sum(1 for m in c.messages if m.bookmarked),
         "unread": sum(1 for m in c.messages if m.role == "assistant" and m.id > c.read_upto),
         "last_message": last.content[:160] if last else "",
         "updated_at": c.updated_at.isoformat(),
@@ -110,6 +115,7 @@ def message_out(m: Message, names: dict[int, tuple[str, bool]] | None = None, ch
     variants = _variants(m)
     return {
         "id": m.id, "role": m.role, "content": m.content, "important": m.important,
+        "bookmarked": bool(m.bookmarked), "created_at": m.created_at.isoformat() if m.created_at else None,
         "character_id": char_id, "character_name": name, "character_has_picture": pic,
         "variant_count": max(1, len(variants)), "variant_index": m.variant_index if variants else 0,
     }
@@ -309,12 +315,18 @@ async def update_summary(session_factory, settings: Settings, chat_id: int, kind
         last_id = new[-1].id
     with session_factory() as db:
         base_url, api_key, model_name = endpoint_for(settings, kind, db)
+        slots = int(cfg.get(db, "model_slots"))
     pieces: list[str] = []
+    turn = QUEUE.join("self") if kind == "self" else None
     try:
+        if turn is not None:
+            await QUEUE.take(turn, slots)
         async for piece in stream_chat(base_url, api_key, model_name, prompt, 300):
             pieces.append(piece)
     except Exception:
         return  # the model is not reachable now; the next message tries again
+    finally:
+        QUEUE.leave(turn)
     with session_factory() as db:
         chat = db.get(Chat, chat_id)
         chat.summary = "".join(pieces).strip()
@@ -397,11 +409,30 @@ async def stream_reply(settings: Settings, job: Job, session_factory, hub=None) 
                                  job.options.language, job.persona_name, job.persona_description, history)
         character_id = character.id
         base_url, api_key, model_name = endpoint_for(settings, job.kind, db)
+        slots = int(cfg.get(db, "model_slots"))
     if job.mode == "send":
         await notify(hub, job.user_id)
 
     pieces: list[str] = []
+    turn = QUEUE.join("self") if job.kind == "self" else None
     try:
+        # Status for the typing bubble: place in line, model loading, then reading the story.
+        if turn is not None:
+            shown = None
+            while not await QUEUE.wait_turn(turn, slots, 1.0):
+                place = QUEUE.position(turn)
+                if place != shown:
+                    shown = place
+                    yield _event({"status": "queued", "position": place})
+            waited = 0.0
+            while waited < MODEL_WAIT_SECONDS:
+                state = await model_state(base_url)
+                if state not in {"loading", "down"}:
+                    break
+                yield _event({"status": state})
+                await asyncio.sleep(3)
+                waited += 3
+        yield _event({"status": "thinking"})
         async for piece in stream_chat(base_url, api_key, model_name, messages, REPLY_TOKENS.get(job.options.reply_length, 400)):
             pieces.append(piece)
             yield _event({"delta": piece})
@@ -412,6 +443,8 @@ async def stream_reply(settings: Settings, job: Job, session_factory, hub=None) 
     except Exception as exc:  # network or model errors are shown to the user, not hidden
         yield _event({"error": f"Model not reachable: {type(exc).__name__}"})
         return
+    finally:
+        QUEUE.leave(turn)
 
     msg_id = _store(session_factory, job, "".join(pieces).strip(), character_id, regenerate_id)
     with session_factory() as db:
@@ -469,6 +502,75 @@ async def create_chat(body: ChatIn, request: Request, user: User = Depends(curre
     return chat_out(c)
 
 
+def _snippet(text: str, q: str, around: int = 70) -> str:
+    at = text.lower().find(q.lower())
+    if at < 0:
+        return text[: around * 2]
+    start, end = max(0, at - around), min(len(text), at + len(q) + around)
+    return ("…" if start else "") + text[start:end] + ("…" if end < len(text) else "")
+
+
+@router.get("/search")
+def search_messages(q: str = "", user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Search the text of all own chats. Newest first, at most 50 hits."""
+    q = q.strip()
+    if len(q) < 2:
+        return []
+    like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    rows = (
+        db.query(Message, Chat)
+        .join(Chat, Message.chat_id == Chat.id)
+        .filter(Chat.owner_id == user.id, Message.content.ilike(like, escape="\\"))
+        .order_by(Message.id.desc())
+        .limit(SEARCH_LIMIT)
+        .all()
+    )
+    ids = {m.character_id for m, _ in rows if m.character_id} | {c.character_id for _, c in rows}
+    names = {c.id: (c.name, bool(c.picture_path)) for c in db.query(Character).filter(Character.id.in_(ids)).all()} if ids else {}
+    out = []
+    for m, c in rows:
+        char_id = m.character_id or c.character_id
+        name, pic = names.get(char_id, ("", False))
+        out.append({
+            "chat_id": c.id, "chat_title": c.title, "message_id": m.id, "role": m.role,
+            "character_id": char_id, "character_name": name, "character_has_picture": pic,
+            "snippet": _snippet(m.content, q), "bookmarked": bool(m.bookmarked),
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        })
+    return out
+
+
+@router.get("/bookmarks")
+def list_bookmarks(user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """All bookmarks of the user, newest first."""
+    rows = (
+        db.query(Message, Chat)
+        .join(Chat, Message.chat_id == Chat.id)
+        .filter(Chat.owner_id == user.id, Message.bookmarked.is_(True))
+        .order_by(Message.id.desc())
+        .limit(500)
+        .all()
+    )
+    ids = {m.character_id or c.character_id for m, c in rows}
+    names = {c.id: (c.name, bool(c.picture_path)) for c in db.query(Character).filter(Character.id.in_(ids)).all()} if ids else {}
+    return [{
+        "chat_id": c.id, "chat_title": c.title, "message_id": m.id, "role": m.role,
+        "character_id": m.character_id or c.character_id,
+        "character_name": names.get(m.character_id or c.character_id, ("", False))[0],
+        "character_has_picture": names.get(m.character_id or c.character_id, ("", False))[1],
+        "snippet": _snippet(m.content, "", 80), "bookmarked": True,
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+    } for m, c in rows]
+
+
+@router.get("/model-status")
+async def model_status(user: User = Depends(current_user), db: DbSession = Depends(get_db),
+                       settings: Settings = Depends(get_settings)):
+    """State of the self-hosted model and its waiting line (shown in the chat)."""
+    base_url = endpoint_for(settings, "self", db)[0]
+    return {"state": await model_state(base_url), "slots": int(cfg.get(db, "model_slots")), **QUEUE.snapshot("self")}
+
+
 @router.get("/{chat_id}")
 def get_chat(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
     c = owned_chat(db, chat_id, user)
@@ -517,7 +619,7 @@ async def delete_chat(chat_id: int, request: Request, user: User = Depends(curre
 @router.patch("/{chat_id}/messages/{message_id}")
 async def update_message(chat_id: int, message_id: int, body: MessagePatch, request: Request,
                          user: User = Depends(current_user), db: DbSession = Depends(get_db)):
-    """Mark as important, or edit the text (own lines and the character's replies)."""
+    """Mark as important, bookmark, or edit the text (own lines and the character's replies)."""
     c = owned_chat(db, chat_id, user)
     msg = next((m for m in c.messages if m.id == message_id), None)
     if msg is None:
@@ -526,6 +628,8 @@ async def update_message(chat_id: int, message_id: int, body: MessagePatch, requ
         if body.important and not msg.important and sum(1 for m in c.messages if m.important) >= MAX_IMPORTANT:
             raise HTTPException(status_code=409, detail=f"Limit: {MAX_IMPORTANT} important messages per chat")
         msg.important = body.important
+    if body.bookmarked is not None:
+        msg.bookmarked = body.bookmarked
     if body.content is not None:
         text = body.content.strip()
         if msg.role == "assistant" and _variants(msg):

@@ -183,7 +183,7 @@ await page.waitForFunction(() => (document.querySelector("#messages .variants") 
 check("versions can be flipped", (await page.textContent("#messages .variants")).includes("1 / 2"));
 
 // Continue: the character writes on without a new message (counted on the server)
-const chatId = Number((await page.getAttribute("#conv a[download]", "href")).split("/").pop());
+const chatId = Number((await page.getAttribute("#conv a[download]", "href")).match(/chat\/(\d+)/)[1]);
 const countMsgs = () => page.evaluate(async (id) => (await (await fetch("/api/chats/" + id, { credentials: "same-origin" })).json()).messages.length, chatId);
 const msgsBefore = await countMsgs();
 await page.click("#conv .quick .accent-chip");
@@ -214,6 +214,40 @@ await page.click("#conv .tools button[aria-label='Search in this chat']");
 await page.fill(".chat-search input", "harbour");
 check("search finds messages in the chat", (await page.locator("#messages .msg.hit").count()) > 0);
 await page.click("#conv .tools button[aria-label='Search in this chat']");
+
+// Bookmarks: only for the user, listed in the chat header
+await page.locator("#messages .msg.char .mark.bm").first().click();
+check("a message can be bookmarked", await page.waitForFunction(() => document.querySelectorAll("#messages .msg.bookmarked").length === 1, null, { timeout: 10000 }).then(() => true, () => false));
+await page.waitForTimeout(1000); // the live update of the bookmark arrives too
+await page.click("#bookmarks-btn");
+check("bookmarks of the chat are listed", (await page.locator("#bookmark-box:not(.hidden) .bm-row").count()) === 1);
+await page.click("#bookmark-box .bm-row");
+check("a bookmark jumps to its message", await page.waitForSelector("#messages .msg.flash", { timeout: 3000 }).then(() => true, () => false));
+
+// Export menu: Markdown to read, JSON to import again
+await page.waitForTimeout(800);
+await page.click("#export-btn");
+check("export menu offers Markdown and JSON", (await page.waitForSelector("#export-menu:not(.hidden)", { timeout: 3000 }).then(() => true, () => false)) && (await page.locator("#export-menu a").count()) === 2,
+  `menus ${await page.locator("#export-menu").count()}, class "${await page.getAttribute("#export-menu", "class")}", expanded ${await page.getAttribute("#export-btn", "aria-expanded")}`);
+const mdHref = await page.getAttribute("#export-menu a:has-text('Markdown')", "href");
+const mdResp = await page.request.get(BASE + mdHref);
+check("chat downloads as Markdown", mdResp.status() === 200 && (mdResp.headers()["content-type"] || "").includes("markdown") && (await mdResp.text()).includes("**Mara Stone:**"));
+await page.click("#conv .conv-head .name");
+
+// The reply stream tells the browser what happens before the first word (place in line, loading, reading)
+const firstEvent = await page.evaluate(async (id) => {
+  const ctl = new AbortController();
+  const r = await fetch("/api/chats/" + id + "/reply", { method: "POST", credentials: "same-origin", signal: ctl.signal,
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "next" }) });
+  const reader = r.body.getReader();
+  const chunk = await reader.read();
+  ctl.abort();
+  return new TextDecoder().decode(chunk.value);
+}, Number((await page.getAttribute("#conv a[download]", "href")).match(/chat\/(\d+)/)[1]));
+check("reply stream starts with a status", firstEvent.includes('"status"'), firstEvent.slice(0, 60));
+await page.waitForTimeout(1500);
+const modelStatus = await page.evaluate(async () => (await fetch("/api/chats/model-status", { credentials: "same-origin" })).json());
+check("model status and queue are reported", modelStatus.state === "ok" && modelStatus.running === 0 && modelStatus.waiting === 0, JSON.stringify(modelStatus));
 
 // Switch the character in the running chat
 await page.evaluate(() => fetch("/api/characters", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
@@ -290,6 +324,7 @@ await page.click("#nav-desktop button[data-go=admin]");
 await page.waitForSelector("#view-admin:not(.hidden)");
 await page.waitForSelector("#view-admin .stat-card, #view-admin .card", { timeout: 10000 });
 check("Server Management overview loads", (await page.textContent("#view-admin")).includes("Hosted API today"));
+check("overview shows the model queue", (await page.textContent("#admin-queue")).includes("waiting"));
 await page.click("#view-admin .subtabs button:has-text('Characters')");
 await page.waitForSelector("#view-admin .card:has-text('review queue')");
 // Approve everything waiting in the queue (earlier runs may have left items).
@@ -335,6 +370,39 @@ await page.setInputFiles("input[type=file][aria-label='Import a character card']
   buffer: Buffer.from(JSON.stringify({ name: "Captain Iris Kade", description: "Airship captain.", first_mes: "Report!" })) });
 await page.waitForSelector("#view-characters .char-card:has-text('Captain Iris Kade')", { timeout: 15000 }).catch(() => {});
 check("character card import works", (await page.textContent("#view-characters")).includes("Captain Iris Kade"));
+await page.setInputFiles("input[type=file][aria-label='Import a character card']", [
+  { name: "a.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ spec: "chara_card_v3", spec_version: "3.0", data: { name: "Vex Thorn", description: "A thief." } })) },
+  { name: "b.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify([{ name: "Nell Gray" }, { name: "Odo Fenn" }])) }]);
+await page.waitForSelector("#view-characters .char-card:has-text('Odo Fenn')", { timeout: 15000 }).catch(() => {});
+const cardsText = await page.textContent("#view-characters");
+check("several cards (V3 and a list) import at once", ["Vex Thorn", "Nell Gray", "Odo Fenn"].every((n) => cardsText.includes(n)));
+const cardHref = await page.getAttribute("#view-characters .char-card:has-text('Mara Stone') a:has-text('Card')", "href");
+const cardResp = await page.request.get(BASE + cardHref);
+check("a character downloads as a card (PNG with the picture)", cardResp.status() === 200 && (cardResp.headers()["content-type"] || "") === "image/png",
+  cardResp.headers()["content-type"]);
+
+// Search over all chats and the bookmarks filter in the chat list
+await page.click("#nav-desktop button[data-go=chats]");
+await page.waitForSelector("#view-chats:not(.hidden) #chat-list");
+await page.fill("#chat-search", "harbour");
+await page.waitForSelector("#message-hits .hit-row", { timeout: 10000 }).catch(() => {});
+check("search over all chats finds messages", (await page.locator("#message-hits .hit-row").count()) > 0);
+await page.locator("#message-hits .hit-row").first().click();
+check("a search hit opens the chat at that message", await page.waitForSelector("#messages .msg.flash", { timeout: 10000 }).then(() => true, () => false));
+await page.fill("#chat-search", "");
+await page.click("#view-chats .chips button:has-text('Bookmarks')");
+await page.waitForSelector("#chat-list .hit-row", { timeout: 10000 }).catch(() => {});
+check("bookmarks filter lists all bookmarks", (await page.locator("#chat-list .hit-row").count()) === 1);
+await page.click("#view-chats .chips button:has-text('All')");
+
+// Import a chat from its JSON export
+const exported = await (await page.request.get(BASE + "/api/export/chat/" + chatId)).body();
+const chooser = page.waitForEvent("filechooser");
+await page.click("#import-chats");
+await (await chooser).setFiles({ name: "chat.json", mimeType: "application/json", buffer: exported });
+await page.waitForFunction(() => (document.querySelector("#toast") || {}).textContent?.includes("chat imported"), null, { timeout: 15000 }).catch(() => {});
+check("a chat imports from its JSON export", (await page.textContent("#toast")).includes("1 chat imported"), await page.textContent("#toast"));
+await page.waitForTimeout(800);
 
 // Live sync: a second window of the same user sees the new message without reloading
 const second = await newPage(1280, 860);
@@ -378,9 +446,12 @@ await page.click("#view-admin button:has-text('Back up now')");
 await page.waitForSelector("#view-admin td:has-text('compain-')", { timeout: 60000 });
 check("backup can be created from the browser", true);
 await page.click("#view-admin .subtabs button:has-text('Models')");
+const speedDone = page.waitForResponse((r) => r.url().includes("/models/speedtest"), { timeout: REPLY_TIMEOUT });
 await page.click("#view-admin button:has-text('Run speed test')");
-await page.waitForSelector("text=pieces per second", { timeout: REPLY_TIMEOUT });
-check("speed test shows a result", true);
+await speedDone;
+// The result is also stored: open the tab again in case another part of the page was redrawn meanwhile.
+if (!(await page.isVisible("text=pieces per second"))) await page.click("#view-admin .subtabs button:has-text('Models')");
+check("speed test shows a result", await page.waitForSelector("text=pieces per second", { timeout: 15000 }).then(() => true, () => false));
 await page.click("#view-admin .subtabs button:has-text('Hosted API')");
 await page.waitForSelector("#h-prov");
 await page.selectOption("#h-prov", "groq");

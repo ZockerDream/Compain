@@ -15,7 +15,7 @@ Decisions from the owner's answers and the approved mockup. Items marked **open*
 - Live sync of chats across devices in real time (WebSocket).
 - Streaming replies.
 - Responsive web UI for desktop and phone (the mockup's bottom bar on phones). Android app later.
-- Character import (SillyTavern V1/V2 JSON, V2 in PNG, plain text), export of characters and chats.
+- Character import (card V1/V2/V3 as JSON or in PNG, JSON lists, plain text) and card export (V2 in the PNG picture or JSON); export of characters and chats (JSON, one chat also as Markdown) and import of these files.
 - Story memory for chats of about 500 messages. Up to 10 important messages per chat, always in context.
 - Hosted API limited to 100 messages per user per day, and a total daily cap (default 500). Self-hosted models unlimited.
 - Login: 48 hours, or permanent with "remember me". Phones stay logged in. Lockout after failed logins.
@@ -71,7 +71,7 @@ Test both on the same roleplay prompt. Measure tokens per second, memory use, an
 - `sessions`: user, token hash, created, expires, "stay logged in" flag, device.
 - `characters`: id, owner, name, tagline, description, personality, greeting, scenario, picture path, visibility (private, pending review, public), tags, source format on import.
 - `chats`: id, owner, character, title, pinned, created, updated, model.
-- `messages`: id, chat, sender (user or character), content, created, important flag.
+- `messages`: id, chat, sender (user or character), content, created, important flag, bookmarked flag (only for the user, never in the prompt).
 - `summaries`: chat, text, updated (story memory).
 - `api_usage`: user, date, message count (hosted API only).
 - `settings`: key and value for server-wide options set in Server Management.
@@ -137,13 +137,16 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - **Web UI:** plain JavaScript served by the API from `compain/static/`, built on the mockup's CSS. German via `i18n.js` (translates interface strings only, never user text).
 - **Designs:** `<html data-design data-palette data-mode data-bg>` plus CSS variables `--g-blur`, `--g-alpha`, `--g-dim`. Glass designs blur panels over `#bg-layer`; on phones the blur is off. Modern designs hide the sidebar and show `#topnav-pills`; phones keep the bottom bar.
 - **Changelog and Impressum:** `routes/legal.py` serves `/api/changelog`, `/api/legal/impressum` and simple pages; the web app shows both as popovers (text rendered with text nodes only). The Impressum file is bind-mounted read-only (`create_host_path: false`).
-- **Migrations:** Alembic in `app/compain/migrations` (0001 = schema 0.3.0, 0002 = 0.4.0, 0003 = help tickets in 1.1.0). `db.init_db` runs `upgrade head` on every start; a database without `alembic_version` gets the old extra columns and is stamped 0001 first. New revision: change `models.py`, then run Alembic's `revision --autogenerate` against a database at head (see the snippet in the 0.4.0 commit), and fix booleans (`sa.false()`) and constraint names by hand.
+- **Migrations:** Alembic in `app/compain/migrations` (0001 = schema 0.3.0, 0002 = 0.4.0, 0003 = help tickets in 1.1.0, 0004 = message bookmarks in 1.3.0). `db.init_db` runs `upgrade head` on every start; a database without `alembic_version` gets the old extra columns and is stamped 0001 first. New revision: change `models.py`, then run Alembic's `revision --autogenerate` against a database at head (see the snippet in the 0.4.0 commit), and fix booleans (`sa.false()`) and constraint names by hand.
 - **Chat tools:** `POST /api/chats/{id}/reply` with `mode` `next` (continue) or `regenerate` (new version stored in `messages.variants`); `POST .../messages/{id}/variant`; `PATCH .../messages/{id}` (text, important); `DELETE .../messages/{id}` and `.../after`. Stop = the browser aborts the request; the stream generator catches the cancellation and saves the part written so far.
+- **Search and bookmarks (1.3.0):** `GET /api/chats/search?q=` searches the text of all own messages (case-insensitive `ILIKE`, `%` and `_` escaped, at least 2 characters, newest 50, with a snippet). `PATCH .../messages/{id}` takes `bookmarked`; `GET /api/chats/bookmarks` lists them. Both routes sit before `/{chat_id}`.
+- **Export and import (1.3.0):** `GET /api/export/chat/{id}?format=md|json`. `POST /api/export/import` takes the body of a `compain-chat-v1`, `compain-chats-v1`, `compain-all-v1` or `compain-characters-v1` file; everything comes in new. Characters are matched by name (own, then public), else created from `character_card` (adults-only check). At most 200 chats, 5000 messages per chat, 10 important. Cards: `cards.parse_cards` (V1–V3, `ccv3` before `chara`, JSON arrays), `GET /api/characters/{id}/card?format=auto|png|json` writes a V2 card (`cards.png_with_card` puts a `chara` tEXt chunk before IEND).
+- **Model queue (1.3.0):** `modelqueue.QUEUE` (in memory, one uvicorn process) lets at most `model_slots` replies and story summaries of the self-hosted model run at once; the rest wait in order. The reply stream sends `{"status": "queued", "position": n}`, `loading`/`down` (llama.cpp `/health` gives 503 while loading; waits up to 10 minutes) and `thinking` before the first `delta`. `GET /api/chats/model-status` gives state, slots, running and waiting; the admin overview has `model_queue`. Keep `model_slots` equal to `LLM_SLOTS`.
 - **Account security:** TOTP (`totp.py`, RFC 6238, secret encrypted with `COMPAIN_SECRET_KEY`), recovery codes as SHA-256 hashes, sessions with `mfa_pending` (5 minutes, only `/login/2fa`), device data (`user_agent`, `ip`, `last_seen`), login guard in memory (`loginguard.py`).
 - **PWA:** manifest and service worker at the root (`/manifest.webmanifest`, `/sw.js`); static files cache-first with background refresh, the page network-first, the API never cached. Service workers need HTTPS or localhost.
 - **Replies:** copied speaker marks ("[Name]:", "Name:") are removed before saving; a stop before the first real word saves nothing.
 - **Help and tickets:** `routes/help.py` under `/api/tickets` (list with `scope=mine|all` and `status`, `summary` for the badge, `admins`, create, get (sets the read marker), `POST .../messages` (admins: `internal`, `status`), `PATCH` (owner: close or reopen; admins: status, priority, category, `assigned_to`/`unassign`), `DELETE` (admins)). Others' tickets return 404. Up to 10 open tickets per user, 5000 characters per post. A user's post reopens an answered or closed ticket; an admin's post sets "answered" and assigns the ticket if nobody has it. Live event `{"type": "tickets"}` to the owner and all admins. Admin actions go to the audit log. Help texts (FAQ, guide, Markdown) are in `static/help.js` in English and German, written in Markdown and shown with the chat renderer. Migration 0003.
-- **Tests:** 60 API tests and 72 browser checks (desktop and phone, German interface) pass against the Docker build.
+- **Tests:** 68 API tests and 86 browser checks (desktop and phone, German interface) pass against the Docker build.
 
 ## Model test results
 

@@ -291,16 +291,24 @@
   /* ---------- chats ---------- */
   async function renderChats() {
     var view = $("view-chats");
-    view.textContent = "";
+    // Own actions and live updates can start two renders at once: only the newest one may draw.
+    var mine = state.chatRender = (state.chatRender || 0) + 1;
     var chats = await api("/api/chats");
+    if (mine !== state.chatRender) return;
+    view.textContent = "";
     if (state.chatId && !chats.some(function (c) { return c.id === state.chatId; })) state.chatId = null;
     if (!state.chatId && chats.length && location.hash.indexOf("#chats/") === 0) state.chatId = chats[0].id;
 
     var search = el("input", { id: "chat-search", placeholder: "Search chats or characters", "aria-label": "Search chats", value: state.query });
-    search.addEventListener("input", function () { state.query = search.value; drawList(); });
+    var searchTimer = null, searchSeq = 0;
+    search.addEventListener("input", function () {
+      state.query = search.value; drawList();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(searchMessages, 250);
+    });
 
     var chips = el("div", { class: "chips", role: "group", "aria-label": "Filter chats" });
-    [["all", "All"], ["unread", "Unread"], ["pinned", "Pinned"], ["important", "Important"]].forEach(function (f) {
+    [["all", "All"], ["unread", "Unread"], ["pinned", "Pinned"], ["important", "Important"], ["bookmarks", "Bookmarks"]].forEach(function (f) {
       chips.appendChild(el("button", { class: "chip", "aria-pressed": state.cfilter === f[0] ? "true" : "false",
         onclick: function () { state.cfilter = f[0]; renderChats(); } }, f[1]));
     });
@@ -313,7 +321,9 @@
     view.appendChild(el("div", { class: "page-head" },
       el("div", null, el("div", { class: "caps eyebrow", text: "Conversations" }), el("h1", { text: "Chats" }),
         el("p", { text: "Pick a conversation. Messages sync to every device." })),
-      el("div", { class: "actions" }, el("button", { class: "primary", onclick: function () { go("characters"); } }, "New chat"))));
+      el("div", { class: "actions" },
+        el("button", { id: "import-chats", onclick: function () { importChats(); } }, icon("i-up", "sm"), " Import chats"),
+        el("button", { class: "primary", onclick: function () { go("characters"); } }, "New chat"))));
     view.appendChild(el("div", { class: "chats-shell" }, listPane, convPane));
 
     function visible() {
@@ -325,6 +335,39 @@
         if (!q) return true;
         return (c.title + " " + c.character_name + " " + c.last_message).toLowerCase().indexOf(q) !== -1;
       });
+    }
+
+    // A hit in the text of a message (search) or a bookmark: opens the chat at that message.
+    function hitRow(x, q) {
+      var snip = el("span", { class: "preview", style: "display:block" });
+      var text = plain(x.snippet), at = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1;
+      if (at >= 0) {
+        snip.appendChild(document.createTextNode(text.slice(0, at)));
+        snip.appendChild(el("mark", { text: text.slice(at, at + q.length) }));
+        snip.appendChild(document.createTextNode(text.slice(at + q.length)));
+      } else snip.textContent = text;
+      return el("button", { class: "c-row hit-row", onclick: function () { state.jumpTo = x.message_id; if (state.chatId === x.chat_id) renderChats(); else go("chat/" + x.chat_id); } },
+        avatar(x.character_name, x.character_id, x.character_has_picture),
+        el("span", { class: "grow", style: "min-width:0" },
+          el("span", { class: "top" },
+            x.bookmarked ? icon("i-bookmark", "sm pin-ic") : null,
+            el("span", { class: "title ellipsis", text: (x.role === "user" ? (me.persona_name || "You") : x.character_name) + " · " + x.chat_title }),
+            el("span", { class: "time", text: fmtTime(x.created_at) })),
+          snip));
+    }
+
+    var hitBox = el("div", { id: "message-hits" });
+    async function searchMessages() {
+      var q = state.query.trim(), seq = ++searchSeq;
+      if (state.cfilter === "bookmarks") return;
+      if (q.length < 2) { hitBox.textContent = ""; return; }
+      var hits = [];
+      try { hits = await api("/api/chats/search?q=" + encodeURIComponent(q)); } catch (e) { return; }
+      if (seq !== searchSeq) return; // a newer search is running
+      hitBox.textContent = "";
+      hitBox.appendChild(el("div", { class: "caps group-label" }, el("span", { text: "In messages" }), " (" + hits.length + (hits.length >= 50 ? "+" : "") + ")"));
+      if (!hits.length) hitBox.appendChild(el("div", { class: "muted small", style: "padding:6px 12px", text: "No message contains this text." }));
+      hits.forEach(function (x) { hitBox.appendChild(hitRow(x, q)); });
     }
 
     function row(c) {
@@ -343,18 +386,37 @@
 
     function drawList() {
       listBox.textContent = "";
+      if (state.cfilter === "bookmarks") return drawBookmarks();
       var items = visible();
       if (!items.length) {
         listBox.appendChild(el("div", { class: "empty" }, icon("i-search"), el("div", { text: chats.length ? "No chats match." : "No chats yet." }),
           el("div", { class: "small", text: chats.length ? "Try another search or filter." : "Start one from Characters." })));
+        listBox.appendChild(hitBox); // lines inside messages can match even when no chat title does
         return;
       }
       var pinned = items.filter(function (c) { return c.pinned; });
       var rest = items.filter(function (c) { return !c.pinned; });
       if (pinned.length) { listBox.appendChild(el("div", { class: "caps group-label", text: "Pinned" })); pinned.forEach(function (c) { listBox.appendChild(row(c)); }); }
       if (rest.length) { listBox.appendChild(el("div", { class: "caps group-label", text: "Recent" })); rest.forEach(function (c) { listBox.appendChild(row(c)); }); }
+      listBox.appendChild(hitBox);
+    }
+
+    var bookmarkList = null;
+    async function drawBookmarks() {
+      if (!bookmarkList) { try { bookmarkList = await api("/api/chats/bookmarks"); } catch (e) { bookmarkList = []; } }
+      listBox.textContent = "";
+      var q = state.query.trim().toLowerCase();
+      var items = bookmarkList.filter(function (x) { return !q || (x.snippet + " " + x.chat_title + " " + x.character_name).toLowerCase().indexOf(q) !== -1; });
+      if (!items.length) {
+        listBox.appendChild(el("div", { class: "empty" }, icon("i-bookmark"), el("div", { text: bookmarkList.length ? "No bookmarks match." : "No bookmarks yet." }),
+          el("div", { class: "small", text: "Use Bookmark under a message to find a scene again." })));
+        return;
+      }
+      listBox.appendChild(el("div", { class: "caps group-label", text: "Bookmarks" }));
+      items.forEach(function (x) { listBox.appendChild(hitRow(x, state.query.trim())); });
     }
     drawList();
+    if (state.query.trim().length >= 2) searchMessages();
 
     if (state.chatId) await renderConversation(convPane, state.chatId, chats, drawList);
     else convPane.appendChild(el("div", { class: "chat-empty" }, el("div", null,
@@ -452,6 +514,7 @@
 
   async function renderConversation(pane, chatId, chats, drawList) {
     var chat = await api("/api/chats/" + chatId);
+    if (!pane.isConnected) return; // a newer render replaced this one meanwhile
     pane.textContent = "";
 
     var modelSel = el("select", { class: "model-select", id: "chat-model", "aria-label": "Model for this chat" });
@@ -492,7 +555,36 @@
         try { await api("/api/chats/" + chatId, { method: "PATCH", body: { pinned: !chat.pinned } }); renderChats(); }
         catch (e) { toast(e.message); }
       } }, icon("i-pin"));
-    var exportLink = el("a", { class: "btn ghost icon-only", href: "/api/export/chat/" + chatId, download: "", "aria-label": "Export this chat" }, icon("i-down"));
+    // Export: JSON (can be imported again) or Markdown (to read and print).
+    var exportMenu = el("div", { class: "pop-menu hidden", id: "export-menu", role: "menu" },
+      el("a", { class: "btn ghost", role: "menuitem", href: "/api/export/chat/" + chatId + "?format=md", download: "" }, "Markdown (to read)"),
+      el("a", { class: "btn ghost", role: "menuitem", href: "/api/export/chat/" + chatId, download: "" }, "JSON (to import again)"));
+    function setExportMenu(open) {
+      exportMenu.classList.toggle("hidden", !open);
+      exportBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      // A click anywhere else closes it (registered after this click has finished).
+      if (open) setTimeout(function () {
+        document.addEventListener("click", function close(ev) {
+          if (exportMenu.contains(ev.target) && !ev.target.closest("a")) { document.addEventListener("click", close, { once: true }); return; }
+          exportMenu.classList.add("hidden"); exportBtn.setAttribute("aria-expanded", "false");
+        }, { once: true });
+      }, 0);
+    }
+    var exportBtn = el("button", { class: "ghost icon-only", id: "export-btn", "aria-label": "Export this chat", "aria-haspopup": "menu", "aria-expanded": "false",
+      onclick: function () { if (exportMenu.classList.contains("hidden")) setExportMenu(true); } }, icon("i-down"));
+    var exportLink = el("div", { class: "pop-wrap" }, exportBtn, exportMenu);
+
+    // Bookmarks of this chat: a list to jump back to a scene.
+    var marks = chat.messages.filter(function (m) { return m.bookmarked; });
+    var bookmarkBox = el("div", { class: "bookmark-box hidden", id: "bookmark-box" },
+      el("div", { class: "caps", style: "width:100%", text: "Bookmarks" }),
+      marks.length ? marks.map(function (m) {
+        return el("button", { class: "bm-row", onclick: function () { jump(m.id); } },
+          icon("i-bookmark", "sm"), el("span", { class: "preview ellipsis", text: (m.role === "user" ? "" : (m.character_name || chat.character_name) + ": ") + plain(m.content).slice(0, 140) }));
+      }) : el("div", { class: "muted small", text: "No bookmarks yet. Use Bookmark under a message to find a scene again." }));
+    var bookmarkBtn = el("button", { class: "ghost icon-only", id: "bookmarks-btn", "aria-label": "Bookmarks in this chat", "aria-pressed": "false",
+      onclick: function () { var open = bookmarkBox.classList.toggle("hidden") === false; bookmarkBtn.setAttribute("aria-pressed", open ? "true" : "false"); } },
+      icon("i-bookmark"), marks.length ? el("span", { class: "mini-count", text: String(marks.length) }) : null);
     var summaryBox = el("div", { class: "conv-stats hidden", style: "display:block;font-size:13px;line-height:1.55;color:var(--fg)" },
       el("div", { class: "caps", style: "margin-bottom:6px", text: "Story so far" }),
       el("div", { text: chat.summary || "No summary yet. It is written automatically after every 40 messages and keeps long stories consistent." }));
@@ -539,8 +631,9 @@
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "name ellipsis", text: chat.character_name }),
         el("div", { class: "meta ellipsis", text: chat.title + (chat.character_tagline ? " · " + chat.character_tagline : "") })),
-      el("div", { class: "tools" }, searchBtn, pinBtn, infoBtn, exportLink)));
+      el("div", { class: "tools" }, searchBtn, bookmarkBtn, pinBtn, infoBtn, exportLink)));
     pane.appendChild(searchBar);
+    pane.appendChild(bookmarkBox);
 
     var important = chat.messages.filter(function (m) { return m.important; }).length;
     pane.appendChild(el("div", { class: "conv-stats" },
@@ -548,8 +641,25 @@
       el("span", { class: "pill" }, icon("i-star", "sm"), " " + important + " of 10 important"),
       el("span", { class: "pill", text: chat.summary ? "Story summary saved" : "No story summary yet" }),
       el("span", { class: "pill", text: "Character:" }), charSel,
-      el("span", { class: "pill", text: "Model:" }), modelSel));
+      el("span", { class: "pill", text: "Model:" }), modelSel,
+      el("span", { class: "pill model-state hidden", id: "model-state" })));
     pane.appendChild(summaryBox);
+    // Busy or loading self-hosted model: say so before you send.
+    if ((chat.model || "self") === "self") {
+      api("/api/chats/model-status").then(function (st) {
+        var pill = $("model-state");
+        if (!pill) return;
+        pill.textContent = "";
+        if (st.state === "loading") pill.appendChild(el("span", { text: "The model is loading…" }));
+        else if (st.state === "down") pill.appendChild(el("span", { text: "Model not reachable" }));
+        else if (st.waiting > 0 || st.running >= st.slots) {
+          pill.appendChild(el("span", { text: "Model busy:" }));
+          pill.appendChild(document.createTextNode(" " + st.waiting + " "));
+          pill.appendChild(el("span", { text: "waiting" }));
+        } else return;
+        pill.classList.remove("hidden");
+      }).catch(function () {});
+    }
 
     var busy = false, controller = null;
     var ctx = {
@@ -633,14 +743,38 @@
     async function run(url, body, replaceNode) {
       setBusy(true);
       controller = new AbortController();
+      var statusLine = el("div", { class: "typing-status", id: "typing-status", "aria-live": "polite" });
       var typing = el("div", { class: "msg char typing" }, avatar(chat.character_name, chat.character_id, chat.character_has_picture, "xs"),
-        el("div", { class: "bubble" }, el("span", { class: "dot" }), el("span", { class: "dot" }), el("span", { class: "dot" })));
+        el("div", null, el("div", { class: "bubble" }, el("span", { class: "dot" }), el("span", { class: "dot" }), el("span", { class: "dot" })), statusLine));
+      // Status from the server: place in line, model loading, reading the story (with seconds after a moment).
+      var since = Date.now(), status = null, ticker = null;
+      function drawStatus() {
+        statusLine.textContent = "";
+        if (!status) return;
+        var secs = Math.round((Date.now() - since) / 1000);
+        if (status.status === "queued") {
+          statusLine.appendChild(el("span", { text: "Waiting in line, place" }));
+          statusLine.appendChild(document.createTextNode(" " + status.position));
+        } else if (status.status === "loading") statusLine.appendChild(el("span", { text: "The model is loading…" }));
+        else if (status.status === "down") statusLine.appendChild(el("span", { text: "The model is starting…" }));
+        else if (status.status === "thinking") {
+          if (secs < 3) return;
+          statusLine.appendChild(el("span", { text: "Reading the story…" }));
+        }
+        if (secs >= 3) statusLine.appendChild(document.createTextNode(" · " + secs + " s"));
+      }
+      function onStatus(ev) {
+        if (!status || status.status !== ev.status) since = Date.now();
+        status = ev; drawStatus();
+        if (!ticker) ticker = setInterval(drawStatus, 1000);
+      }
       if (replaceNode) replaceNode.replaceWith(typing); else box.appendChild(typing);
       box.scrollTop = box.scrollHeight;
       var bubble = null, reply = "", stopped = false;
       try {
         await streamTo(url, body, controller.signal, function (delta) {
           if (!bubble) {
+            if (ticker) { clearInterval(ticker); ticker = null; }
             var node = messageNode({ id: null, role: "assistant", content: "", important: false, character_name: chat.character_name }, chat, false, ctx);
             typing.replaceWith(node);
             bubble = node.querySelector(".bubble");
@@ -649,13 +783,14 @@
           reply += delta;
           setBubble(bubble, reply);
           box.scrollTop = box.scrollHeight;
-        });
+        }, onStatus);
         chime();
       } catch (e) {
         if (e.name === "AbortError") { stopped = true; toast("Stopped. The part written so far is kept."); }
         else toast(e.message);
         if (!bubble) typing.remove();
       } finally {
+        if (ticker) clearInterval(ticker);
         if (bubble) bubble.classList.remove("cursor");
         controller = null;
         setBusy(false);
@@ -668,13 +803,27 @@
       }, stopped ? 600 : 0);
     }
     box.scrollTop = box.scrollHeight;
+
+    function jump(id, quiet) {
+      var node = box.querySelector('.msg[data-id="' + id + '"]');
+      if (!node) { if (!quiet) toast("This message is no longer in the chat"); return; }
+      node.scrollIntoView({ block: "center" });
+      if (!quiet) { node.classList.add("flash"); setTimeout(function () { node.classList.remove("flash"); }, 2200); }
+    }
+    if (state.keepScroll !== undefined && state.keepScroll !== null) box.scrollTop = state.keepScroll;
+    state.keepScroll = null;
+    if (state.keepPanels && state.keepPanels.bookmarks) { bookmarkBox.classList.remove("hidden"); bookmarkBtn.setAttribute("aria-pressed", "true"); }
+    if (state.keepPanels && state.keepPanels.exportMenu) setExportMenu(true);
+    state.keepPanels = null;
+    // Coming from the search, a bookmark, or after (un)bookmarking: show that message.
+    if (state.jumpTo) { var target = state.jumpTo, quietJump = state.jumpQuiet; state.jumpTo = null; state.jumpQuiet = false; jump(target, quietJump); }
   }
 
   // One message with its actions. ctx gives access to the running conversation (regenerate, resend).
   function messageNode(m, chat, isLast, ctx) {
     var mine = m.role === "user";
     var name = mine ? "You" : (m.character_name || chat.character_name);
-    var wrap = el("div", { class: "msg " + (mine ? "user" : "char") + (m.important ? " important" : "") });
+    var wrap = el("div", { class: "msg " + (mine ? "user" : "char") + (m.important ? " important" : "") + (m.bookmarked ? " bookmarked" : ""), "data-id": m.id || null });
     if (!mine) wrap.appendChild(avatar(name, m.character_id || chat.character_id, m.character_id ? m.character_has_picture : chat.character_has_picture, "xs"));
     var bubble = el("div", { class: "bubble" });
     setBubble(bubble, m.content);
@@ -689,6 +838,14 @@
           toast(!m.important ? "Marked important" : "Unmarked");
           await renderChats();
         }); } }, icon("i-star", "sm"), m.important ? " Important" : " Mark important"));
+      // A bookmark is only for you (jump back to a scene later); the model never sees it.
+      line.appendChild(el("button", { class: "mark bm", "aria-pressed": m.bookmarked ? "true" : "false", title: "Bookmark this scene for yourself",
+        onclick: function () { act(async function () {
+          await api("/api/chats/" + chat.id + "/messages/" + m.id, { method: "PATCH", body: { bookmarked: !m.bookmarked } });
+          toast(!m.bookmarked ? "Bookmarked" : "Bookmark removed");
+          state.jumpTo = m.id; state.jumpQuiet = true;
+          await renderChats();
+        }); } }, icon("i-bookmark", "sm"), m.bookmarked ? " Bookmarked" : " Bookmark"));
       if (!mine) {
         if (m.variant_count > 1) {
           var flip = function (d) { act(async function () {
@@ -746,7 +903,7 @@
   }
 
   // Stream a reply over Server-Sent Events. Aborting (Stop) closes the connection; the server keeps the part written so far.
-  async function streamTo(url, body, signal, onDelta) {
+  async function streamTo(url, body, signal, onDelta, onStatus) {
     var r = await fetch(url, {
       method: "POST", credentials: "same-origin", signal: signal,
       headers: { "Content-Type": "application/json" },
@@ -772,10 +929,52 @@
           if (line.indexOf("data: ") !== 0) return;
           var ev = JSON.parse(line.slice(6));
           if (ev.error) throw new Error(ev.error);
+          if (ev.status && onStatus) onStatus(ev);
           if (ev.delta) onDelta(ev.delta);
         });
       }
     }
+  }
+
+  /* ---------- import: chats (Compain export files) and character cards ---------- */
+  function pickFiles(accept, multiple, then) {
+    var input = el("input", { type: "file", accept: accept, multiple: multiple || null, style: "display:none" });
+    input.addEventListener("change", function () { var files = Array.prototype.slice.call(input.files || []); input.remove(); if (files.length) then(files); });
+    document.body.appendChild(input);
+    input.click();
+  }
+
+  async function postFile(url, file) {
+    var r = await fetch(url, { method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": file.type || "application/octet-stream", "X-Filename": file.name }, body: file });
+    var data = null; try { data = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error((data && data.detail) || "Import failed");
+    return data;
+  }
+
+  function importChats() {
+    pickFiles(".json,application/json", true, async function (files) {
+      var chats = 0, chars = 0, first = null;
+      for (var i = 0; i < files.length; i++) {
+        try {
+          var d = await postFile("/api/export/import", files[i]);
+          chats += d.chats; chars += d.characters; first = first || d.first_chat_id;
+        } catch (e) { toast(files[i].name + ": " + e.message); }
+      }
+      if (!chats && !chars) return;
+      if (!chats) { toast(chars === 1 ? "1 character imported" : chars + " characters imported"); return; }
+      toast(chats === 1 ? "1 chat imported" : chats + " chats imported");
+      if (first) go("chat/" + first); else renderChats();
+    });
+  }
+
+  async function importCards(files) {
+    var names = [];
+    for (var i = 0; i < files.length; i++) {
+      try { var d = await postFile("/api/characters/import", files[i]); (d.characters || [d]).forEach(function (c) { names.push(c.name); }); }
+      catch (e) { toast(files[i].name + ": " + e.message); }
+    }
+    if (names.length) { toast(names.length === 1 ? "Imported " + names[0] : names.length + " characters imported"); renderCharacters(); }
   }
 
   /* ---------- characters ---------- */
@@ -785,23 +984,28 @@
     if (state.editing !== null) return renderEditor(view);
 
     var chars = await api("/api/characters");
-    var importInput = el("input", { type: "file", accept: ".json,.png,.txt,application/json,image/png,text/plain", style: "display:none", "aria-label": "Import a character card" });
-    importInput.addEventListener("change", async function () {
-      var file = importInput.files && importInput.files[0];
-      if (!file) return;
-      try {
-        var r = await fetch("/api/characters/import", { method: "POST", credentials: "same-origin",
-          headers: { "Content-Type": file.type || "text/plain", "X-Filename": file.name }, body: file });
-        var data = null; try { data = await r.json(); } catch (e) {}
-        if (!r.ok) throw new Error((data && data.detail) || "Import failed");
-        toast("Imported " + data.name);
-        renderCharacters();
-      } catch (e) { toast(e.message); }
+    var importInput = el("input", { type: "file", multiple: true, accept: ".json,.png,.txt,application/json,image/png,text/plain", style: "display:none", "aria-label": "Import a character card" });
+    importInput.addEventListener("change", function () {
+      var files = Array.prototype.slice.call(importInput.files || []);
+      importInput.value = "";
+      if (files.length) importCards(files);
     });
     view.appendChild(importInput);
+    // Drop card files anywhere on the page.
+    if (!view.dataset.drop) {
+      view.dataset.drop = "1";
+      view.addEventListener("dragover", function (e) { if (state.editing === null && e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, "Files") !== -1) { e.preventDefault(); view.classList.add("dropping"); } });
+      view.addEventListener("dragleave", function (e) { if (e.target === view) view.classList.remove("dropping"); });
+      view.addEventListener("drop", function (e) {
+        view.classList.remove("dropping");
+        if (state.editing !== null || !e.dataTransfer || !e.dataTransfer.files.length) return;
+        e.preventDefault();
+        importCards(Array.prototype.slice.call(e.dataTransfer.files));
+      });
+    }
     view.appendChild(el("div", { class: "page-head" },
       el("div", null, el("div", { class: "caps eyebrow", text: "Your library" }), el("h1", { text: "Characters" }),
-        el("p", { text: "Characters you created. You can edit and delete only these. Import SillyTavern cards (JSON or PNG) or plain text." })),
+        el("p", { text: "Characters you created. You can edit and delete only these. Import character cards (SillyTavern, Chub and others: PNG or JSON, V1 to V3) or plain text, also several at once or by dropping files here." })),
       el("div", { class: "actions" },
         el("button", { onclick: function () { importInput.click(); } }, "Import card"),
         el("button", { class: "primary", onclick: function () { state.editing = {}; renderCharacters(); } }, "New character"))));
@@ -827,6 +1031,7 @@
           catch (e) { toast(e.message); }
         } }, "Chat"),
         el("button", { class: "ghost", onclick: function () { state.editing = c; renderCharacters(); } }, "Edit"),
+        el("a", { class: "btn ghost", href: "/api/characters/" + c.id + "/card", download: "", title: "Download as a character card (PNG with picture, else JSON)" }, "Card"),
         c.visibility === "private" ? el("button", { class: "ghost", onclick: async function () {
           try { await api("/api/characters/" + c.id + "/publish", { method: "POST" }); toast("Sent to review"); renderCharacters(); }
           catch (e) { toast(e.message); }
@@ -1023,11 +1228,13 @@
           } catch (e) { toast(e.message); }
         } }, "Save persona"))),
       el("div", { class: "card form" }, el("h2", { text: "Your data" }),
-        el("p", { class: "muted small", text: "Download everything you own as JSON." }),
+        el("p", { class: "muted small", text: "Download everything you own as JSON. The files can be imported again, here or on another Compain server." }),
         el("div", { class: "row", style: "flex-wrap:wrap" },
           el("a", { class: "btn", href: "/api/export/characters", download: "" }, "Characters"),
           el("a", { class: "btn", href: "/api/export/chats", download: "" }, "Chats"),
-          el("a", { class: "btn primary", href: "/api/export/all", download: "" }, "Everything")))));
+          el("a", { class: "btn primary", href: "/api/export/all", download: "" }, "Everything")),
+        el("div", { class: "row", style: "flex-wrap:wrap" },
+          el("button", { id: "profile-import", onclick: function () { importChats(); } }, icon("i-up", "sm"), " Import a file")))));
   }
   function kpi(n, label) { return el("div", { class: "kpi" }, el("b", { text: String(n) }), el("span", { text: label })); }
 
@@ -1653,6 +1860,9 @@
       el("button", { class: "card stat-card lift", style: "text-align:left", id: "admin-tickets", onclick: function () { state.helpTab = "support"; state.ticketId = null; state.ticketScope = "all"; go("help/support"); } },
         el("div", { class: "ic-wrap" }, icon("i-help")), el("div", { class: "caps", text: "Tickets" }),
         el("div", { class: "stat", text: String(o.tickets_waiting || 0) }), el("div", { class: "muted small", text: "waiting for an answer" })),
+      el("div", { class: "card stat-card", id: "admin-queue" }, el("div", { class: "ic-wrap" }, icon("i-chat")), el("div", { class: "caps", text: "Model queue" }),
+        el("div", { class: "stat", text: (o.model_queue ? o.model_queue.running : 0) + " / " + (o.model_queue ? o.model_queue.slots : 0) }),
+        el("div", { class: "muted small" }, el("span", { text: "writing now," }), " " + (o.model_queue ? o.model_queue.waiting : 0) + " ", el("span", { text: "waiting" }))),
       el("div", { class: "card stat-card" }, el("div", { class: "caps", text: "Disk" }),
         el("div", { class: "stat", text: disk.percent + "%" }),
         el("div", { class: "muted small", text: disk.used_gb + " of " + disk.total_gb + " GB used" }),
@@ -1825,7 +2035,8 @@
     body.appendChild(panel("Models", settingsForm([
       { key: "self_hosted_model_name", label: "Name of the self-hosted model", type: "text", help: "Shown in chats. Start: Mistral Small 3.2 abliteration (Q4_K_M)." },
       { key: "default_model", label: "Default for new chats", type: "select", options: [["self", "Self-hosted model"], ["hosted", "Hosted API"]] },
-      { key: "context_tokens", label: "Context window per request (tokens)", type: "int", help: "Must fit the model server. Compose starts it with 16384 tokens for 2 slots, so 8192 each." }
+      { key: "context_tokens", label: "Context window per request (tokens)", type: "int", help: "Must fit the model server. Compose starts it with 16384 tokens for 2 slots, so 8192 each." },
+      { key: "model_slots", label: "Replies at the same time", type: "int", help: "Slots of the self-hosted model (LLM_SLOTS in .env, default 2). More requests wait in line and see their place." }
     ])));
     body.appendChild(panel("Speed test", el("div", null,
       el("p", { class: "muted small", text: "Measures how fast the self-hosted model writes. Run it after changing the model or the server." }),
@@ -2019,7 +2230,17 @@
         return;
       }
       if (msg.type !== "chats" || state.sending) return;
-      if (state.route === "chats") renderChats();
+      if (state.route === "chats") {
+        // A live update must not move the reader: keep the scroll position, the open panels and the typed text.
+        var mbox = $("messages");
+        if (mbox && !state.jumpTo) state.keepScroll = mbox.scrollHeight - mbox.scrollTop - mbox.clientHeight < 40 ? null : mbox.scrollTop;
+        var openBm = $("bookmark-box"), field = document.querySelector("#conv .composer textarea");
+        var openEx = $("export-menu");
+        state.keepPanels = { bookmarks: !!(openBm && !openBm.classList.contains("hidden")), exportMenu: !!(openEx && !openEx.classList.contains("hidden")) };
+        if (field && field.value.trim() && state.chatId) { state.drafts = state.drafts || {}; state.drafts[state.chatId] = field.value; }
+        if (field && document.activeElement === field) state.refocus = state.chatId;
+        renderChats();
+      }
       else if (state.route === "home") renderHome();
     };
     ws.onclose = function () {

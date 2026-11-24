@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from .. import backup as backup_mod
 from .. import settings as cfg
+from ..modelqueue import QUEUE
 from ..config import Settings
 from ..deps import get_db, get_settings, require_admin
 from ..llm import stream_chat
@@ -73,6 +74,7 @@ def overview(_: User = Depends(require_admin), db: DbSession = Depends(get_db), 
         "chats": db.query(func.count(Chat.id)).scalar(),
         "messages": db.query(func.count(Message.id)).scalar(),
         "tickets_waiting": db.query(Ticket).filter(Ticket.status == "open").count(),
+        "model_queue": {**QUEUE.snapshot("self"), "slots": int(cfg.get(db, "model_slots"))},
         "hosted_used_today": db.query(func.coalesce(func.sum(ApiUsage.count), 0))
         .filter(ApiUsage.day == date.today())
         .scalar()
@@ -253,15 +255,20 @@ async def speed_test(request: Request, admin: User = Depends(require_admin), db:
         {"role": "user", "content": "Describe a harbour at dawn in about 80 words."},
     ]
     pieces = 0
-    started = time.monotonic()
     first = None
+    # Wait for a free slot first, so replies of other users do not distort the measurement.
+    turn = QUEUE.join("self")
     try:
+        await QUEUE.take(turn, int(cfg.get(db, "model_slots")))
+        started = time.monotonic()
         async for piece in stream_chat(settings.self_hosted_url, "", settings.self_hosted_model, prompt, 120):
             if first is None:
                 first = time.monotonic() - started
             pieces += 1
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Model not reachable: {type(exc).__name__}")
+    finally:
+        QUEUE.leave(turn)
     elapsed = max(time.monotonic() - started, 1e-6)
     result = {
         "pieces": pieces,
