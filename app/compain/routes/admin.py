@@ -98,8 +98,7 @@ def list_users(_: User = Depends(require_admin), db: DbSession = Depends(get_db)
 def create_user(body: NewUser, admin: User = Depends(require_admin), db: DbSession = Depends(get_db)):
     if body.role not in {"user", "admin"}:
         raise HTTPException(status_code=422, detail="Role must be 'user' or 'admin'")
-    if len(body.password) < cfg.get(db, "password_min_length"):
-        raise HTTPException(status_code=422, detail=f"Password must be at least {cfg.get(db, 'password_min_length')} characters")
+    # Admins may bypass the password policy (min length) when they set a password.
     if db.query(User).filter(User.username == body.username).one_or_none():
         raise HTTPException(status_code=409, detail="Username already exists")
     user = User(username=body.username, role=body.role, password_hash=hash_password(body.password))
@@ -127,8 +126,7 @@ def update_user(user_id: int, body: UserPatch, admin: User = Depends(require_adm
             raise HTTPException(status_code=422, detail="Role must be 'user' or 'admin'")
         user.role = body.role
     if body.password is not None:
-        if len(body.password) < cfg.get(db, "password_min_length"):
-            raise HTTPException(status_code=422, detail=f"Password must be at least {cfg.get(db, 'password_min_length')} characters")
+        # Admins may bypass the password policy (min length) when they set a password.
         user.password_hash = hash_password(body.password)
         for s in list(user.sessions):
             db.delete(s)

@@ -143,7 +143,7 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - **PWA:** manifest and service worker at the root (`/manifest.webmanifest`, `/sw.js`); static files cache-first with background refresh, the page network-first, the API never cached. Service workers need HTTPS or localhost.
 - **Replies:** copied speaker marks ("[Name]:", "Name:") are removed before saving; a stop before the first real word saves nothing.
 - **Help and tickets:** `routes/help.py` under `/api/tickets` (list with `scope=mine|all` and `status`, `summary` for the badge, `admins`, create, get (sets the read marker), `POST .../messages` (admins: `internal`, `status`), `PATCH` (owner: close or reopen; admins: status, priority, category, `assigned_to`/`unassign`), `DELETE` (admins)). Others' tickets return 404. Up to 10 open tickets per user, 5000 characters per post. A user's post reopens an answered or closed ticket; an admin's post sets "answered" and assigns the ticket if nobody has it. Live event `{"type": "tickets"}` to the owner and all admins. Admin actions go to the audit log. Help texts (FAQ, guide, Markdown) are in `static/help.js` in English and German, written in Markdown and shown with the chat renderer. Migration 0003.
-- **Tests:** 59 API tests and 72 browser checks (desktop and phone, German interface) pass against the Docker build.
+- **Tests:** 60 API tests and 72 browser checks (desktop and phone, German interface) pass against the Docker build.
 
 ## Model test results
 

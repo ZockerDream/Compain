@@ -1669,7 +1669,7 @@
 
   async function adminUsers(body) {
     var users = await api("/api/admin/users");
-    var nu = { u: el("input", { placeholder: "username", "aria-label": "New username" }), p: el("input", { type: "password", placeholder: "password (min. length from settings)", "aria-label": "New password" }) };
+    var nu = { u: el("input", { placeholder: "username", "aria-label": "New username" }), p: el("input", { type: "password", placeholder: "password", "aria-label": "New password" }) };
     var table = el("table", null,
       el("thead", null, el("tr", null, el("th", { text: "User" }), el("th", { text: "Role" }), el("th", { text: "Status" }), el("th", null))),
       el("tbody", null, users.map(function (u) {

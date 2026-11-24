@@ -2,6 +2,11 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.2.0 – 2026-11-24
+
+- Admins may bypass the password policy (minimum length): for their own password, for new users and when they set a password for a user. Normal users still need the minimum length.
+- The placeholder for a new user's password in Server admin no longer mentions the minimum length.
+
 ## 1.1.0 – 2026-11-24
 
 - Mark your own messages as important, for example when you give the story important context. The character keeps them in mind like important replies; they count toward the 10 per chat.

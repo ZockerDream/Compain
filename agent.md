@@ -33,9 +33,9 @@ A private, self-hosted, multi-user AI roleplay chat app. It replaces a paid char
 
 ## Current status
 
-Last updated: 2026-11-24 (version 1.1.0).
+Last updated: 2026-11-24 (version 1.2.0).
 
-Done (release 1.1.0, verified with tests):
+Done (release 1.2.0, verified with tests):
 - Login with 48-hour and "stay logged in" sessions, two-factor login (TOTP, QR code, 8 recovery codes), login guard per address and account (`loginguard.py`, in memory) plus 30 tries per address in 10 minutes, invite-code sign-up, maintenance mode with notice, device list with "Log out", password change, deleting the own account with all data. One-time 18+ question.
 - Characters: owner rules, adults-only check, pictures, card import, publish with admin review, add from Community. Community likes and usage counts (`character_likes`), most liked first.
 - Chats: Markdown in messages (rendered with DOM nodes only), streaming, Stop (the written part is saved when the connection closes; llama.cpp cancels the task), Regenerate with versions (`messages.variants`, `variant_index`), Continue (`POST /api/chats/{id}/reply`), edit and delete messages, rewind (`DELETE .../messages/{id}/after`), search in a chat, switching the character in a running chat (`messages.character_id` keeps the author; other characters' lines are marked `[Name]:` in the prompt), persona (`users.persona_*`) in the system prompt, story summary, important messages (own lines and replies, each labelled with its speaker in the prompt), unread counts, export, sound when a reply is complete.
@@ -47,7 +47,7 @@ Done (release 1.1.0, verified with tests):
 - Installable web app (PWA): `manifest.webmanifest`, `sw.js` (never caches `/api`), icons in `static/icons/`. Bump `CACHE` in `sw.js` with every release.
 - Database migrations with Alembic (`app/compain/migrations`, run on start by `db.init_db`); databases from before 0.4.0 are completed and stamped as 0001 automatically.
 - Self-hosted model: Gemma 4 26B-A4B uncensored (default), Mistral Small 3.2 as alternative.
-- Tests: 59 API tests (`app/tests`) and 72 browser checks against the Docker build (`app/e2e`), passing with the real Gemma model on a fresh database. Run the browser checks on a fresh database; data left over from many runs makes some checks pick other chats.
+- Tests: 60 API tests (`app/tests`) and 72 browser checks against the Docker build (`app/e2e`), passing with the real Gemma model on a fresh database. Run the browser checks on a fresh database; data left over from many runs makes some checks pick other chats.
 - `scripts/update.sh` for updates on the server, `scripts/download-models.sh` for the models.
 
 Open:

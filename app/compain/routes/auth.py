@@ -387,7 +387,7 @@ def change_password(body: PasswordIn, request: Request, session: UserSession = D
     if not verify_password(body.current, user.password_hash):
         _guard(request).failed(client_ip(request), user.username, int(cfg.get(db, "failed_login_limit")), int(cfg.get(db, "lock_minutes")))
         raise HTTPException(status_code=401, detail="The current password is wrong")
-    if len(body.new) < int(cfg.get(db, "password_min_length")):
+    if user.role != "admin" and len(body.new) < int(cfg.get(db, "password_min_length")):
         raise HTTPException(status_code=422, detail=f"Password must be at least {cfg.get(db, 'password_min_length')} characters")
     if body.new == body.current:
         raise HTTPException(status_code=422, detail="The new password must be different")

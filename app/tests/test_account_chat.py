@@ -36,11 +36,23 @@ def test_change_password_keeps_this_device_and_logs_out_the_others(tmp_path):
     app, client, h = admin_client(tmp_path)
     other = auth_headers(client, "admin", ADMIN_PW)
     assert client.post("/api/auth/password", json={"current": "wrong", "new": "x" * 14}, headers=h).status_code == 401
-    assert client.post("/api/auth/password", json={"current": ADMIN_PW, "new": "short"}, headers=h).status_code == 422
     assert client.post("/api/auth/password", json={"current": ADMIN_PW, "new": "a-brand-new-password"}, headers=h).status_code == 200
     assert client.get("/api/auth/me", headers=h).status_code == 200
     assert client.get("/api/auth/me", headers=other).status_code == 401
     assert login(client, "admin", "a-brand-new-password").status_code == 200
+    client.__exit__(None, None, None)
+
+
+def test_admins_may_bypass_the_password_policy_users_may_not(tmp_path):
+    app, client, h = admin_client(tmp_path)
+    uid = client.post("/api/admin/users", json={"username": "frank", "password": USER_PW}, headers=h).json()["id"]
+    frank = auth_headers(client, "frank", USER_PW)
+    assert client.post("/api/auth/password", json={"current": USER_PW, "new": "short"}, headers=frank).status_code == 422
+    assert client.patch(f"/api/admin/users/{uid}", json={"password": "Short-1!"}, headers=h).status_code == 200
+    assert login(client, "frank", "Short-1!").status_code == 200
+    assert client.post("/api/admin/users", json={"username": "gina", "password": "abc"}, headers=h).status_code == 201
+    assert client.post("/api/auth/password", json={"current": ADMIN_PW, "new": "Short-1!"}, headers=h).status_code == 200
+    assert login(client, "admin", "Short-1!").status_code == 200
     client.__exit__(None, None, None)
 
 
