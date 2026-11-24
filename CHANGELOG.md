@@ -2,6 +2,10 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.3.1 – 2026-11-24
+
+- **The character of a chat is fixed.** The character switcher in the chat header is gone, and the server refuses a change. For another character, start a new chat. Chats imported from older versions keep showing who wrote each reply.
+
 ## 1.3.0 – 2026-11-24
 
 - **Search over all chats:** the search above the chat list also looks inside every message of all your chats (*In messages*, newest first). A click opens the chat at that message.

@@ -1,8 +1,8 @@
 """Chats and messages. Replies stream as Server-Sent Events.
 
 Rules (concept.md):
-- A chat belongs to one user. Its character can be switched while the story runs; every reply
-  remembers which character wrote it.
+- A chat belongs to one user and has one character, fixed when the chat starts. Another character
+  means another chat. (Replies still store their author, for chats imported from older versions.)
 - Up to 10 important messages per chat, always included in the model context.
 - Replies can be stopped (the part written so far is kept), regenerated (all versions are kept and
   can be flipped through), continued, and every message can be edited or deleted.
@@ -54,7 +54,7 @@ class ChatPatch(BaseModel):
     title: str | None = Field(default=None, max_length=256)
     pinned: bool | None = None
     model: str | None = None
-    character_id: int | None = None  # switch the character in the running chat
+    character_id: int | None = None  # only accepted when unchanged: the character of a chat is fixed
 
 
 class MessagePatch(BaseModel):
@@ -589,15 +589,8 @@ async def update_chat(chat_id: int, body: ChatPatch, request: Request, user: Use
     if changes.get("model") is not None:
         check_model_kind(changes["model"])
     if changes.get("character_id") is not None and changes["character_id"] != c.character_id:
-        new = _usable_character(db, user, changes["character_id"])
-        # Earlier replies keep their author when the character changes.
-        for m in c.messages:
-            if m.role == "assistant" and m.character_id is None:
-                m.character_id = c.character_id
-        c.character_id = new.id
-        changes.pop("character_id")
-    else:
-        changes.pop("character_id", None)
+        raise HTTPException(status_code=422, detail="The character of a chat is fixed. Start a new chat for another character.")
+    changes.pop("character_id", None)
     for key, value in changes.items():
         if value is not None:
             setattr(c, key, value)

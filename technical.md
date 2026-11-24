@@ -168,7 +168,7 @@ Decision: **Gemma 4 26B-A4B uncensored is the default self-hosted model** (`--pr
 ## Decisions log
 
 - Project folder created at `/opt/docker/Compain`.
-- Owner requirements recorded: Docker, login, no GPU, uncensored roleplay, German and English, adjustable reply and context length, character switching mid-chat, story memory, multi-user, live sync, PostgreSQL, nightly backups, HTTPS.
+- Owner requirements recorded: Docker, login, no GPU, uncensored roleplay, German and English, adjustable reply and context length, one fixed character per chat (switching mid-chat was removed in 1.3.1), story memory, multi-user, live sync, PostgreSQL, nightly backups, HTTPS.
 - First model test set: Mistral Small 3.2 abliteration, Gemma 4 26B-A4B uncensored.
 - Design approved: `design/mockup.html` is the reference for all screens (version 6 of the mockup).
 - Backend v0 built and tested: API, Docker Compose with PostgreSQL, 14 tests passing.

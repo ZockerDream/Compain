@@ -510,7 +510,6 @@
   }
 
   /* ---------- conversation ---------- */
-  var characterChoices = null; // own + community characters for the switcher, loaded once per visit
 
   async function renderConversation(pane, chatId, chats, drawList) {
     var chat = await api("/api/chats/" + chatId);
@@ -523,30 +522,6 @@
       try {
         await api("/api/chats/" + chatId, { method: "PATCH", body: { model: modelSel.value } });
         toast("Model for this chat: " + modelSel.options[modelSel.selectedIndex].text);
-      } catch (e) { toast(e.message); }
-    });
-
-    // Switch the character while the story runs.
-    var charSel = el("select", { class: "model-select", id: "chat-character", "aria-label": "Character in this chat" });
-    charSel.appendChild(el("option", { value: String(chat.character_id), selected: true, text: chat.character_name }));
-    charSel.addEventListener("focus", loadChoices, { once: true });
-    charSel.addEventListener("pointerdown", loadChoices, { once: true });
-    async function loadChoices() {
-      if (!characterChoices) {
-        var lists = await Promise.all([api("/api/characters"), api("/api/community")]);
-        var seen = {};
-        characterChoices = lists[0].concat(lists[1]).filter(function (c) { if (seen[c.id]) return false; seen[c.id] = 1; return true; });
-      }
-      charSel.textContent = "";
-      characterChoices.forEach(function (c) {
-        charSel.appendChild(el("option", { value: String(c.id), selected: c.id === chat.character_id, text: c.name + (c.mine ? "" : " (Community)") }));
-      });
-    }
-    charSel.addEventListener("change", async function () {
-      try {
-        await api("/api/chats/" + chatId, { method: "PATCH", body: { character_id: Number(charSel.value) } });
-        toast(charSel.options[charSel.selectedIndex].text + " takes over the scene");
-        renderChats();
       } catch (e) { toast(e.message); }
     });
 
@@ -640,7 +615,6 @@
       el("span", { class: "pill", text: chat.messages.length + " messages" }),
       el("span", { class: "pill" }, icon("i-star", "sm"), " " + important + " of 10 important"),
       el("span", { class: "pill", text: chat.summary ? "Story summary saved" : "No story summary yet" }),
-      el("span", { class: "pill", text: "Character:" }), charSel,
       el("span", { class: "pill", text: "Model:" }), modelSel,
       el("span", { class: "pill model-state hidden", id: "model-state" })));
     pane.appendChild(summaryBox);

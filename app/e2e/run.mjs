@@ -249,14 +249,16 @@ await page.waitForTimeout(1500);
 const modelStatus = await page.evaluate(async () => (await fetch("/api/chats/model-status", { credentials: "same-origin" })).json());
 check("model status and queue are reported", modelStatus.state === "ok" && modelStatus.running === 0 && modelStatus.waiting === 0, JSON.stringify(modelStatus));
 
-// Switch the character in the running chat
+// The character of a chat is fixed: no switcher, and the API refuses a change
 await page.evaluate(() => fetch("/api/characters", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ name: "Iris Kade", tagline: "Airship captain" }) }));
-await page.focus("#chat-character");
-await page.waitForTimeout(800);
-await page.selectOption("#chat-character", { label: "Iris Kade" });
-await page.waitForFunction(() => (document.querySelector("#conv .conv-head .name") || {}).textContent === "Iris Kade", null, { timeout: 10000 }).catch(() => {});
-check("character can be switched in the running chat", (await page.textContent("#conv .conv-head .name")) === "Iris Kade");
+const fixedChatId = Number((await page.getAttribute("#conv a[download]", "href")).match(/chat\/(\d+)/)[1]);
+const switchStatus = await page.evaluate(async (id) => {
+  const other = (await (await fetch("/api/characters", { credentials: "same-origin" })).json()).find((c) => c.name === "Iris Kade");
+  return (await fetch("/api/chats/" + id, { method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ character_id: other.id }) })).status;
+}, fixedChatId);
+check("character of a chat is fixed", (await page.locator("#chat-character").count()) === 0 && switchStatus === 422, String(switchStatus));
 await page.screenshot({ path: SHOTS + "12-chat-tools.png" });
 
 // Settings: theme and appearance

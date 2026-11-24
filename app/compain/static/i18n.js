@@ -133,7 +133,7 @@
       "Die Datenschutzerklärung ist noch nicht eingerichtet. Der Betreiber legt die Datei .datenschutz an (Vorlage: .datenschutz-example).",
     // chat tools
     "Search in this chat": "In diesem Chat suchen", "Earlier match": "Früherer Treffer", "Later match": "Späterer Treffer",
-    "Character:": "Charakter:", "Character in this chat": "Charakter in diesem Chat", "Regenerate": "Neu schreiben",
+    "Regenerate": "Neu schreiben",
     "↻ Regenerate": "↻ Neu schreiben", "Write a new version of this reply": "Eine neue Version dieser Antwort schreiben",
     "Previous version": "Vorherige Version", "Next version": "Nächste Version", "Edit": "Bearbeiten", "Delete": "Löschen",
     "Delete?": "Löschen?", "Save": "Speichern", "Save and resend": "Speichern und neu senden", "Edit message": "Nachricht bearbeiten",

@@ -47,7 +47,7 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 
 1. **Streaming replies:** a typing indicator appears, then text shows word by word.
 2. **Chat list:** search, filters, pinned chats, unread counts, and grouping.
-3. **Switch character:** start a chat with any of the user's characters or a character added from Community. Each character has its own chat history.
+3. **Switch character:** start a chat with any of the user's characters or a character added from Community. Each character has its own chat history. The character of a chat is fixed; another character means a new chat.
 4. **Important messages:** the user can mark up to 10 messages per chat, their own lines (important context) and the character's replies. They are always kept in the context, each with its speaker.
 5. **Story memory:** long chats (about 500 messages) keep a running summary and key facts so the story stays consistent. The chat header shows when the summary was last updated.
 6. **Quick replies:** one-tap prompts above the input (Continue, Describe the scene, Shorter, Longer, Narrate the weather).
@@ -118,7 +118,7 @@ Ten sections, as in the mockup:
 
 ## Non-goals
 
-- No group chats with several characters at once (the owner said no). Switching the character in a running chat is fine.
+- No group chats with several characters at once (the owner said no). The character of a running chat cannot be switched either (owner decision, 1.3.1).
 
 - No public marketplace, feeds, or social features beyond sharing characters in Community.
 - No payments or subscriptions inside the app.

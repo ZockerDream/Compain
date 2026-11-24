@@ -1,9 +1,8 @@
 """Tests for 0.4.0: account security (password, deletion, login guard, 2FA, devices), persona and pictures,
-chat tools (stop, regenerate, versions, continue, edit, delete, rewind, switch character), likes,
+chat tools (stop, regenerate, versions, continue, edit, delete, rewind, the character of a chat is fixed), likes,
 privacy policy and offsite backups."""
 
 import asyncio
-import json
 
 from compain import totp
 from compain.models import Chat, Message
@@ -211,25 +210,18 @@ def test_stop_keeps_the_part_already_written(tmp_path):
     client.__exit__(None, None, None)
 
 
-def test_switch_character_in_a_running_chat(tmp_path):
+def test_character_of_a_chat_is_fixed(tmp_path):
     app, client, h = admin_client(tmp_path)
     mara, chat = _chat(client, h, "Mara", greeting="*Rain.* You are late.")
     iris = client.post("/api/characters", json={"name": "Iris"}, headers=h).json()["id"]
     r = client.patch(f"/api/chats/{chat['id']}", json={"character_id": iris}, headers=h)
-    assert r.status_code == 200 and r.json()["character_name"] == "Iris"
+    assert r.status_code == 422 and "fixed" in r.json()["detail"]
+    # The same character (no change) and other fields still work.
+    r = client.patch(f"/api/chats/{chat['id']}", json={"character_id": chat["character_id"], "title": "Harbour"}, headers=h)
+    assert r.status_code == 200 and r.json()["character_name"] == "Mara" and r.json()["title"] == "Harbour"
     _stream(client, f"/api/chats/{chat['id']}/messages", h, {"content": "Captain?"})
     msgs = client.get(f"/api/chats/{chat['id']}", headers=h).json()["messages"]
-    assert msgs[0]["character_name"] == "Mara" and msgs[-1]["character_name"] == "Iris"
-    with app.state.session_factory() as db:
-        c = db.get(Chat, chat["id"])
-        context = build_context(db, c, c.character, 60)
-    assert "[Mara]: *Rain.* You are late." in json.dumps(context)
-    assert "other characters spoke: Mara" in context[0]["content"]
-    # Characters of other users that are not public cannot be switched to
-    create_user(client, h, "gina")
-    gina = auth_headers(client, "gina", USER_PW)
-    hidden = client.post("/api/characters", json={"name": "Hidden"}, headers=gina).json()["id"]
-    assert client.patch(f"/api/chats/{chat['id']}", json={"character_id": hidden}, headers=h).status_code == 404
+    assert {m["character_name"] for m in msgs if m["role"] == "assistant"} == {"Mara"}
     client.__exit__(None, None, None)
 
 
