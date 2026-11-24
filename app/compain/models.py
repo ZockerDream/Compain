@@ -23,6 +23,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(256))
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     preferences: Mapped[str] = mapped_column(Text, default="{}")  # JSON: theme, reply length, context
+    # When the user confirmed being 18 or older (asked once, at the first login). None = not yet.
+    age_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

@@ -26,6 +26,7 @@ ADDED_COLUMNS = [
     ("chats", "summary_upto", "INTEGER NOT NULL DEFAULT 0"),
     ("chats", "read_upto", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "preferences", "TEXT NOT NULL DEFAULT '{}'"),
+    ("users", "age_confirmed_at", "TIMESTAMP WITH TIME ZONE NULL"),
 ]
 
 

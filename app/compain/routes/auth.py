@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session as DbSession
 from .. import settings as cfg
 from ..config import Settings
 from ..deps import SESSION_COOKIE, as_utc, current_session, current_user, get_db, get_settings
+from ..models import AuditLog
 from ..models import Session as UserSession
 from ..models import User
 from ..security import hash_password, hash_token, new_token, verify_password
@@ -132,7 +133,29 @@ def me(user: User = Depends(current_user), db: DbSession = Depends(get_db), sett
         "hosted_used_today": usage_today(db, user),
         "hosted_limit": per_user,
         "notice": cfg.get(db, "notice"),
+        "age_confirmed": user.age_confirmed_at is not None,
     }
+
+
+class AgeIn(BaseModel):
+    adult: bool
+
+
+@router.post("/confirm-age")
+def confirm_age(body: AgeIn, response: Response, session: UserSession = Depends(current_session),
+                user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Asked once at the first login. 'No' logs the user out and the app stays closed for them."""
+    if not body.adult:
+        db.add(AuditLog(user_id=user.id, action="age.denied", detail=user.username))
+        db.delete(session)
+        db.commit()
+        response.delete_cookie(SESSION_COOKIE)
+        raise HTTPException(status_code=403, detail="Compain is for adults only (18+).")
+    if user.age_confirmed_at is None:
+        user.age_confirmed_at = datetime.now(timezone.utc)
+        db.add(AuditLog(user_id=user.id, action="age.confirmed", detail=user.username))
+        db.commit()
+    return {"age_confirmed": True}
 
 
 PREF_KEYS = {

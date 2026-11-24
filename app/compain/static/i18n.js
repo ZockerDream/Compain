@@ -108,7 +108,11 @@
     "The key is stored encrypted and never shown again. It is also inside backups (encrypted), so keep COMPAIN_SECRET_KEY safe.":
       "Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt. Er ist auch (verschlüsselt) in Backups enthalten, also COMPAIN_SECRET_KEY sicher aufbewahren.",
     "Self-hosted models are unlimited.": "Eigene Modelle sind unbegrenzt.",
-    "Context window per request (tokens)": "Kontextfenster pro Anfrage (Tokens)", "From .env (default)": "Aus .env (Standard)"
+    "Context window per request (tokens)": "Kontextfenster pro Anfrage (Tokens)",
+    "Are you 18 or older?": "Bist du 18 Jahre oder älter?",
+    "Compain is for adults only. You answer this once for your account.": "Compain ist nur für Erwachsene. Du beantwortest das einmal für dein Konto.",
+    "Yes, I am 18 or older": "Ja, ich bin 18 oder älter", "No": "Nein",
+    "Compain is for adults only (18+).": "Compain ist nur für Erwachsene (18+).", "From .env (default)": "Aus .env (Standard)"
   };
 
   var lang = "en";

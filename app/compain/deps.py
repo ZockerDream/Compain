@@ -50,12 +50,22 @@ def current_session(request: Request, db: Session = Depends(get_db)) -> UserSess
     return session
 
 
-def current_user(session: UserSession = Depends(current_session), db: Session = Depends(get_db)) -> User:
+# Paths a logged-in user may use before confirming the age (needed to show and answer the question).
+AGE_FREE_PATHS = {
+    "/api/auth/me", "/api/auth/confirm-age", "/api/auth/logout", "/api/auth/logout-all", "/api/auth/preferences",
+}
+AGE_REQUIRED = "age_confirmation_required"
+
+
+def current_user(request: Request, session: UserSession = Depends(current_session), db: Session = Depends(get_db)) -> User:
     user = session.user
     if not user.active:
         raise HTTPException(status_code=403, detail="Account is disabled")
     if user.role != "admin" and cfg.get(db, "maintenance_mode"):
         raise HTTPException(status_code=503, detail="The server is in maintenance. Try again later.")
+    if user.age_confirmed_at is None and request.url.path not in AGE_FREE_PATHS:
+        # Adults only: every account confirms once that it is 18 or older before using the app.
+        raise HTTPException(status_code=403, detail=AGE_REQUIRED)
     return user
 
 

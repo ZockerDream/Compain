@@ -116,6 +116,7 @@ Ten sections, as in the mockup:
 
 ## Content rules
 
+- **Age check.** At the first login every account answers once: "Are you 18 or older?". "No" logs out and the app stays closed for that account. The answer and its time are stored.
 - **Adults only.** Characters must be adults in every roleplay. Any character described as a minor, or described in a way that suggests one, is not allowed, whatever the setting. The check is always on in Server Management.
 - **No real people.** Sexual or degrading content about identifiable real people is not allowed. The real-person check flags it.
 - Within these rules, the app adds no content restrictions of its own. The model's own rules still apply, so the model choice matters (see [technical.md](technical.md)).

@@ -47,9 +47,12 @@ def login(client, username, password, remember=False):
     return r
 
 
-def auth_headers(client, username, password):
+def auth_headers(client, username, password, confirm_age=True):
     token = login(client, username, password).json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    if confirm_age:
+        client.post("/api/auth/confirm-age", json={"adult": True}, headers=headers)
+    return headers
 
 
 def create_user(client, admin_headers, username, password=USER_PW):
@@ -220,3 +223,28 @@ def test_remember_me_gives_a_long_session(client):
     r = login(client, "admin", ADMIN_PW, remember=True)
     assert r.json()["remember"] is True
     assert "expires_at" in r.json()
+
+
+def test_age_is_asked_once_and_blocks_until_confirmed(client):
+    admin = auth_headers(client, "admin", ADMIN_PW)
+    create_user(client, admin, "carol")
+    carol = auth_headers(client, "carol", USER_PW, confirm_age=False)
+    assert client.get("/api/auth/me", headers=carol).json()["age_confirmed"] is False
+    r = client.get("/api/characters", headers=carol)
+    assert r.status_code == 403 and r.json()["detail"] == "age_confirmation_required"
+    assert client.post("/api/auth/confirm-age", json={"adult": True}, headers=carol).status_code == 200
+    assert client.get("/api/characters", headers=carol).status_code == 200
+    # Asked only once: a new login is already confirmed
+    again = auth_headers(client, "carol", USER_PW, confirm_age=False)
+    assert client.get("/api/auth/me", headers=again).json()["age_confirmed"] is True
+
+
+def test_saying_no_logs_out_and_keeps_the_app_closed(client):
+    admin = auth_headers(client, "admin", ADMIN_PW)
+    create_user(client, admin, "dave")
+    dave = auth_headers(client, "dave", USER_PW, confirm_age=False)
+    r = client.post("/api/auth/confirm-age", json={"adult": False}, headers=dave)
+    assert r.status_code == 403
+    assert client.get("/api/auth/me", headers=dave).status_code == 401  # session ended
+    dave2 = auth_headers(client, "dave", USER_PW, confirm_age=False)
+    assert client.get("/api/chats", headers=dave2).status_code == 403  # still not confirmed

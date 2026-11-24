@@ -1132,7 +1132,31 @@
     $("view-login").classList.remove("hidden");
   }
 
+  function showAgeGate() {
+    ["boot", "view-login", "app", "bottombar"].forEach(function (id) { $(id).classList.add("hidden"); });
+    $("age-gate").classList.remove("hidden");
+  }
+
+  $("age-yes").addEventListener("click", async function () {
+    try {
+      await api("/api/auth/confirm-age", { method: "POST", body: { adult: true } });
+      me.age_confirmed = true;
+      $("age-gate").classList.add("hidden");
+      showApp();
+    } catch (e) { toast(e.message); }
+  });
+
+  $("age-no").addEventListener("click", async function () {
+    try { await api("/api/auth/confirm-age", { method: "POST", body: { adult: false } }); } catch (e) { /* expected: logged out */ }
+    me = null;
+    $("age-gate").classList.add("hidden");
+    showLogin();
+    $("login-error").textContent = "Compain is for adults only (18+).";
+  });
+
   function showApp() {
+    if (!me.age_confirmed) { showAgeGate(); return; }
+    $("age-gate").classList.add("hidden");
     $("boot").classList.add("hidden");
     $("view-login").classList.add("hidden");
     $("app").classList.remove("hidden");

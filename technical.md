@@ -123,6 +123,7 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 
 ## Built (version 1)
 
+- **Age check:** `users.age_confirmed_at`. Until it is set, every API call except `/api/auth/me`, `/confirm-age`, `/logout`, `/logout-all` and `/preferences` returns 403 `age_confirmation_required`. The web app shows the question once; "No" ends the session. Both answers go into the audit log.
 - **Auth:** session cookie (`compain_session`, HTTP-only, `Secure` behind HTTPS) or Bearer token (for the Android app later). Session lengths, lockout and password length come from Server Management. Sign-up only with an invite code when the admin allows it.
 - **Characters:** owner-only edit and delete, admins all. Adults-only check on save and import. Pictures checked by file content. Card import: SillyTavern JSON V1/V2, PNG with an embedded card (the PNG becomes the picture), plain text.
 - **Chats:** streaming over Server-Sent Events. Context = system prompt (character, roleplay rules, reply length, reply language) + story summary + important messages + the last N messages. Turns are merged and start with a user turn, because Mistral and Gemma chat templates need alternating roles. The greeting is the first message.
@@ -132,7 +133,7 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - **Backups:** `pg_dump --clean` plus pictures in one `.tar.gz` under the data volume. Nightly at the configured time, retention in days, restore in one transaction with a 30-second lock timeout.
 - **Maintenance mode:** blocks everyone except admins with HTTP 503 and shows the notice.
 - **Web UI:** plain JavaScript served by the API from `compain/static/`, built on the mockup's CSS. German via `i18n.js` (translates interface strings only, never user text).
-- **Tests:** 30 API tests and 31 browser checks (desktop and phone, German interface) pass against the Docker build.
+- **Tests:** 33 API tests and 34 browser checks (desktop and phone, German interface) pass against the Docker build.
 
 ## Model test results
 

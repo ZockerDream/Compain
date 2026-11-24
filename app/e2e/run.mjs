@@ -23,6 +23,17 @@ async function waitForReply(p) {
   }, null, { timeout: REPLY_TIMEOUT });
 }
 
+// After logging in: answer the one-time age question if it appears. Returns true if it was shown.
+async function passAgeGate(p) {
+  await p.waitForSelector("#app:not(.hidden), #age-gate:not(.hidden)", { timeout: 15000 });
+  if (await p.isVisible("#age-gate")) {
+    await p.click("#age-yes");
+    await p.waitForSelector("#app:not(.hidden)", { timeout: 15000 });
+    return true;
+  }
+  return false;
+}
+
 const results = [];
 function check(name, ok, info = "") {
   results.push({ name, ok, info });
@@ -69,7 +80,8 @@ check("wrong password shows an error", (await page.textContent("#login-error")).
 
 await page.fill("#pw", ADMIN_PW);
 await page.click("#login-form button[type=submit]");
-await page.waitForSelector("#app:not(.hidden)", { timeout: 10000 });
+const gateShown = await passAgeGate(page);
+check("age question is shown at the first login, or was answered before", true, gateShown ? "shown and answered" : "answered earlier");
 check("login with the right password opens the app", true);
 await page.screenshot({ path: SHOTS + "01-home-desktop.png" });
 check("home shows the hosted quota", (await page.textContent("#view-home")).includes("Hosted API today"));
@@ -194,7 +206,7 @@ await second.waitForSelector("#login-form", { state: "visible" });
 await second.fill("#user", ADMIN_USER);
 await second.fill("#pw", ADMIN_PW);
 await second.click("#login-form button[type=submit]");
-await second.waitForSelector("#app:not(.hidden)");
+check("age question is not asked again", !(await passAgeGate(second)));
 await second.click("#nav-desktop button[data-go=chats]");
 await second.waitForSelector("#view-chats:not(.hidden)");
 await page.click("#nav-desktop button[data-go=chats]");
@@ -244,7 +256,7 @@ await phone.waitForSelector("#login-form", { state: "visible" });
 await phone.fill("#user", ADMIN_USER);
 await phone.fill("#pw", ADMIN_PW);
 await phone.click("#login-form button[type=submit]");
-await phone.waitForSelector("#app:not(.hidden)");
+await passAgeGate(phone);
 await phone.click("#bottombar button[data-go=chats]");
 await phone.waitForSelector("#view-chats:not(.hidden)");
 await phone.waitForSelector("#chat-list .c-row", { timeout: 10000 });
