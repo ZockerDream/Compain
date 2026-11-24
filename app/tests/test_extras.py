@@ -224,3 +224,76 @@ def test_publish_goes_to_community_and_the_picture_comes_along(tmp_path):
     assert copy["has_picture"]
     assert client.get(f"/api/characters/{copy['id']}/picture", headers=rita).content == png
     client.__exit__(None, None, None)
+
+
+# ---------- replies run on without the browser (1.3.4) ----------
+
+def test_reply_finishes_after_leaving_the_chat_and_stop_still_works(tmp_path, monkeypatch):
+    from compain.models import Message
+    from compain.routes import chats as cm
+
+    gate = {"open": False}
+
+    async def slow_model(*args, **kwargs):
+        yield "First part. "
+        while not gate["open"]:
+            await asyncio.sleep(0.02)
+        yield "Second part."
+
+    monkeypatch.setattr(cm, "stream_chat", slow_model)
+    app, client, h = admin_client(tmp_path)
+    _, chat = _chat(client, h, "Mara")
+    cid = chat["id"]
+    sf, settings = app.state.session_factory, app.state.settings
+
+    def start(mode, text=None):
+        run = cm.Run(cid, 1)
+        cm.RUNS[cid] = run
+        run.task = asyncio.create_task(cm._drive(run, settings, cm.Job(cid, 1, "self", mode, cm.ReplyOptions(), user_text=text), sf, None))
+        return run
+
+    async def read_first_words(run):
+        gen = cm.follow(run)
+        async for ev in gen:
+            if b"delta" in ev:
+                break
+        await gen.aclose()  # the browser leaves the chat
+
+    async def scenario():
+        # Leaving the chat does not stop the reply: it is finished and saved.
+        run = start("send", "Hello")
+        await read_first_words(run)
+        assert cm.replying(cid)
+        gate["open"] = True
+        await run.task
+        assert not cm.replying(cid) and cid not in cm.RUNS
+        # Coming back while it writes: the stream repeats what was written so far. Stop keeps that part.
+        gate["open"] = False
+        run = start("next")
+        await read_first_words(run)
+        events = list(run.events)
+        assert any(b"First part." in e for e in events)
+        run.task.cancel()
+        try:
+            await run.task
+        except asyncio.CancelledError:
+            pass
+        assert run.done and b"stopped" in run.events[-1]
+
+    asyncio.run(scenario())
+    with sf() as db:
+        texts = [m.content for m in db.query(Message).filter(Message.chat_id == cid).order_by(Message.id)]
+    assert texts[-3:] == ["Hello", "First part. Second part.", "First part."]
+
+    # Over HTTP: the chat says whether a reply is running; a second one waits; nothing to stop or follow.
+    url = f"/api/chats/{cid}"
+    busy = cm.Run(cid, 1)
+    cm.RUNS[cid] = busy
+    assert client.get(url, headers=h).json()["replying"] is True
+    assert client.post(url + "/messages", json={"content": "Again"}, headers=h).status_code == 409
+    assert client.post(url + "/reply", json={"mode": "next"}, headers=h).status_code == 409
+    del cm.RUNS[cid]
+    assert client.get(url, headers=h).json()["replying"] is False
+    assert client.get(url + "/stream", headers=h).status_code == 204
+    assert client.post(url + "/stop", headers=h).json() == {"stopped": False}
+    client.__exit__(None, None, None)

@@ -195,6 +195,9 @@
     "Send and close": "Senden und schließen", "Internal note (only admins see it)": "Interne Notiz (nur Admins sehen sie)",
     "Ctrl+Enter sends": "Strg+Enter sendet", "Tickets": "Tickets", "waiting for an answer": "warten auf eine Antwort",
     "Set password": "Passwort setzen", "Password set": "Passwort gesetzt",
+    // 1.3.4: replies go on without the browser
+    "Connection lost. The reply is still being written and shows up when it is done.": "Verbindung verloren. Die Antwort wird weiter geschrieben und erscheint, sobald sie fertig ist.",
+    "The character is still writing. Wait for the reply or press Stop.": "Der Charakter schreibt noch. Warte auf die Antwort oder drücke Stopp.",
     // 1.3.3: Community and pictures
     "Published in the Community": "In der Community veröffentlicht", "Waiting for review": "Wartet auf Prüfung",
     "Only you see it here until an admin approves it.": "Nur du siehst ihn hier, bis ein Admin ihn freigibt.",

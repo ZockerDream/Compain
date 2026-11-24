@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.3.4 – 2026-11-24
+
+- **Replies go on without you.** A reply is now written on the server on its own. Leaving the chat, switching to another tab or app, or losing the connection no longer stops it: the reply is finished and saved, and the chat list shows it as unread. Coming back while it is still being written shows the text so far and follows it.
+- Only **Stop** ends a reply early; the part written so far is kept, as before.
+- While a reply is being written, a second message in the same chat waits: *The character is still writing*.
+
 ## 1.3.3 – 2026-11-24
 
 - **Publishing:** characters an admin publishes go straight into the Community. Characters of other users still wait for an admin's review; meanwhile their owner sees them in the Community marked *Waiting for review*.

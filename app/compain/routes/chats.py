@@ -4,8 +4,10 @@ Rules (concept.md):
 - A chat belongs to one user and has one character, fixed when the chat starts. Another character
   means another chat. (Replies still store their author, for chats imported from older versions.)
 - Up to 10 important messages per chat, always included in the model context.
-- Replies can be stopped (the part written so far is kept), regenerated (all versions are kept and
-  can be flipped through), continued, and every message can be edited or deleted.
+- Replies are written on the server on their own (class Run): leaving the chat or losing the connection
+  does not stop them. Only Stop does; the part written so far is kept.
+- Replies can be regenerated (all versions are kept and can be flipped through) and continued, and
+  every message can be edited or deleted.
 - Hosted model: a per-user daily message limit (and a total daily cap). Self-hosted: unlimited.
 """
 
@@ -96,6 +98,7 @@ def chat_out(c: Chat) -> dict:
         "important_count": sum(1 for m in c.messages if m.important),
         "bookmark_count": sum(1 for m in c.messages if m.bookmarked),
         "unread": sum(1 for m in c.messages if m.role == "assistant" and m.id > c.read_upto),
+        "replying": replying(c.id),
         "last_message": last.content[:160] if last else "",
         "updated_at": c.updated_at.isoformat(),
     }
@@ -456,12 +459,69 @@ async def stream_reply(settings: Settings, job: Job, session_factory, hub=None) 
     yield _event({"done": True, "message_id": msg_id})
 
 
+class Run:
+    """A reply that is being written. It runs on the server on its own, so it is finished and saved even
+    when the browser leaves the chat, switches tabs or loses the connection. Browsers only follow it;
+    only Stop (POST /stop) ends it early."""
+
+    def __init__(self, chat_id: int, user_id: int):
+        self.chat_id, self.user_id = chat_id, user_id
+        self.events: list[bytes] = []
+        self.done = False
+        self.task: asyncio.Task | None = None
+
+
+RUNS: dict[int, Run] = {}  # chat id -> the reply being written (one process, see modelqueue.py)
+
+
+def replying(chat_id: int) -> bool:
+    run = RUNS.get(chat_id)
+    return run is not None and not run.done
+
+
+async def _drive(run: Run, settings: Settings, job: Job, session_factory, hub) -> None:
+    gen = stream_reply(settings, job, session_factory, hub)
+    try:
+        async for ev in gen:
+            run.events.append(ev)
+    except asyncio.CancelledError:
+        # Stop: stream_reply has saved the part written so far.
+        run.events.append(_event({"done": True, "stopped": True}))
+        await notify(hub, job.user_id)
+    except Exception as exc:  # pragma: no cover - stream_reply reports model errors itself
+        run.events.append(_event({"error": f"Reply failed: {type(exc).__name__}"}))
+    finally:
+        run.done = True
+        if RUNS.get(run.chat_id) is run:
+            del RUNS[run.chat_id]
+
+
+async def follow(run: Run) -> AsyncIterator[bytes]:
+    """Everything the reply has sent so far, then the rest as it comes. Leaving does not stop the reply."""
+    i = 0
+    while True:
+        while i < len(run.events):
+            yield run.events[i]
+            i += 1
+        if run.done:
+            return
+        await asyncio.sleep(0.05)
+
+
+def _sse(gen: AsyncIterator[bytes]) -> StreamingResponse:
+    return StreamingResponse(gen, media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 def _streaming(settings: Settings, job: Job, request: Request) -> StreamingResponse:
-    return StreamingResponse(
-        stream_reply(settings, job, request.app.state.session_factory, request.app.state.hub),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    run = Run(job.chat_id, job.user_id)
+    RUNS[job.chat_id] = run
+    run.task = asyncio.create_task(_drive(run, settings, job, request.app.state.session_factory, request.app.state.hub))
+    return _sse(follow(run))
+
+
+def _not_busy(chat_id: int) -> None:
+    if replying(chat_id):
+        raise HTTPException(status_code=409, detail="The character is still writing. Wait for the reply or press Stop.")
 
 
 def _usable_character(db: DbSession, user: User, character_id: int) -> Character:
@@ -685,6 +745,7 @@ async def choose_variant(chat_id: int, message_id: int, body: VariantIn, request
 async def send_message(chat_id: int, body: MessageIn, request: Request, user: User = Depends(current_user),
                        db: DbSession = Depends(get_db), settings: Settings = Depends(get_settings)):
     c = owned_chat(db, chat_id, user)
+    _not_busy(c.id)
     kind = c.model or "self"
     charge_hosted(db, user, settings, kind)
     job = Job(c.id, user.id, kind, "send", body, user.persona_name, user.persona_description, body.content)
@@ -701,7 +762,35 @@ async def reply(chat_id: int, body: ReplyIn, request: Request, user: User = Depe
         raise HTTPException(status_code=422, detail="Mode must be 'next' or 'regenerate'")
     if body.mode == "regenerate" and (not c.messages or c.messages[-1].role != "assistant"):
         raise HTTPException(status_code=409, detail="Only the last reply of the character can be regenerated")
+    _not_busy(c.id)
     kind = c.model or "self"
     charge_hosted(db, user, settings, kind)
     job = Job(c.id, user.id, kind, body.mode, body, user.persona_name, user.persona_description)
     return _streaming(settings, job, request)
+
+
+@router.get("/{chat_id}/stream")
+def follow_reply(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Follow the reply that is being written (after coming back to the chat). 204 = none is running."""
+    owned_chat(db, chat_id, user)
+    run = RUNS.get(chat_id)
+    if run is None or run.done:
+        from fastapi import Response
+
+        return Response(status_code=204)
+    return _sse(follow(run))
+
+
+@router.post("/{chat_id}/stop")
+async def stop_reply(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Stop the reply being written. The part written so far is kept."""
+    owned_chat(db, chat_id, user)
+    run = RUNS.get(chat_id)
+    if run is None or run.done or run.task is None:
+        return {"stopped": False}
+    run.task.cancel()
+    try:
+        await asyncio.wait_for(asyncio.shield(run.task), timeout=5)
+    except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+        pass
+    return {"stopped": True}

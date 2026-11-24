@@ -246,13 +246,40 @@ const firstEvent = await page.evaluate(async (id) => {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "next" }) });
   const reader = r.body.getReader();
   const chunk = await reader.read();
-  ctl.abort();
-  return new TextDecoder().decode(chunk.value);
+  ctl.abort();  // only stops watching: the reply goes on until Stop
+  const stop = await (await fetch("/api/chats/" + id + "/stop", { method: "POST", credentials: "same-origin" })).json();
+  return new TextDecoder().decode(chunk.value) + " stop=" + stop.stopped;
 }, Number((await page.getAttribute("#conv a[download]", "href")).match(/chat\/(\d+)/)[1]));
+check("Stop ends a reply that nobody watches any more", firstEvent.endsWith("stop=true"), firstEvent.slice(-20));
 check("reply stream starts with a status", firstEvent.includes('"status"'), firstEvent.slice(0, 60));
 await page.waitForTimeout(1500);
 const modelStatus = await page.evaluate(async () => (await fetch("/api/chats/model-status", { credentials: "same-origin" })).json());
 check("model status and queue are reported", modelStatus.state === "ok" && modelStatus.running === 0 && modelStatus.waiting === 0, JSON.stringify(modelStatus));
+
+// Leaving the chat while the character writes does not stop the reply; coming back shows it.
+{
+  const awayChat = Number((await page.getAttribute("#conv a[download]", "href")).match(/chat\/(\d+)/)[1]);
+  const before = (await page.evaluate(async (id) => (await (await fetch("/api/chats/" + id, { credentials: "same-origin" })).json()).messages.length, awayChat));
+  await page.fill("#conv textarea", "Describe the harbour in two sentences.");
+  await page.press("#conv textarea", "Enter");
+  await page.waitForSelector("#conv .msg.typing, #conv .bubble.cursor", { timeout: 10000 }).catch(() => {});
+  await page.click("#nav-desktop button[data-go=home]");
+  await page.waitForTimeout(1500);
+  const runningAway = await page.evaluate(async (id) => (await (await fetch("/api/chats/" + id, { credentials: "same-origin" })).json()).replying, awayChat);
+  for (const end = Date.now() + REPLY_TIMEOUT; Date.now() < end;) {
+    const busy = await page.evaluate(async (id) => (await (await fetch("/api/chats/" + id, { credentials: "same-origin" })).json()).replying, awayChat);
+    if (!busy) break;
+    await page.waitForTimeout(2000);
+  }
+  const after = await page.evaluate(async (id) => (await (await fetch("/api/chats/" + id, { credentials: "same-origin" })).json()).messages, awayChat);
+  check("the reply is finished after leaving the chat", runningAway === true && after.length === before + 2 && after[after.length - 1].role === "assistant" && after[after.length - 1].content.length > 10,
+    `running=${runningAway} ${before}->${after.length}`);
+  await page.goto(BASE + "/#chat/" + awayChat);
+  await page.waitForSelector("#conv .msg.char", { timeout: 10000 });
+  const words = after[after.length - 1].content.replace(/[*_~`#>\[\]]/g, "").trim().split(/\s+/).slice(0, 3).join(" ");
+  await page.waitForFunction((w) => (document.querySelector("#conv") || {}).textContent.includes(w), words, { timeout: 10000 }).catch(() => {});
+  check("coming back shows the reply", (await page.textContent("#conv")).includes(words), words);
+}
 
 // The character of a chat is fixed: no switcher, and the API refuses a change
 await page.evaluate(() => fetch("/api/characters", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
@@ -398,8 +425,8 @@ await page.locator("#message-hits .hit-row").first().click();
 check("a search hit opens the chat at that message", await page.waitForSelector("#messages .msg.flash", { timeout: 10000 }).then(() => true, () => false));
 await page.fill("#chat-search", "");
 await page.click("#view-chats .chips button:has-text('Bookmarks')");
-await page.waitForSelector("#chat-list .hit-row", { timeout: 10000 }).catch(() => {});
-check("bookmarks filter lists all bookmarks", (await page.locator("#chat-list .hit-row").count()) === 1);
+await page.waitForSelector("#chat-list .group-label:has-text('Bookmarks') ~ .hit-row", { timeout: 10000 }).catch(() => {});
+check("bookmarks filter lists all bookmarks", (await page.locator("#chat-list .hit-row").count()) === 1, `rows=${await page.locator("#chat-list .hit-row").count()} marks=${JSON.stringify(await page.evaluate(async () => (await (await fetch("/api/chats/bookmarks", { credentials: "same-origin" })).json()).map((b) => b.snippet.slice(0, 30))))}`);
 await page.click("#view-chats .chips button:has-text('All')");
 
 // Import a chat from its JSON export

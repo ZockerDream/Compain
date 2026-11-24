@@ -324,7 +324,9 @@
     var search = el("input", { id: "chat-search", placeholder: "Search chats or characters", "aria-label": "Search chats", value: state.query });
     var searchTimer = null, searchSeq = 0;
     search.addEventListener("input", function () {
-      state.query = search.value; drawList();
+      state.query = search.value;
+      if (state.query.trim().length < 2) { searchSeq++; hitBox.textContent = ""; } // no stale hits while the box is emptied
+      drawList();
       clearTimeout(searchTimer);
       searchTimer = setTimeout(searchMessages, 250);
     });
@@ -704,7 +706,7 @@
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      if (busy) { if (controller) controller.abort(); return; } // the send button is the Stop button while writing
+      if (busy) { stopReply(); return; } // the send button is the Stop button while writing
       send();
     });
     input.addEventListener("keydown", function (e) {
@@ -713,7 +715,7 @@
 
     function setBusy(on) {
       busy = on;
-      state.sending = on;
+      state.sending = on ? pane : (state.sending === pane ? null : state.sending); // live updates wait while this chat is open and writing
       sendBtn.textContent = "";
       sendBtn.appendChild(on ? el("span", { class: "stop-square", "aria-hidden": "true" }) : icon("i-send"));
       sendBtn.setAttribute("aria-label", on ? "Stop" : "Send");
@@ -739,9 +741,26 @@
       await run("/api/chats/" + chatId + "/reply", { mode: mode }, replace);
     }
 
-    async function run(url, body, replaceNode) {
+    // Stop asks the server to end the reply (it keeps the part written so far); the stream then ends by itself.
+    var stopRequested = false;
+    async function stopReply() {
+      stopRequested = true;
+      try { await api("/api/chats/" + chatId + "/stop", { method: "POST" }); }
+      catch (e) { if (controller) controller.abort(); }
+    }
+
+    // The reply is written on the server. Leaving the chat only stops watching it; it is finished and saved anyway.
+    // attach = follow a reply that is already running (after coming back to the chat).
+    async function run(url, body, replaceNode, attach) {
       setBusy(true);
+      stopRequested = false;
       controller = new AbortController();
+      var detached = false;
+      function stillHere() {
+        if (pane.isConnected) return true;
+        if (!detached) { detached = true; if (controller) controller.abort(); }
+        return false;
+      }
       var statusLine = el("div", { class: "typing-status", id: "typing-status", "aria-live": "polite" });
       var typing = el("div", { class: "msg char typing" }, avatar(chat.character_name, chat.character_id, chat.character_has_picture, "xs"),
         el("div", null, el("div", { class: "bubble" }, el("span", { class: "dot" }), el("span", { class: "dot" }), el("span", { class: "dot" })), statusLine));
@@ -772,6 +791,7 @@
       var bubble = null, reply = "", stopped = false;
       try {
         await streamTo(url, body, controller.signal, function (delta) {
+          if (!stillHere()) return;
           if (!bubble) {
             if (ticker) { clearInterval(ticker); ticker = null; }
             var node = messageNode({ id: null, role: "assistant", content: "", important: false, character_name: chat.character_name }, chat, false, ctx);
@@ -782,10 +802,13 @@
           reply += delta;
           setBubble(bubble, reply);
           box.scrollTop = box.scrollHeight;
-        }, onStatus);
-        chime();
+        }, function (ev) { if (stillHere()) onStatus(ev); });
+        if (stopRequested) { stopped = true; toast("Stopped. The part written so far is kept."); }
+        else if (!attach || bubble) chime();
       } catch (e) {
+        if (detached) { if (ticker) clearInterval(ticker); controller = null; busy = false; if (state.sending === pane) state.sending = null; return; }
         if (e.name === "AbortError") { stopped = true; toast("Stopped. The part written so far is kept."); }
+        else if (e.name === "TypeError") toast("Connection lost. The reply is still being written and shows up when it is done.");
         else toast(e.message);
         if (!bubble) typing.remove();
       } finally {
@@ -794,6 +817,7 @@
         controller = null;
         setBusy(false);
       }
+      if (detached || !pane.isConnected) return; // the user went elsewhere; the reply was saved on the server
       // Reload so the new messages get their ids and actions. After Stop, give the server a moment to save.
       state.refocus = chatId;
       setTimeout(function () {
@@ -802,6 +826,8 @@
       }, stopped ? 600 : 0);
     }
     box.scrollTop = box.scrollHeight;
+    // A reply is still being written (sent before leaving the chat): show it and follow it.
+    if (chat.replying && !busy) run("/api/chats/" + chatId + "/stream", null, null, true);
 
     function jump(id, quiet) {
       var node = box.querySelector('.msg[data-id="' + id + '"]');
@@ -901,13 +927,16 @@
     ta.focus();
   }
 
-  // Stream a reply over Server-Sent Events. Aborting (Stop) closes the connection; the server keeps the part written so far.
+  // Stream a reply over Server-Sent Events. Closing the connection only stops watching; the server writes on.
   async function streamTo(url, body, signal, onDelta, onStatus) {
-    var r = await fetch(url, {
-      method: "POST", credentials: "same-origin", signal: signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(Object.assign({ reply_length: prefs.replyLength, context_messages: prefs.ctx, language: prefs.language }, body))
-    });
+    var r = body === null
+      ? await fetch(url, { credentials: "same-origin", signal: signal })  // follow a running reply
+      : await fetch(url, {
+          method: "POST", credentials: "same-origin", signal: signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ reply_length: prefs.replyLength, context_messages: prefs.ctx, language: prefs.language }, body))
+        });
+    if (r.status === 204) return; // nothing is being written any more
     if (!r.ok) {
       var data = null;
       try { data = await r.json(); } catch (e) { data = null; }
@@ -2246,7 +2275,7 @@
         if (state.route === "help" && state.helpTab === "support") renderHelp();
         return;
       }
-      if (msg.type !== "chats" || state.sending) return;
+      if (msg.type !== "chats" || (state.sending && state.sending.isConnected)) return;
       if (state.route === "chats") {
         // A live update must not move the reader: keep the scroll position, the open panels and the typed text.
         var mbox = $("messages");
