@@ -112,7 +112,7 @@
 /* ---------- Modern (modern and modern-glass): navigation on top ---------- */
 :root:is([data-design="modern"], [data-design="modern-glass"]) .app { grid-template-columns: minmax(0, 1fr); }
 :root:is([data-design="modern"], [data-design="modern-glass"]) .sidebar { display: none; }
-:root:is([data-design="modern"], [data-design="modern-glass"]) main.content { max-width: 1280px; margin: 0 auto; padding-top: 18px; }
+:root:is([data-design="modern"], [data-design="modern-glass"]) main.content { margin: 0 auto; padding-top: 18px; }
 :root:is([data-design="modern"], [data-design="modern-glass"]) .topbar { flex-wrap: wrap; margin-bottom: 22px; }
 :root:is([data-design="modern"], [data-design="modern-glass"]) .topbar .brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 19px; color: var(--fg); }
 :root:is([data-design="modern"], [data-design="modern-glass"]) .topbar .brand i { width: 30px; height: 30px; border-radius: 10px; background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #000)); display: inline-block; }

@@ -2,6 +2,10 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.3.2 – 2026-11-24
+
+- **The app uses the whole screen.** The page is no longer limited to 1200 pixels; on wide screens the chat, the chat list and the messages grow with the window. The chat panel ends above the bottom edge, so the input field is fully visible.
+
 ## 1.3.1 – 2026-11-24
 
 - **The character of a chat is fixed.** The character switcher in the chat header is gone, and the server refuses a change. For another character, start a new chat. Chats imported from older versions keep showing who wrote each reply.

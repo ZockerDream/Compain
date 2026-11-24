@@ -33,15 +33,16 @@ A private, self-hosted, multi-user AI roleplay chat app. It replaces a paid char
 
 ## Current status
 
-Last updated: 2026-11-24 (version 1.3.1).
+Last updated: 2026-11-24 (version 1.3.2).
 
-Done (release 1.3.1, verified with tests):
+Done (release 1.3.2, verified with tests):
 - Login with 48-hour and "stay logged in" sessions, two-factor login (TOTP, QR code, 8 recovery codes), login guard per address and account (`loginguard.py`, in memory) plus 30 tries per address in 10 minutes, invite-code sign-up, maintenance mode with notice, device list with "Log out", password change, deleting the own account with all data. One-time 18+ question.
 - Characters: owner rules, adults-only check, pictures, card import, publish with admin review, add from Community. Community likes and usage counts (`character_likes`), most liked first.
 - Chats: Markdown in messages (rendered with DOM nodes only), streaming, Stop (the written part is saved when the connection closes; llama.cpp cancels the task), Regenerate with versions (`messages.variants`, `variant_index`), Continue (`POST /api/chats/{id}/reply`), edit and delete messages, rewind (`DELETE .../messages/{id}/after`), search in a chat, the character of a chat is fixed (PATCH with another `character_id` gives 422; `messages.character_id` still names the author, and lines of other characters in chats from older versions are marked `[Name]:` in the prompt), persona (`users.persona_*`) in the system prompt, story summary, important messages (own lines and replies, each labelled with its speaker in the prompt), unread counts, export, sound when a reply is complete.
 - Help page: FAQ, guide, Markdown reference with live preview (`static/help.js`, English and German) and support tickets (`routes/help.py`, tables `tickets` and `ticket_messages`, migration 0003) with internal notes, status, priority, category, assignment, unread badge and live updates. Admins can set a user's password in Server Management → Users.
 - 1.3.0: search over all chats (`GET /api/chats/search`), bookmarks (`messages.bookmarked`, migration 0004, never in the prompt), chat export as Markdown and import of export files (`POST /api/export/import`), card V3, card lists and card export (`GET /api/characters/{id}/card`), model waiting line with status events (`modelqueue.py`, setting `model_slots`).
 - 1.3.1: the character of a chat is fixed (no switcher; the API refuses a change).
+- 1.3.2: full-width layout (no max-width on `main.content`; chat list `clamp(300px, 22vw, 420px)`, messages up to 980px).
 - Profile picture and own glass background picture per user (`data/avatars`, `data/backgrounds`).
 - Four designs, seven colour themes, per account and live on all devices; German and English interface.
 - Changelog, Impressum (`.impressum`) and Datenschutzerklärung (`.datenschutz`) as popovers and pages; Compose refuses to start without the two files.
