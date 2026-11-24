@@ -37,7 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         task.cancel()
 
-    app = FastAPI(title="Compain", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="Compain", version="0.4.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = make_engine(settings.database_url)
     app.state.session_factory = make_session_factory(app.state.engine)
@@ -59,7 +59,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def index():
-        return FileResponse(static_dir / "index.html", media_type="text/html")
+        return FileResponse(static_dir / "index.html", media_type="text/html", headers={"Cache-Control": "no-cache"})
+
+    # Installable web app (PWA): the manifest and the service worker must live at the root.
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    def manifest():
+        return FileResponse(static_dir / "manifest.webmanifest", media_type="application/manifest+json")
+
+    @app.get("/sw.js", include_in_schema=False)
+    def service_worker():
+        return FileResponse(static_dir / "sw.js", media_type="text/javascript",
+                            headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
 
     @app.get("/api/health")
     def health(db: DbSession = Depends(get_db)):

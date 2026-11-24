@@ -135,7 +135,12 @@ Domain, ports, backup location and retention, daily limits, sign-up mode, and mo
 - **Web UI:** plain JavaScript served by the API from `compain/static/`, built on the mockup's CSS. German via `i18n.js` (translates interface strings only, never user text).
 - **Designs:** `<html data-design data-palette data-mode data-bg>` plus CSS variables `--g-blur`, `--g-alpha`, `--g-dim`. Glass designs blur panels over `#bg-layer`; on phones the blur is off. Modern designs hide the sidebar and show `#topnav-pills`; phones keep the bottom bar.
 - **Changelog and Impressum:** `routes/legal.py` serves `/api/changelog`, `/api/legal/impressum` and simple pages; the web app shows both as popovers (text rendered with text nodes only). The Impressum file is bind-mounted read-only (`create_host_path: false`).
-- **Tests:** 38 API tests and 45 browser checks (desktop and phone, German interface) pass against the Docker build.
+- **Migrations:** Alembic in `app/compain/migrations` (0001 = schema 0.3.0, 0002 = 0.4.0). `db.init_db` runs `upgrade head` on every start; a database without `alembic_version` gets the old extra columns and is stamped 0001 first. New revision: change `models.py`, then run Alembic's `revision --autogenerate` against a database at head (see the snippet in the 0.4.0 commit), and fix booleans (`sa.false()`) and constraint names by hand.
+- **Chat tools:** `POST /api/chats/{id}/reply` with `mode` `next` (continue) or `regenerate` (new version stored in `messages.variants`); `POST .../messages/{id}/variant`; `PATCH .../messages/{id}` (text, important); `DELETE .../messages/{id}` and `.../after`. Stop = the browser aborts the request; the stream generator catches the cancellation and saves the part written so far.
+- **Account security:** TOTP (`totp.py`, RFC 6238, secret encrypted with `COMPAIN_SECRET_KEY`), recovery codes as SHA-256 hashes, sessions with `mfa_pending` (5 minutes, only `/login/2fa`), device data (`user_agent`, `ip`, `last_seen`), login guard in memory (`loginguard.py`).
+- **PWA:** manifest and service worker at the root (`/manifest.webmanifest`, `/sw.js`); static files cache-first with background refresh, the page network-first, the API never cached. Service workers need HTTPS or localhost.
+- **Replies:** copied speaker marks ("[Name]:", "Name:") are removed before saving; a stop before the first real word saves nothing.
+- **Tests:** 53 API tests and 57 browser checks (desktop and phone, German interface) pass against the Docker build.
 
 ## Model test results
 

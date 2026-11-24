@@ -176,3 +176,39 @@
 .design-card, .palette-card { white-space: normal; min-width: 0; }
 .design-grid { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
 #view-home .grid-3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+
+/* ---------- Messages: Markdown, actions, search, stop (0.4.0) ---------- */
+.bubble p { margin: 0; }
+.bubble p + p, .bubble p + ul, .bubble ul + p, .bubble p + ol, .bubble ol + p, .bubble blockquote + p, .bubble p + blockquote { margin-top: .7em; }
+.bubble ul, .bubble ol { margin: .3em 0 .3em 1.2em; padding: 0; }
+.bubble blockquote { margin: .4em 0; padding-left: .8em; border-left: 3px solid color-mix(in srgb, currentColor 35%, transparent); opacity: .9; }
+.bubble code { font-size: .9em; padding: 1px 5px; border-radius: 6px; background: color-mix(in srgb, currentColor 12%, transparent); }
+.bubble .md-h { font-weight: 700; }
+/* Actions in *asterisks* read like stage directions */
+.msg.char .bubble em { font-style: italic; color: color-mix(in srgb, var(--fg) 68%, var(--accent)); }
+.msg.user .bubble em { font-style: italic; opacity: .88; }
+.msg .meta-line { flex-wrap: wrap; row-gap: 2px; }
+.msg .meta-line .mark { opacity: .75; }
+.msg:hover .meta-line .mark, .msg .meta-line .mark:focus-visible { opacity: 1; }
+.variants { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.edit-box textarea { min-height: 90px; border-radius: 16px; }
+.chat-search { display: flex; align-items: center; gap: 8px; padding: 8px 20px; border-bottom: 1px solid var(--line); }
+.chat-search input { border-radius: 999px; padding: 8px 14px; }
+.msg.hit .bubble { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.msg.hit-now .bubble { box-shadow: 0 0 0 3px var(--accent); }
+.quick .accent-chip { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); }
+.send.stopping { background: var(--fg); border-color: var(--fg); }
+.stop-square { width: 14px; height: 14px; border-radius: 3px; background: var(--bg); display: block; }
+
+/* ---------- 0.4.0: own background, likes, security cards ---------- */
+:root[data-bg="custom"] { --sky: var(--user-bg) center / cover no-repeat, var(--bg); }
+:root[data-bg="custom"] #bg-layer :is(.bg-sun, .bg-m1, .bg-m2, .bg-m3) { display: none; }
+.like { border: 0; background: transparent; box-shadow: none; padding: 4px 8px; color: var(--muted); font-size: 14px; }
+.like.on { color: #e0517e; }
+.like:hover { color: #e0517e; background: var(--surface-2); }
+.qr { width: 190px; height: 190px; border-radius: 12px; background: #fff; flex: none; }
+code.secret { display: inline-block; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; word-break: break-all; }
+pre.codes { padding: 12px 14px; border-radius: 12px; background: var(--surface-2); font-size: 14px; line-height: 1.7; user-select: all; }
+.card.danger { border-color: color-mix(in srgb, #dc2626 40%, var(--line)); }
+.danger-btn { background: #dc2626; border-color: #dc2626; color: #fff; }
+.danger-btn:hover { filter: brightness(1.08); border-color: #dc2626; }

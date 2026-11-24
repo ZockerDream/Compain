@@ -127,7 +127,54 @@
     "Close": "Schließen", "Changelog": "Changelog", "Impressum": "Impressum",
     "The Impressum is not set up yet. The operator creates the file .impressum (template: .impressum-example).":
       "Das Impressum ist noch nicht eingerichtet. Der Betreiber legt die Datei .impressum an (Vorlage: .impressum-example).",
-    "No changelog found.": "Kein Changelog gefunden.", "About Compain": "Über Compain", "What changed, and who runs this server.": "Was sich geändert hat und wer diesen Server betreibt.", "From .env (default)": "Aus .env (Standard)"
+    "No changelog found.": "Kein Changelog gefunden.",
+    "Datenschutz": "Datenschutz",
+    "The privacy policy is not set up yet. The operator creates the file .datenschutz (template: .datenschutz-example).":
+      "Die Datenschutzerklärung ist noch nicht eingerichtet. Der Betreiber legt die Datei .datenschutz an (Vorlage: .datenschutz-example).",
+    // chat tools
+    "Search in this chat": "In diesem Chat suchen", "Earlier match": "Früherer Treffer", "Later match": "Späterer Treffer",
+    "Character:": "Charakter:", "Character in this chat": "Charakter in diesem Chat", "Regenerate": "Neu schreiben",
+    "↻ Regenerate": "↻ Neu schreiben", "Write a new version of this reply": "Eine neue Version dieser Antwort schreiben",
+    "Previous version": "Vorherige Version", "Next version": "Nächste Version", "Edit": "Bearbeiten", "Delete": "Löschen",
+    "Delete?": "Löschen?", "Save": "Speichern", "Save and resend": "Speichern und neu senden", "Edit message": "Nachricht bearbeiten",
+    "The character writes on": "Die Figur schreibt weiter", "Stop": "Stopp", "Send": "Senden",
+    "Stopped. The part written so far is kept.": "Gestoppt. Der bisher geschriebene Teil bleibt erhalten.",
+    "Always keep this in mind": "Immer im Gedächtnis behalten",
+    // likes
+    "Like": "Gefällt mir", "Unlike": "Gefällt mir nicht mehr", "Chats with this character": "Chats mit dieser Figur",
+    // profile and persona
+    "Persona": "Persona", "Who you are in the roleplays. Every character knows it.": "Wer du in den Rollenspielen bist. Jede Figur kennt das.",
+    "Your role name": "Dein Rollenname", "About your role": "Über deine Rolle", "Save persona": "Persona speichern",
+    "Who you play: look, job, how you know the characters. The characters know this.": "Wen du spielst: Aussehen, Beruf, woher du die Figuren kennst. Die Figuren wissen das.",
+    "Upload picture": "Bild hochladen", "Change picture": "Bild ändern", "Remove": "Entfernen", "Picture saved": "Bild gespeichert",
+    "Persona saved": "Persona gespeichert", "Profile picture": "Profilbild",
+    // settings: sound, security
+    "Sound when a reply is complete": "Ton, wenn eine Antwort fertig ist", "A short chime, also handy when the model is slow.": "Ein kurzer Klang, praktisch wenn das Modell langsam ist.",
+    "Password": "Passwort", "Current password": "Aktuelles Passwort", "New password": "Neues Passwort", "New password again": "Neues Passwort wiederholen",
+    "Your other devices are logged out; this one stays logged in.": "Deine anderen Geräte werden abgemeldet, dieses bleibt angemeldet.",
+    "Change password": "Passwort ändern", "Password changed": "Passwort geändert", "The new passwords are not the same": "Die neuen Passwörter sind nicht gleich",
+    "Two-factor login": "Zwei-Faktor-Anmeldung", "Set up": "Einrichten", "Switch on": "Einschalten", "Switch off": "Ausschalten",
+    "After the password, Compain also asks for a code from an authenticator app (for example Aegis, Google Authenticator, 1Password).":
+      "Nach dem Passwort fragt Compain zusätzlich nach einem Code aus einer Authenticator-App (zum Beispiel Aegis, Google Authenticator, 1Password).",
+    "1. Scan the code with your authenticator app (or type the key).": "1. Scanne den Code mit deiner Authenticator-App (oder tippe den Schlüssel ein).",
+    "2. Code from the app": "2. Code aus der App", "Password to switch it off": "Passwort zum Ausschalten",
+    "Two-factor login is on. Keep these recovery codes somewhere safe; each works once if your phone is gone:":
+      "Die Zwei-Faktor-Anmeldung ist an. Bewahre diese Wiederherstellungscodes sicher auf; jeder funktioniert einmal, falls dein Handy weg ist:",
+    "I saved them": "Ich habe sie gesichert", "Two-factor login is off": "Die Zwei-Faktor-Anmeldung ist aus",
+    "Enter the code from your authenticator app, or one of your recovery codes.": "Gib den Code aus deiner Authenticator-App ein oder einen deiner Wiederherstellungscodes.",
+    "Code": "Code", "Confirm": "Bestätigen", "Wrong code": "Falscher Code",
+    "Devices": "Geräte", "Where your account is logged in. End anything you do not recognise.": "Wo dein Konto angemeldet ist. Melde ab, was du nicht kennst.",
+    "This device": "Dieses Gerät", "Log out": "Abmelden", "Device logged out": "Gerät abgemeldet",
+    "Delete account": "Konto löschen", "Delete my account": "Mein Konto löschen", "Type your username": "Gib deinen Benutzernamen ein",
+    "Deletes your account with all characters, chats, pictures and settings. This cannot be undone. Export your data first (Profile → Your data).":
+      "Löscht dein Konto mit allen Charakteren, Chats, Bildern und Einstellungen. Das lässt sich nicht rückgängig machen. Exportiere vorher deine Daten (Profil → Deine Daten).",
+    // glass: own picture
+    "My picture": "Eigenes Bild", "Upload my picture": "Eigenes Bild hochladen", "Change my picture": "Eigenes Bild ändern",
+    "Remove my picture": "Eigenes Bild entfernen", "Only you see your picture.": "Nur du siehst dein Bild.", "Background saved": "Hintergrund gespeichert",
+    // admin: second place
+    "Also copy to a second place": "Zusätzlich an einen zweiten Ort kopieren", "Second place": "Zweiter Ort", "Ready": "Bereit",
+    "Not available": "Nicht verfügbar", "Backups can be copied there.": "Backups können dorthin kopiert werden.",
+    "Mount a folder with BACKUP_OFFSITE_DIR in .env and restart.": "Binde einen Ordner mit BACKUP_OFFSITE_DIR in der .env ein und starte neu.", "About Compain": "Über Compain", "What changed, and who runs this server.": "Was sich geändert hat und wer diesen Server betreibt.", "From .env (default)": "Aus .env (Standard)"
   };
 
   var lang = "en";

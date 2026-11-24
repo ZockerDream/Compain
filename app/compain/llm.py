@@ -33,7 +33,9 @@ async def stream_chat(
         headers["Authorization"] = f"Bearer {api_key}"
     payload = {"model": model, "messages": messages, "max_tokens": max_tokens, "stream": True}
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
+    # A self-hosted model on a CPU can need minutes before the first word (long story, other requests
+    # waiting for the same slot), so the read timeout is generous. Stop still works at any time.
+    async with httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=10.0)) as client:
         async with client.stream("POST", url, headers=headers, json=payload) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():

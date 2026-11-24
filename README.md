@@ -43,7 +43,7 @@ Run the browser tests against the running stack: `cd app/e2e && npm install && B
 ## Install on the server
 
 1. Get the code: `git clone -b develop git@github.com:ZockerDream/Compain.git /opt/docker/Compain && cd /opt/docker/Compain`
-2. Impressum: `cp .impressum-example .impressum` and enter your own details (required: the app does not start without this file).
+2. Legal pages: `cp .impressum-example .impressum` and `cp .datenschutz-example .datenschutz`, then enter your own details (required: the app does not start without these files).
 3. Settings: `cp .env.example .env`, then set real values for `POSTGRES_PASSWORD`, `COMPAIN_SECRET_KEY` (long random text, keep it safe) and `COMPAIN_ADMIN_PASSWORD`. The model settings in `.env.example` already point to Gemma 4.
 4. Model (about 17 GB, roughly an hour): `./scripts/download-models.sh` (Gemma 4; `mistral` or `all` for the others).
 5. Start: `docker compose --profile llm-gemma up -d --build`
@@ -51,4 +51,6 @@ Run the browser tests against the running stack: `cd app/e2e && npm install && B
 7. Optional HTTPS: point a domain to the server, set `COMPAIN_DOMAIN` in `.env`, open ports 80 and 443, and add `--profile https` to the start command. Then turn on "HTTPS is set up" in Server Management, Domain & HTTPS.
 8. Backups run every night (Server Management, Backups). They are stored in the `compain-data` volume; copy them off the server from time to time.
 
-Update later: `git pull && docker compose --profile llm-gemma up -d --build`
+Update later: `./scripts/update.sh` (pulls, checks `.env`, `.impressum` and `.datenschutz`, rebuilds, runs the migrations, checks health).
+
+Install as an app: open Compain over HTTPS in Chrome or Safari on the phone and choose "Install app" / "Add to Home Screen".

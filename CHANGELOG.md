@@ -2,6 +2,21 @@
 
 All notable changes to Compain. Newest first.
 
+## 0.4.0 – 2026-11-24
+
+- Messages show Markdown: *actions* in italics, **bold**, `code`, lists and quotes. No more visible asterisks.
+- Chat tools: Stop while the character writes (the part so far is kept), Regenerate with versions to flip through, Continue (the character writes on), edit and delete messages, "Save and resend" from an earlier line, search in a chat.
+- Switch the character in a running chat; every reply keeps its author and the new character knows who spoke before.
+- Persona: your role name and description, known to every character.
+- Profile picture for your account; your own background picture for the glass designs (only you see it).
+- Community: likes and usage counts; the most liked characters come first.
+- Sound when a reply is complete (Settings).
+- Account security: change the password, two-factor login with an authenticator app and recovery codes, list of logged-in devices with "Log out", delete the own account with all data.
+- Wrong passwords no longer lock your account for everyone: the lock applies to the address that tried, plus a limit per address.
+- Datenschutzerklärung as popup and page, from the file `.datenschutz` (template `.datenschutz-example`).
+- Installable as an app (PWA) on phones and computers.
+- Server: database migrations with Alembic, backups can be copied to a second place, `scripts/update.sh` for updates.
+
 ## 0.3.0 – 2026-11-24
 
 - Four designs, like in the RP-Management-Board: Classic (sidebar), Glass (glass panels over a background picture with sliders for blur, opacity and dimming), Modern (navigation on top as pills) and Modern Glass.

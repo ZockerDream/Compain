@@ -259,3 +259,12 @@ def test_backup_is_copied_to_the_second_place(tmp_path):
     assert r["offsite"] and (tmp_path / "offsite" / r["name"]).exists()
     assert client.get("/api/admin/backups-offsite", headers=h).json() == {"configured": True, "writable": True}
     client.__exit__(None, None, None)
+
+
+def test_speaker_marks_are_removed_from_replies():
+    from compain.routes.chats import clean_reply
+
+    assert clean_reply("[Captain Iris Kade]: *She sighs.* Fine.", "Iris Kade") == "*She sighs.* Fine."
+    assert clean_reply("Iris Kade: Hold the line.", "Iris Kade") == "Hold the line."
+    assert clean_reply("**Mara**: Sit down.", "Iris") == "Sit down."
+    assert clean_reply("*She looks at [the map]: north.*", "Iris") == "*She looks at [the map]: north.*"

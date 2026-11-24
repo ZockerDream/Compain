@@ -11,6 +11,7 @@ Rules (concept.md):
 
 import asyncio
 import json
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import date
@@ -320,10 +321,26 @@ def _event(payload: dict) -> bytes:
     return f"data: {json.dumps(payload)}\n\n".encode()
 
 
+_SPEAKER_TAG = re.compile(r"^\s*(?:\[[^\]\n]{1,60}\]|\*\*[^*\n]{1,60}\*\*)\s*:\s*")
+
+
+def clean_reply(text: str, name: str) -> str:
+    """Models sometimes copy the "[Name]:" marks of the history or start with their own name. Remove that."""
+    text = _SPEAKER_TAG.sub("", text, count=1)
+    if name and text.lower().startswith(name.lower() + ":"):
+        text = text[len(name) + 1:].lstrip()
+    return text.strip()
+
+
 def _store(session_factory, job: Job, text: str, character_id: int, regenerate_id: int | None) -> int | None:
     """Save the reply. Regenerating adds a new version to the last message instead of a new message."""
     if not text:
         return None
+    with session_factory() as db:
+        character = db.get(Character, character_id)
+        text = clean_reply(text, character.name if character else "")
+    if not re.search(r"\w", text):
+        return None  # stopped before a real word was written (for example only "*")
     with session_factory() as db:
         chat = db.get(Chat, job.chat_id)
         if chat is None:

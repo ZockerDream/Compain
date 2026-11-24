@@ -53,6 +53,8 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 7. **Live sync:** a message sent on the phone appears on the computer, and the reverse, in real time.
 8. **Pinned chats:** the user can pin any chat to the top of the list.
 9. **Chat only:** no voice, no image generation.
+11. **Chat tools (0.4.0):** Markdown in messages, Stop, Regenerate with versions, Continue, edit and delete messages, "Save and resend", search in a chat.
+12. **Persona:** your role name and description; every character knows it.
 10. **Model per chat:** the user can choose the model for each chat from the chat header, from the models the admin has allowed. A hosted model counts against the user's daily limit.
 
 ## Character features (version 1)
@@ -79,6 +81,9 @@ A private, self-hosted roleplay app for the owner and the people the owner invit
 ## Login and sessions
 
 - Standard login lasts 48 hours.
+- Optional two-factor login with an authenticator app and recovery codes.
+- Every user can change the own password, see the logged-in devices and log them out, and delete the own account with all data.
+- Wrong passwords lock only the address that tried them, not the account for everyone.
 - "Stay logged in" keeps the login on that device. The duration is set by the admin (mockup default: 365 days).
 - Phones stay logged in.
 - After a set number of failed logins (default 5), the account is locked for a set time (default 15 minutes).
@@ -110,6 +115,8 @@ Ten sections, as in the mockup:
 - Android app that uses the same server.
 
 ## Non-goals
+
+- No group chats with several characters at once (the owner said no). Switching the character in a running chat is fine.
 
 - No public marketplace, feeds, or social features beyond sharing characters in Community.
 - No payments or subscriptions inside the app.

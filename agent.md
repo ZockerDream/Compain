@@ -33,38 +33,36 @@ A private, self-hosted, multi-user AI roleplay chat app. It replaces a paid char
 
 ## Current status
 
-Last updated: 2026-11-23 (night).
+Last updated: 2026-11-24 (version 0.4.0).
 
-Done (version 1, verified with tests):
-- One-time age question ("Are you 18 or older?") at the first login of every account, enforced by the API.
-- Four designs (classic, glass, modern, modern-glass; modelled on the RP-Management-Board V1–V4) and seven colour themes, all per account and live on every device (`static/designs.css`, `static/designs-palettes.css`, preferences `design`, `bg`, `blur`, `alpha`, `dim`, `palette`).
-- Changelog (`CHANGELOG.md`) and Impressum (`.impressum`, not in git; template `.impressum-example`) as popovers from the top bar and as pages `/changelog`, `/impressum`. Compose refuses to start without `.impressum`.
-- Four reply lengths: short, medium, long, xlong (`LENGTH_GUIDE` in `routes/chats.py`), measured with Gemma: about 18, 65, 105 and 270 words.
-- Login with 48-hour and "stay logged in" sessions, lockout, invite-code sign-up, maintenance mode with a notice, log out everywhere. Secure cookie behind HTTPS.
-- Characters: create, edit, delete (owner rules), adults-only check, pictures (PNG/JPG/WebP, size limit from settings), card import (SillyTavern JSON V1/V2, PNG cards, plain text), publish to Community with admin review, add from Community.
-- Chats: greeting opens the chat, streaming replies, roleplay system prompt with reply length and reply language, important messages (max 10, always in context), story summary every 40 messages, unread counts, pinning, search and filters, per-chat model, export (one chat, all chats, characters, everything).
-- Live sync between devices (WebSocket at `/ws`).
-- Per-user preferences on the server (theme, appearance, reply length, context, reply language, interface language).
-- German and English interface (`static/i18n.js`).
-- Server Management, all ten sections: overview (disk, endpoints), users, characters (review queue, card import switch), hosted API (provider presets, encrypted key, connection test, limits), access and security (sign-up, invite codes, sessions, lockout, password length, log out everyone), domain and HTTPS, models (default model, name, speed test), backups (nightly, retention, pictures, run now, download, restore), storage (upload limit, disk warning, cleanup), logs and maintenance (maintenance mode, notice, audit log).
-- Backups: `pg_dump` + pictures as `.tar.gz`; restore tested end to end on PostgreSQL 17.
-- Docker Compose: app, PostgreSQL 17, optional `llm-mistral` / `llm-gemma` (llama.cpp) and `https` (Caddy) profiles.
-- Tests: 38 API tests (`app/tests`), 45 browser checks against the Docker build (`app/e2e`, desktop and phone, German interface).
-
-- Models measured (technical.md, "Model test results"): Gemma 4 26B-A4B uncensored is the default (10–13 tokens/s here), Mistral Small 3.2 the alternative (2–3.5 tokens/s). The browser tests also pass against the real Gemma model.
+Done (version 1 plus 0.4.0, verified with tests):
+- Login with 48-hour and "stay logged in" sessions, two-factor login (TOTP, QR code, 8 recovery codes), login guard per address and account (`loginguard.py`, in memory) plus 30 tries per address in 10 minutes, invite-code sign-up, maintenance mode with notice, device list with "Log out", password change, deleting the own account with all data. One-time 18+ question.
+- Characters: owner rules, adults-only check, pictures, card import, publish with admin review, add from Community. Community likes and usage counts (`character_likes`), most liked first.
+- Chats: Markdown in messages (rendered with DOM nodes only), streaming, Stop (the written part is saved when the connection closes; llama.cpp cancels the task), Regenerate with versions (`messages.variants`, `variant_index`), Continue (`POST /api/chats/{id}/reply`), edit and delete messages, rewind (`DELETE .../messages/{id}/after`), search in a chat, switching the character in a running chat (`messages.character_id` keeps the author; other characters' lines are marked `[Name]:` in the prompt), persona (`users.persona_*`) in the system prompt, story summary, important messages, unread counts, export, sound when a reply is complete.
+- Profile picture and own glass background picture per user (`data/avatars`, `data/backgrounds`).
+- Four designs, seven colour themes, per account and live on all devices; German and English interface.
+- Changelog, Impressum (`.impressum`) and Datenschutzerklärung (`.datenschutz`) as popovers and pages; Compose refuses to start without the two files.
+- Server Management, all ten sections; backups with restore, retention and a second place (`BACKUP_OFFSITE_DIR`).
+- Installable web app (PWA): `manifest.webmanifest`, `sw.js` (never caches `/api`), icons in `static/icons/`. Bump `CACHE` in `sw.js` with every release.
+- Database migrations with Alembic (`app/compain/migrations`, run on start by `db.init_db`); databases from before 0.4.0 are completed and stamped as 0001 automatically.
+- Self-hosted model: Gemma 4 26B-A4B uncensored (default), Mistral Small 3.2 as alternative.
+- Tests: 53 API tests (`app/tests`) and 57 browser checks against the Docker build (`app/e2e`), passing with the real Gemma model on a fresh database. Run the browser checks on a fresh database; data left over from many runs makes some checks pick other chats.
+- `scripts/update.sh` for updates on the server, `scripts/download-models.sh` for the models.
 
 Open:
-1. Android app (later, by design).
+1. Android app as a native app (the PWA covers installing on phones for now).
 2. Test adult scenarios with Gemma on the server before relying on it.
 3. Real-person rule is not checked by code; the admin review is the safeguard.
-4. Alembic migrations: for now `db.py` adds new columns on start (`ADDED_COLUMNS`). Move to Alembic before the data model changes a lot.
-5. Unread counts are per chat, not per device.
+4. HTTPS: tested locally through Caddy with its own certificate for `localhost` (health, Secure cookie, HTTP→HTTPS redirect, live sync over wss). Not yet tested with a real domain and Let's Encrypt.
+5. Install and measure on the owner's server (i7-8700, 64 GB).
 
 Known risks:
-- The adults-only check is a keyword and age heuristic (`app/compain/content.py`). Admin review is the second layer.
-- Changing `COMPAIN_SECRET_KEY` makes the stored hosted API key unreadable (enter it again).
+- The adults-only check is a keyword and age heuristic (`app/compain/content.py`).
+- Changing `COMPAIN_SECRET_KEY` makes the stored hosted API key and the 2FA secrets unreadable (2FA must then be set up again).
+- The login guard lives in memory: a restart clears the counters.
 - Restoring a backup replaces all data and logs out sessions created after the backup.
-- Free hosted providers change limits and policies without notice.
+- Prompt processing is slow on CPU: after switching the character or with long chats, the first reply can take a minute or two.
+- New migration: change `models.py`, then generate with Alembic (see technical.md) and check the file by hand (booleans need `sa.false()`, foreign keys need names).
 
 ## Layout
 

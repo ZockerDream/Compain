@@ -62,6 +62,14 @@
     return box;
   }
 
+  // The user's own profile picture, or initials.
+  function userAvatar(u, cls, style) {
+    var box = el("span", { class: "avatar alt" + (cls ? " " + cls : ""), style: style || null, text: u.has_avatar ? null : initials(u.display_name || u.username) });
+    if (u.has_avatar) box.appendChild(el("img", { src: "/api/users/" + u.id + "/avatar?v=" + (u._v || 0), alt: "",
+      style: "width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block" }));
+    return box;
+  }
+
   function fmtTime(iso) {
     if (!iso) return "";
     var d = new Date(iso), now = new Date();
@@ -108,7 +116,7 @@
     { id: "modern", name: "Modern", sub: "Navigation on top, calm surfaces", glassy: false, top: true },
     { id: "modern-glass", name: "Modern Glass", sub: "Navigation on top, glass over a background", glassy: true, top: true }
   ];
-  var BACKGROUNDS = [["dusk", "Dusk"], ["night", "Night"], ["forest", "Forest"], ["none", "None"]];
+  var BACKGROUNDS = [["dusk", "Dusk"], ["night", "Night"], ["forest", "Forest"], ["none", "None"], ["custom", "My picture"]];
   var MODELS = [
     { value: "self", label: "Self-hosted model (unlimited)" },
     { value: "hosted", label: "Hosted API (daily limit)" }
@@ -136,6 +144,8 @@
     var root = document.documentElement;
     root.setAttribute("data-design", prefs.design || "classic");
     root.setAttribute("data-bg", prefs.bg || "dusk");
+    // Own background picture (only this user sees it); the version forces a reload after a new upload.
+    if (prefs.bg === "custom") root.style.setProperty("--user-bg", 'url("/api/auth/background?v=' + (state.bgVersion || 0) + '")');
     root.style.setProperty("--g-blur", (prefs.blur == null ? 22 : prefs.blur) + "px");
     root.style.setProperty("--g-alpha", String((prefs.alpha == null ? 52 : prefs.alpha) / 100));
     root.style.setProperty("--g-dim", String((prefs.dim == null ? 20 : prefs.dim) / 100));
@@ -221,7 +231,7 @@
         avatar(latest.character_name, latest.character_id, latest.character_has_picture),
         el("span", { class: "grow" },
           el("span", { style: "display:block;font-weight:600", text: latest.title }),
-          el("span", { style: "display:block;font-size:13px;opacity:.85", class: "ellipsis", text: latest.last_message || "No messages yet" }))) : null,
+          el("span", { style: "display:block;font-size:13px;opacity:.85", class: "ellipsis", text: plain(latest.last_message) || "No messages yet" }))) : null,
       el("div", { class: "actions" },
         el("button", { class: "primary", onclick: function () { go("chats"); } }, "Open chats"),
         el("button", { onclick: function () { go("characters"); } }, "My characters"),
@@ -241,7 +251,7 @@
         avatar(c.character_name, c.character_id, c.character_has_picture, "sm"),
         el("div", { class: "grow", style: "min-width:0" },
           el("div", { text: c.character_name + " · " + c.title }),
-          el("div", { class: "muted small ellipsis", text: c.last_message || "No messages yet" })),
+          el("div", { class: "muted small ellipsis", text: plain(c.last_message) || "No messages yet" })),
         el("span", { class: "time", text: fmtTime(c.updated_at) }));
     });
 
@@ -317,7 +327,7 @@
             c.pinned ? icon("i-pin", "sm pin-ic") : null,
             el("span", { class: "title ellipsis", text: c.title }),
             el("span", { class: "time", text: fmtTime(c.updated_at) })),
-          el("span", { class: "preview ellipsis", style: "display:block", text: c.character_name + " · " + (c.last_message || "No messages yet") })),
+          el("span", { class: "preview ellipsis", style: "display:block", text: c.character_name + " · " + (plain(c.last_message) || (c.message_count ? "…" : "No messages yet")) })),
         // The open chat counts as read: it is on screen.
         c.unread && state.chatId !== c.id ? el("span", { class: "badge", "aria-label": c.unread + " unread", text: String(c.unread) }) : null);
     }
@@ -342,12 +352,100 @@
       el("h2", { text: "Pick a conversation" }), el("p", { text: "Your chats stay here, synced to every device." }))));
   }
 
+  /* ---------- Markdown in messages ----------
+     Roleplay text uses *actions*, **emphasis**, `code`, lists and quotes. Rendered with DOM nodes only,
+     so nothing in a message can inject HTML. */
+  function mdInline(text) {
+    var out = [];
+    // An action that is still being written (or was cut off by Stop) has no closing star yet: close it.
+    var singles = (text.replace(/\*\*/g, "").match(/\*/g) || []).length;
+    if (singles % 2 === 1) text = text + "*";
+    // Order matters: *** before ** before *; ` and ~~ too.
+    var re = /(\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|_[^_\n]+?_|`[^`\n]+?`|~~[^~\n]+?~~)/g;
+    var last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) out.push(document.createTextNode(text.slice(last, m.index)));
+      var t = m[0];
+      if (t.indexOf("***") === 0) out.push(el("strong", null, el("em", { text: t.slice(3, -3) })));
+      else if (t.indexOf("**") === 0) out.push(el("strong", { text: t.slice(2, -2) }));
+      else if (t[0] === "*" || t[0] === "_") out.push(el("em", { text: t.slice(1, -1) }));
+      else if (t[0] === "`") out.push(el("code", { text: t.slice(1, -1) }));
+      else out.push(el("del", { text: t.slice(2, -2) }));
+      last = m.index + t.length;
+    }
+    if (last < text.length) out.push(document.createTextNode(text.slice(last)));
+    return out;
+  }
+
+  function mdRender(text) {
+    var box = document.createDocumentFragment();
+    var lines = String(text || "").replace(/\r/g, "").split("\n");
+    var para = [], list = null, listTag = null, quote = null;
+    function flush() {
+      if (para.length) {
+        var p = el("p");
+        para.forEach(function (l, i) { if (i) p.appendChild(el("br")); mdInline(l).forEach(function (n) { p.appendChild(n); }); });
+        (quote || box).appendChild(p);
+        para = [];
+      }
+    }
+    function endList() { list = null; listTag = null; }
+    lines.forEach(function (raw) {
+      var line = raw.replace(/\s+$/, "");
+      var ul = /^\s*[-•]\s+(.*)$/.exec(line), ol = /^\s*\d+[.)]\s+(.*)$/.exec(line), q = /^>\s?(.*)$/.exec(line), h = /^#{1,3}\s+(.*)$/.exec(line);
+      if (!line.trim()) { flush(); endList(); quote = null; return; }
+      if (ul || ol) {
+        flush();
+        var tag = ul ? "ul" : "ol";
+        if (!list || listTag !== tag) { list = el(tag); listTag = tag; (quote || box).appendChild(list); }
+        var li = el("li"); mdInline((ul || ol)[1]).forEach(function (n) { li.appendChild(n); }); list.appendChild(li);
+        return;
+      }
+      endList();
+      if (q) { flush(); if (!quote) { quote = el("blockquote"); box.appendChild(quote); } para.push(q[1]); return; }
+      if (h) { flush(); var s = el("p", { class: "md-h" }); mdInline(h[1]).forEach(function (n) { s.appendChild(n); }); box.appendChild(s); return; }
+      if (quote) { flush(); quote = null; }
+      para.push(line);
+    });
+    flush();
+    return box;
+  }
+
+  function setBubble(bubble, text) {
+    bubble.textContent = "";
+    bubble.appendChild(mdRender(text));
+  }
+
+  // List previews: the text without Markdown signs.
+  function plain(text) { return String(text || "").replace(/(\*\*\*|\*\*|\*|__|_|~~|`)/g, "").replace(/^>\s?/gm, ""); }
+
+  /* ---------- sound when a reply is complete (Settings → Sound) ---------- */
+  var audioCtx = null;
+  function chime() {
+    if (!prefs.sound) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      var now = audioCtx.currentTime;
+      [660, 880].forEach(function (f, i) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, now + i * 0.12);
+        g.gain.exponentialRampToValueAtTime(0.12, now + i * 0.12 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.12 + 0.25);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(now + i * 0.12); o.stop(now + i * 0.12 + 0.3);
+      });
+    } catch (e) { /* no audio: fine */ }
+  }
+
+  /* ---------- conversation ---------- */
+  var characterChoices = null; // own + community characters for the switcher, loaded once per visit
+
   async function renderConversation(pane, chatId, chats, drawList) {
     var chat = await api("/api/chats/" + chatId);
     pane.textContent = "";
-    var listRef = chats.filter(function (c) { return c.id === chatId; })[0];
 
-    var modelSel = el("select", { class: "model-select", "aria-label": "Model for this chat" });
+    var modelSel = el("select", { class: "model-select", id: "chat-model", "aria-label": "Model for this chat" });
     MODELS.forEach(function (m) { modelSel.appendChild(el("option", { value: m.value, selected: chat.model === m.value, text: m.label })); });
     modelSel.addEventListener("change", async function () {
       try {
@@ -356,21 +454,75 @@
       } catch (e) { toast(e.message); }
     });
 
+    // Switch the character while the story runs.
+    var charSel = el("select", { class: "model-select", id: "chat-character", "aria-label": "Character in this chat" });
+    charSel.appendChild(el("option", { value: String(chat.character_id), selected: true, text: chat.character_name }));
+    charSel.addEventListener("focus", loadChoices, { once: true });
+    charSel.addEventListener("pointerdown", loadChoices, { once: true });
+    async function loadChoices() {
+      if (!characterChoices) {
+        var lists = await Promise.all([api("/api/characters"), api("/api/community")]);
+        var seen = {};
+        characterChoices = lists[0].concat(lists[1]).filter(function (c) { if (seen[c.id]) return false; seen[c.id] = 1; return true; });
+      }
+      charSel.textContent = "";
+      characterChoices.forEach(function (c) {
+        charSel.appendChild(el("option", { value: String(c.id), selected: c.id === chat.character_id, text: c.name + (c.mine ? "" : " (Community)") }));
+      });
+    }
+    charSel.addEventListener("change", async function () {
+      try {
+        await api("/api/chats/" + chatId, { method: "PATCH", body: { character_id: Number(charSel.value) } });
+        toast(charSel.options[charSel.selectedIndex].text + " takes over the scene");
+        renderChats();
+      } catch (e) { toast(e.message); }
+    });
+
     var pinBtn = el("button", { class: "ghost icon-only", "aria-label": "Pin chat", "aria-pressed": chat.pinned ? "true" : "false",
       onclick: async function () {
         try { await api("/api/chats/" + chatId, { method: "PATCH", body: { pinned: !chat.pinned } }); renderChats(); }
         catch (e) { toast(e.message); }
       } }, icon("i-pin"));
-
     var exportLink = el("a", { class: "btn ghost icon-only", href: "/api/export/chat/" + chatId, download: "", "aria-label": "Export this chat" }, icon("i-down"));
     var summaryBox = el("div", { class: "conv-stats hidden", style: "display:block;font-size:13px;line-height:1.55;color:var(--fg)" },
       el("div", { class: "caps", style: "margin-bottom:6px", text: "Story so far" }),
       el("div", { text: chat.summary || "No summary yet. It is written automatically after every 40 messages and keeps long stories consistent." }));
     var infoBtn = el("button", { class: "ghost icon-only", "aria-label": "Story summary", "aria-pressed": "false",
-      onclick: function () {
-        var open = summaryBox.classList.toggle("hidden") === false;
-        infoBtn.setAttribute("aria-pressed", open ? "true" : "false");
-      } }, icon("i-info"));
+      onclick: function () { var open = summaryBox.classList.toggle("hidden") === false; infoBtn.setAttribute("aria-pressed", open ? "true" : "false"); } }, icon("i-info"));
+
+    // Search in this chat
+    var searchBar = el("div", { class: "chat-search hidden" });
+    var searchInput = el("input", { type: "search", placeholder: "Search in this chat", "aria-label": "Search in this chat" });
+    var searchCount = el("span", { class: "muted small" });
+    var hits = [], hitAt = -1;
+    function runSearch() {
+      var q = searchInput.value.trim().toLowerCase();
+      hits = [];
+      box.querySelectorAll(".msg").forEach(function (n) {
+        n.classList.remove("hit", "hit-now");
+        if (q && n.textContent.toLowerCase().indexOf(q) !== -1) { n.classList.add("hit"); hits.push(n); }
+      });
+      hitAt = hits.length ? hits.length - 1 : -1;
+      showHit();
+    }
+    function showHit() {
+      searchCount.textContent = hits.length ? (hitAt + 1) + " / " + hits.length : (searchInput.value.trim() ? "0" : "");
+      hits.forEach(function (n, i) { n.classList.toggle("hit-now", i === hitAt); });
+      if (hitAt >= 0) hits[hitAt].scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    searchInput.addEventListener("input", runSearch);
+    searchInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? 1 : -1); } if (e.key === "Escape") toggleSearch(false); });
+    function step(d) { if (!hits.length) return; hitAt = (hitAt + d + hits.length) % hits.length; showHit(); }
+    searchBar.appendChild(searchInput);
+    searchBar.appendChild(searchCount);
+    searchBar.appendChild(el("button", { class: "ghost icon-only", "aria-label": "Earlier match", onclick: function () { step(-1); } }, "↑"));
+    searchBar.appendChild(el("button", { class: "ghost icon-only", "aria-label": "Later match", onclick: function () { step(1); } }, "↓"));
+    function toggleSearch(on) {
+      var show = on === undefined ? searchBar.classList.contains("hidden") : on;
+      searchBar.classList.toggle("hidden", !show);
+      if (show) searchInput.focus(); else { searchInput.value = ""; runSearch(); }
+    }
+    var searchBtn = el("button", { class: "ghost icon-only", "aria-label": "Search in this chat", onclick: function () { toggleSearch(); } }, icon("i-search"));
 
     pane.appendChild(el("header", { class: "conv-head" },
       el("button", { class: "ghost icon-only back-btn", "aria-label": "Back to chat list", onclick: function () { go("chats"); } }, icon("i-back")),
@@ -378,22 +530,42 @@
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "name ellipsis", text: chat.character_name }),
         el("div", { class: "meta ellipsis", text: chat.title + (chat.character_tagline ? " · " + chat.character_tagline : "") })),
-      el("div", { class: "tools" }, pinBtn, infoBtn, exportLink)));
+      el("div", { class: "tools" }, searchBtn, pinBtn, infoBtn, exportLink)));
+    pane.appendChild(searchBar);
 
     var important = chat.messages.filter(function (m) { return m.important; }).length;
     pane.appendChild(el("div", { class: "conv-stats" },
       el("span", { class: "pill", text: chat.messages.length + " messages" }),
       el("span", { class: "pill" }, icon("i-star", "sm"), " " + important + " of 10 important"),
       el("span", { class: "pill", text: chat.summary ? "Story summary saved" : "No story summary yet" }),
+      el("span", { class: "pill", text: "Character:" }), charSel,
       el("span", { class: "pill", text: "Model:" }), modelSel));
     pane.appendChild(summaryBox);
 
+    var busy = false, controller = null;
+    var ctx = {
+      chat: chat, chatId: chatId,
+      busy: function () { return busy; },
+      regenerate: function () { generate("regenerate"); },
+      resend: function () { generate("next"); }
+    };
     var box = el("div", { class: "messages", id: "messages" });
     pane.appendChild(box);
-    chat.messages.forEach(function (m) { box.appendChild(messageNode(m, chat)); });
+    var lastId = chat.messages.length ? chat.messages[chat.messages.length - 1].id : null;
+    var prevChar = null;
+    chat.messages.forEach(function (m) {
+      // When the character changes in the story, show who comes in.
+      if (m.role === "assistant" && m.character_id && prevChar && m.character_id !== prevChar) {
+        box.appendChild(el("div", { class: "day", text: (m.character_name || "Someone") + " joins the scene" }));
+      }
+      if (m.role === "assistant" && m.character_id) prevChar = m.character_id;
+      box.appendChild(messageNode(m, chat, m.id === lastId, ctx));
+    });
 
     var quick = el("div", { class: "quick" });
-    ["Continue", "Describe the scene", "Shorter", "Longer", "Narrate the weather"].forEach(function (t) {
+    quick.appendChild(el("button", { type: "button", class: "accent-chip", text: "Continue", title: "The character writes on",
+      onclick: function () { generate("next"); } }));
+    ["Describe the scene", "Shorter", "Longer", "Narrate the weather"].forEach(function (t) {
       quick.appendChild(el("button", { type: "button", text: t, onclick: function () { input.value = t; input.focus(); } }));
     });
     pane.appendChild(quick);
@@ -403,82 +575,158 @@
     var form = el("form", { class: "composer" }, input, sendBtn);
     pane.appendChild(form);
 
-    form.addEventListener("submit", function (e) { e.preventDefault(); send(); });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (busy) { if (controller) controller.abort(); return; } // the send button is the Stop button while writing
+      send();
+    });
     input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!busy) send(); }
     });
 
-    var busy = false;
+    function setBusy(on) {
+      busy = on;
+      state.sending = on;
+      sendBtn.textContent = "";
+      sendBtn.appendChild(on ? el("span", { class: "stop-square", "aria-hidden": "true" }) : icon("i-send"));
+      sendBtn.setAttribute("aria-label", on ? "Stop" : "Send");
+      sendBtn.classList.toggle("stopping", on);
+    }
+
     async function send() {
       var text = input.value.trim();
-      if (!text || busy) return;
-      busy = true;
-      state.sending = true;
-      sendBtn.disabled = true;
+      if (!text) return;
       input.value = "";
-      box.appendChild(messageNode({ id: null, role: "user", content: text, important: false }, chat));
+      box.appendChild(messageNode({ id: null, role: "user", content: text, important: false }, chat, false, ctx));
+      await run("/api/chats/" + chatId + "/messages", { content: text }, null);
+    }
+
+    async function generate(mode) {
+      if (busy) return;
+      var replace = null;
+      if (mode === "regenerate") {
+        var nodes = box.querySelectorAll(".msg.char");
+        replace = nodes.length ? nodes[nodes.length - 1] : null;
+      }
+      await run("/api/chats/" + chatId + "/reply", { mode: mode }, replace);
+    }
+
+    async function run(url, body, replaceNode) {
+      setBusy(true);
+      controller = new AbortController();
       var typing = el("div", { class: "msg char typing" }, avatar(chat.character_name, chat.character_id, chat.character_has_picture, "xs"),
         el("div", { class: "bubble" }, el("span", { class: "dot" }), el("span", { class: "dot" }), el("span", { class: "dot" })));
-      box.appendChild(typing);
+      if (replaceNode) replaceNode.replaceWith(typing); else box.appendChild(typing);
       box.scrollTop = box.scrollHeight;
-
-      var bubble = null;
-      var reply = "";
+      var bubble = null, reply = "", stopped = false;
       try {
-        await streamMessage(chatId, text, function (delta) {
+        await streamTo(url, body, controller.signal, function (delta) {
           if (!bubble) {
-            typing.remove();
-            var node = messageNode({ id: null, role: "assistant", content: "", important: false }, chat);
-            box.appendChild(node);
+            var node = messageNode({ id: null, role: "assistant", content: "", important: false, character_name: chat.character_name }, chat, false, ctx);
+            typing.replaceWith(node);
             bubble = node.querySelector(".bubble");
             bubble.classList.add("cursor");
           }
           reply += delta;
-          bubble.textContent = reply;
+          setBubble(bubble, reply);
           box.scrollTop = box.scrollHeight;
         });
-        if (bubble) bubble.classList.remove("cursor");
-        // Reload the chat so the new messages get their ids (needed for "Mark important").
-        await renderChats();
+        chime();
       } catch (e) {
-        typing.remove();
-        toast(e.message);
+        if (e.name === "AbortError") { stopped = true; toast("Stopped. The part written so far is kept."); }
+        else toast(e.message);
+        if (!bubble) typing.remove();
       } finally {
-        busy = false;
-        state.sending = false;
-        sendBtn.disabled = false;
+        if (bubble) bubble.classList.remove("cursor");
+        controller = null;
+        setBusy(false);
       }
+      // Reload so the new messages get their ids and actions. After Stop, give the server a moment to save.
+      setTimeout(function () { renderChats(); }, stopped ? 600 : 0);
     }
     box.scrollTop = box.scrollHeight;
   }
 
-  function messageNode(m, chat) {
-    var who = m.role === "user" ? "You" : chat.character_name;
-    var wrap = el("div", { class: "msg " + (m.role === "user" ? "user" : "char") + (m.important ? " important" : "") });
-    if (m.role !== "user") wrap.appendChild(avatar(chat.character_name, chat.character_id, chat.character_has_picture, "xs"));
-    var col = el("div", { style: "min-width:0" },
-      el("div", { class: "bubble", text: m.content }));
-    if (m.role !== "user" && m.id) {
-      col.appendChild(el("div", { class: "meta-line" },
-        el("button", { class: "mark", "aria-pressed": m.important ? "true" : "false",
-          onclick: async function () {
-            try {
-              await api("/api/chats/" + chat.id + "/messages/" + m.id, { method: "PATCH", body: { important: !m.important } });
-              m.important = !m.important;
-              toast(m.important ? "Marked important" : "Unmarked");
-              await renderChats(); // refresh the counter and the list
-            } catch (e) { toast(e.message); }
-          } }, icon("i-star", "sm"), m.important ? " Important" : " Mark important")));
+  // One message with its actions. ctx gives access to the running conversation (regenerate, resend).
+  function messageNode(m, chat, isLast, ctx) {
+    var mine = m.role === "user";
+    var name = mine ? "You" : (m.character_name || chat.character_name);
+    var wrap = el("div", { class: "msg " + (mine ? "user" : "char") + (m.important ? " important" : "") });
+    if (!mine) wrap.appendChild(avatar(name, m.character_id || chat.character_id, m.character_id ? m.character_has_picture : chat.character_has_picture, "xs"));
+    var bubble = el("div", { class: "bubble" });
+    setBubble(bubble, m.content);
+    var col = el("div", { style: "min-width:0" }, bubble);
+    if (m.id && ctx) {
+      var line = el("div", { class: "meta-line" });
+      var act = async function (fn) { if (ctx.busy()) return; try { await fn(); } catch (e) { toast(e.message); } };
+      if (!mine) {
+        line.appendChild(el("button", { class: "mark", "aria-pressed": m.important ? "true" : "false", title: "Always keep this in mind",
+          onclick: function () { act(async function () {
+            await api("/api/chats/" + chat.id + "/messages/" + m.id, { method: "PATCH", body: { important: !m.important } });
+            toast(!m.important ? "Marked important" : "Unmarked");
+            await renderChats();
+          }); } }, icon("i-star", "sm"), m.important ? " Important" : " Mark important"));
+        if (m.variant_count > 1) {
+          var flip = function (d) { act(async function () {
+            var i = (m.variant_index + d + m.variant_count) % m.variant_count;
+            await api("/api/chats/" + chat.id + "/messages/" + m.id + "/variant", { method: "POST", body: { index: i } });
+            await renderChats();
+          }); };
+          line.appendChild(el("span", { class: "variants" },
+            el("button", { class: "mark", "aria-label": "Previous version", onclick: function () { flip(-1); } }, "‹"),
+            el("span", { text: (m.variant_index + 1) + " / " + m.variant_count }),
+            el("button", { class: "mark", "aria-label": "Next version", onclick: function () { flip(1); } }, "›")));
+        }
+        if (isLast) line.appendChild(el("button", { class: "mark", title: "Write a new version of this reply", onclick: function () { if (!ctx.busy()) ctx.regenerate(); } }, "↻ Regenerate"));
+      }
+      line.appendChild(el("button", { class: "mark", onclick: function () { editMessage(m, chat, bubble, col, ctx); } }, "Edit"));
+      line.appendChild(el("button", { class: "mark", onclick: function () {
+        var b = this;
+        if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Delete?"; setTimeout(function () { b.dataset.armed = ""; b.textContent = "Delete"; }, 3000); return; }
+        act(async function () { await api("/api/chats/" + chat.id + "/messages/" + m.id, { method: "DELETE" }); await renderChats(); });
+      } }, "Delete"));
+      col.appendChild(line);
     }
     wrap.appendChild(col);
     return wrap;
   }
 
-  async function streamMessage(chatId, text, onDelta) {
-    var r = await fetch("/api/chats/" + chatId + "/messages", {
-      method: "POST", credentials: "same-origin",
+  function editMessage(m, chat, bubble, col, ctx) {
+    if (ctx.busy() || col.querySelector(".edit-box")) return;
+    var ta = el("textarea", { rows: "4", "aria-label": "Edit message" });
+    ta.value = m.content;
+    var save = async function (resend) {
+      var text = ta.value.trim();
+      if (!text) return;
+      try {
+        await api("/api/chats/" + chat.id + "/messages/" + m.id, { method: "PATCH", body: { content: text } });
+        if (resend) {
+          // Edit and resend: everything after this line goes, then the character answers again.
+          await api("/api/chats/" + chat.id + "/messages/" + m.id + "/after", { method: "DELETE" });
+          await renderChats();
+          var again = document.querySelector("#conv .quick .accent-chip");
+          if (again) again.click();
+          return;
+        }
+        await renderChats();
+      } catch (e) { toast(e.message); }
+    };
+    var boxEl = el("div", { class: "edit-box" }, ta,
+      el("div", { class: "row", style: "flex-wrap:wrap;gap:6px;margin-top:6px" },
+        el("button", { class: "primary", onclick: function () { save(false); } }, "Save"),
+        m.role === "user" ? el("button", { onclick: function () { save(true); } }, "Save and resend") : null,
+        el("button", { class: "ghost", onclick: function () { boxEl.remove(); bubble.classList.remove("hidden"); } }, "Cancel")));
+    bubble.classList.add("hidden");
+    col.insertBefore(boxEl, bubble.nextSibling);
+    ta.focus();
+  }
+
+  // Stream a reply over Server-Sent Events. Aborting (Stop) closes the connection; the server keeps the part written so far.
+  async function streamTo(url, body, signal, onDelta) {
+    var r = await fetch(url, {
+      method: "POST", credentials: "same-origin", signal: signal,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: text, reply_length: prefs.replyLength, context_messages: prefs.ctx, language: prefs.language })
+      body: JSON.stringify(Object.assign({ reply_length: prefs.replyLength, context_messages: prefs.ctx, language: prefs.language }, body))
     });
     if (!r.ok) {
       var data = null;
@@ -551,7 +799,7 @@
       el("div", { class: "tags" }, el("span", { class: "pill", text: status }), c.tags.map(function (t) { return el("span", { class: "pill", text: t }); })),
       el("div", { class: "foot" },
         el("button", { class: "primary", onclick: async function () {
-          try { var chat = await api("/api/chats", { method: "POST", body: { character_id: c.id, model: "self" } }); go("chat/" + chat.id); }
+          try { var chat = await api("/api/chats", { method: "POST", body: { character_id: c.id } }); go("chat/" + chat.id); }
           catch (e) { toast(e.message); }
         } }, "Chat"),
         el("button", { class: "ghost", onclick: function () { state.editing = c; renderCharacters(); } }, "Edit"),
@@ -641,7 +889,7 @@
     var top = items[0];
     view.appendChild(el("div", { class: "featured" },
       el("div", { class: "grow", style: "min-width:0" },
-        el("div", { class: "caps", text: "Featured" }),
+        el("div", { class: "caps", text: top.likes ? "Most liked · ♥ " + top.likes : "Featured" }),
         el("h2", { style: "margin-top:6px;font-size:24px", text: top.name }),
         el("p", { text: top.description || top.tagline }),
         el("div", { class: "row", style: "margin-top:14px;flex-wrap:wrap" },
@@ -665,14 +913,21 @@
           el("p", { class: "desc", text: c.description || c.tagline }),
           el("div", { class: "tags" }, c.tags.map(function (t) { return el("span", { class: "pill", text: t }); })),
           el("div", { class: "foot" },
-            el("button", { class: "primary", onclick: function () { startChat(c.id); } }, "Chat"),
-            el("button", { class: "ghost", onclick: function () { addToMine(c.id); } }, "Add"))));
+            el("span", { class: "stats" },
+              el("button", { class: "like" + (c.liked ? " on" : ""), "aria-pressed": c.liked ? "true" : "false", "aria-label": c.liked ? "Unlike" : "Like",
+                onclick: async function () {
+                  try { await api("/api/community/" + c.id + "/like", { method: c.liked ? "DELETE" : "POST" }); renderCommunity(); }
+                  catch (e) { toast(e.message); }
+                } }, c.liked ? "♥" : "♡", " " + c.likes),
+              el("span", { title: "Chats with this character" }, icon("i-chat", "sm"), " " + c.uses)),
+            el("button", { class: "ghost", onclick: function () { addToMine(c.id); } }, "Add"),
+            el("button", { class: "primary", onclick: function () { startChat(c.id); } }, "Chat"))));
       });
     view.appendChild(grid);
   }
 
   async function startChat(characterId) {
-    try { var chat = await api("/api/chats", { method: "POST", body: { character_id: characterId, model: "self" } }); go("chat/" + chat.id); }
+    try { var chat = await api("/api/chats", { method: "POST", body: { character_id: characterId } }); go("chat/" + chat.id); }
     catch (e) { toast(e.message); }
   }
   async function addToMine(characterId) {
@@ -698,7 +953,7 @@
       el("div", { class: "cover" }),
       el("div", { style: "padding:0 24px 24px" },
         el("div", { class: "profile-top" },
-          el("span", { class: "avatar lg alt", style: "width:92px;height:92px;border-radius:28px;font-size:28px;margin-top:-46px", text: initials(me.display_name || me.username) }),
+          userAvatar(me, "lg", "width:92px;height:92px;border-radius:28px;font-size:28px;margin-top:-46px"),
           el("div", { class: "grow", style: "min-width:180px" },
             el("div", { style: "font-family:var(--display);font-size:24px;font-weight:600", text: me.display_name || me.username }),
             el("div", { class: "muted small", text: (me.role === "admin" ? "Admin" : "User") + " · " + chars.length + " characters · " + chats.length + " chats" })),
@@ -708,10 +963,40 @@
         el("div", { class: "kpis" },
           kpi(chars.length, "characters"), kpi(chats.length, "chats"), kpi(msgs, "messages")))));
 
+    var picInput = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", style: "display:none", "aria-label": "Profile picture" });
+    picInput.addEventListener("change", async function () {
+      var f = picInput.files && picInput.files[0];
+      if (!f) return;
+      try {
+        var r = await fetch("/api/auth/avatar", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": f.type }, body: f });
+        if (!r.ok) { var d = null; try { d = await r.json(); } catch (e) {} throw new Error((d && d.detail) || "Picture not saved"); }
+        me.has_avatar = true; me._v = Date.now(); refreshMe(); renderProfile(); toast("Picture saved");
+      } catch (e) { toast(e.message); }
+    });
+    var personaName = el("input", { id: "persona-name", value: me.persona_name || "", placeholder: "e.g. Jay" });
+    var personaDesc = el("textarea", { id: "persona-desc", rows: "4", placeholder: "Who you play: look, job, how you know the characters. The characters know this." });
+    personaDesc.value = me.persona_description || "";
+    view.appendChild(picInput);
     view.appendChild(el("div", { class: "grid grid-2", style: "margin-top:18px" },
       el("div", { class: "card form" }, el("h2", { text: "Details" }),
         el("div", null, el("label", { for: "display", text: "Display name" }), nameInput),
+        el("div", null, el("label", { text: "Profile picture" }),
+          el("div", { class: "row", style: "flex-wrap:wrap" },
+            el("button", { onclick: function () { picInput.click(); } }, me.has_avatar ? "Change picture" : "Upload picture"),
+            me.has_avatar ? el("button", { class: "ghost", onclick: async function () {
+              try { await api("/api/auth/avatar", { method: "DELETE" }); me.has_avatar = false; refreshMe(); renderProfile(); } catch (e) { toast(e.message); }
+            } }, "Remove") : null)),
         el("div", { class: "row" }, save)),
+      el("div", { class: "card form" }, el("h2", { text: "Persona" }),
+        el("p", { class: "muted small", text: "Who you are in the roleplays. Every character knows it." }),
+        el("div", null, el("label", { for: "persona-name", text: "Your role name" }), personaName),
+        el("div", null, el("label", { for: "persona-desc", text: "About your role" }), personaDesc),
+        el("div", { class: "row" }, el("button", { class: "primary", onclick: async function () {
+          try {
+            var r = await api("/api/auth/profile", { method: "PATCH", body: { persona_name: personaName.value, persona_description: personaDesc.value } });
+            me.persona_name = r.persona_name; me.persona_description = r.persona_description; toast("Persona saved");
+          } catch (e) { toast(e.message); }
+        } }, "Save persona"))),
       el("div", { class: "card form" }, el("h2", { text: "Your data" }),
         el("p", { class: "muted small", text: "Download everything you own as JSON." }),
         el("div", { class: "row", style: "flex-wrap:wrap" },
@@ -764,8 +1049,21 @@
     var glassCard = null;
     if (prefs.design === "glass" || prefs.design === "modern-glass") {
       var bgs = el("div", { class: "segmented", role: "group", "aria-label": "Background" });
+      var bgFile = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp", style: "display:none", "aria-label": "Background picture" });
+      bgFile.addEventListener("change", async function () {
+        var f = bgFile.files && bgFile.files[0];
+        if (!f) return;
+        try {
+          var r = await fetch("/api/auth/background", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": f.type }, body: f });
+          if (!r.ok) { var d = null; try { d = await r.json(); } catch (e) {} throw new Error((d && d.detail) || "Picture not saved"); }
+          me.has_background = true; state.bgVersion = Date.now(); prefs.bg = "custom"; savePrefs(); applyPrefs(); renderSettings(); toast("Background saved");
+        } catch (e) { toast(e.message); }
+      });
       BACKGROUNDS.forEach(function (b) {
-        bgs.appendChild(el("button", { "aria-pressed": prefs.bg === b[0] ? "true" : "false", onclick: function () { prefs.bg = b[0]; savePrefs(); applyPrefs(); renderSettings(); } }, b[1]));
+        bgs.appendChild(el("button", { "aria-pressed": prefs.bg === b[0] ? "true" : "false", onclick: function () {
+          if (b[0] === "custom" && !me.has_background) { bgFile.click(); return; }
+          prefs.bg = b[0]; savePrefs(); applyPrefs(); renderSettings();
+        } }, b[1]));
       });
       var slider = function (key, label, min, max, unit) {
         var out = el("output", { text: prefs[key] + unit });
@@ -776,6 +1074,14 @@
       };
       glassCard = el("div", { class: "card form" }, el("h2", { text: "Glass" }),
         el("div", null, el("label", { text: "Background" }), bgs),
+        bgFile,
+        el("div", { class: "row", style: "flex-wrap:wrap" },
+          el("button", { onclick: function () { bgFile.click(); } }, me.has_background ? "Change my picture" : "Upload my picture"),
+          me.has_background ? el("button", { class: "ghost", onclick: async function () {
+            try { await api("/api/auth/background", { method: "DELETE" }); me.has_background = false; if (prefs.bg === "custom") prefs.bg = "dusk"; savePrefs(); applyPrefs(); renderSettings(); }
+            catch (e) { toast(e.message); }
+          } }, "Remove my picture") : null,
+          el("span", { class: "muted small", text: "Only you see your picture." })),
         slider("blur", "Blur", 0, 40, " px"), slider("alpha", "Panel opacity", 20, 95, " %"), slider("dim", "Dim background", 0, 80, " %"),
         el("p", { class: "muted small", text: "On phones the blur is switched off, so scrolling stays smooth." }));
     }
@@ -791,12 +1097,123 @@
       el("div", { class: "card form" }, el("h2", { text: "Replies" }),
         el("div", { class: "two" },
           el("div", null, el("label", { for: "len", text: "Reply length" }), len),
-          el("div", null, el("label", { for: "ctx", text: "Context sent to the model" }), ctx))),
+          el("div", null, el("label", { for: "ctx", text: "Context sent to the model" }), ctx)),
+        el("div", { class: "switch" }, el("div", null, el("div", { text: "Sound when a reply is complete" }), el("div", { class: "muted small", text: "A short chime, also handy when the model is slow." })),
+          el("button", { class: "toggle", role: "switch", "aria-checked": prefs.sound ? "true" : "false", "aria-label": "Sound when a reply is complete",
+            onclick: function () { prefs.sound = !prefs.sound; savePrefs(); renderSettings(); if (prefs.sound) chime(); } }))),
       aboutCard(),
+      passwordCard(),
+      twoFactorCard(),
+      devicesCard(),
       el("div", { class: "card" }, el("h2", { text: "Account" }),
         el("div", { class: "row", style: "flex-wrap:wrap;margin-top:12px" },
           el("button", { onclick: logout }, "Log out on this device"),
-          el("button", { class: "ghost", onclick: logoutAll }, "Log out on all devices")))));
+          el("button", { class: "ghost", onclick: logoutAll }, "Log out on all devices"))),
+      deleteAccountCard()));
+  }
+
+  function passwordCard() {
+    var cur = el("input", { type: "password", autocomplete: "current-password", id: "pw-cur" });
+    var nw = el("input", { type: "password", autocomplete: "new-password", id: "pw-new" });
+    var nw2 = el("input", { type: "password", autocomplete: "new-password", id: "pw-new2" });
+    return el("div", { class: "card form" }, el("h2", { text: "Password" }),
+      el("div", { class: "two" },
+        el("div", null, el("label", { for: "pw-cur", text: "Current password" }), cur),
+        el("div", null, el("label", { for: "pw-new", text: "New password" }), nw),
+        el("div", null, el("label", { for: "pw-new2", text: "New password again" }), nw2)),
+      el("p", { class: "muted small", text: "Your other devices are logged out; this one stays logged in." }),
+      el("div", null, el("button", { class: "primary", onclick: async function () {
+        if (nw.value !== nw2.value) { toast("The new passwords are not the same"); return; }
+        try { await api("/api/auth/password", { method: "POST", body: { current: cur.value, new: nw.value } }); cur.value = nw.value = nw2.value = ""; toast("Password changed"); }
+        catch (e) { toast(e.message); }
+      } }, "Change password")));
+  }
+
+  function twoFactorCard() {
+    var card = el("div", { class: "card form" }, el("h2", { text: "Two-factor login" }));
+    if (me.totp_enabled) {
+      var pw = el("input", { type: "password", autocomplete: "current-password", id: "tf-pw" });
+      card.appendChild(el("p", null, el("span", { class: "pill ok", text: "On" }), " ", el("span", { class: "muted small", text: me.recovery_codes_left + " recovery codes left" })));
+      card.appendChild(el("div", null, el("label", { for: "tf-pw", text: "Password to switch it off" }), pw));
+      card.appendChild(el("div", null, el("button", { class: "ghost", onclick: async function () {
+        try { await api("/api/auth/2fa/disable", { method: "POST", body: { password: pw.value } }); await refreshMe(); renderSettings(); toast("Two-factor login is off"); }
+        catch (e) { toast(e.message); }
+      } }, "Switch off")));
+      return card;
+    }
+    card.appendChild(el("p", { class: "muted small", text: "After the password, Compain also asks for a code from an authenticator app (for example Aegis, Google Authenticator, 1Password)." }));
+    var area = el("div", { class: "form" });
+    card.appendChild(area);
+    area.appendChild(el("div", null, el("button", { class: "primary", onclick: async function () {
+      try {
+        var r = await api("/api/auth/2fa/setup", { method: "POST" });
+        area.textContent = "";
+        var qr = new DOMParser().parseFromString(r.qr_svg, "image/svg+xml").documentElement; // our own server's SVG
+        qr.setAttribute("class", "qr");
+        var code = el("input", { id: "tf-code", inputmode: "numeric", autocomplete: "one-time-code", placeholder: "123456" });
+        area.appendChild(el("div", { class: "row", style: "flex-wrap:wrap;align-items:flex-start;gap:18px" }, document.importNode(qr, true),
+          el("div", { class: "grow form" },
+            el("p", { class: "small", text: "1. Scan the code with your authenticator app (or type the key)." }),
+            el("code", { class: "secret", text: r.secret }),
+            el("div", null, el("label", { for: "tf-code", text: "2. Code from the app" }), code),
+            el("div", null, el("button", { class: "primary", onclick: async function () {
+              try {
+                var res = await api("/api/auth/2fa/enable", { method: "POST", body: { code: code.value } });
+                area.textContent = "";
+                area.appendChild(el("p", { class: "small", text: "Two-factor login is on. Keep these recovery codes somewhere safe; each works once if your phone is gone:" }));
+                area.appendChild(el("pre", { class: "codes", text: res.recovery_codes.join("\n") }));
+                area.appendChild(el("button", { onclick: async function () { await refreshMe(); renderSettings(); } }, "I saved them"));
+              } catch (e) { toast(e.message); }
+            } }, "Switch on")))));
+      } catch (e) { toast(e.message); }
+    } }, "Set up")));
+    return card;
+  }
+
+  function devicesCard() {
+    var card = el("div", { class: "card" }, el("h2", { text: "Devices" }),
+      el("p", { class: "muted small", style: "margin:6px 0 10px", text: "Where your account is logged in. End anything you do not recognise." }));
+    var list = el("div", { class: "form" });
+    card.appendChild(list);
+    api("/api/auth/sessions").then(function (rows) {
+      rows.forEach(function (d) {
+        var ua = d.user_agent || "Unknown device";
+        var label = /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iPhone / iPad" : /Windows/.test(ua) ? "Windows" : /Mac OS/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux" : "Device";
+        var browser = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+        list.appendChild(el("div", { class: "switch" },
+          el("div", { style: "min-width:0" },
+            el("div", null, label + (browser ? " · " + browser : ""), d.current ? el("span", { class: "pill accent", style: "margin-left:8px", text: "This device" }) : null),
+            el("div", { class: "muted small ellipsis", text: (d.ip || "") + (d.last_seen ? " · last used " + fmtTime(d.last_seen) : "") })),
+          d.current ? null : el("button", { class: "ghost", onclick: async function () {
+            try { await api("/api/auth/sessions/" + d.id, { method: "DELETE" }); renderSettings(); toast("Device logged out"); } catch (e) { toast(e.message); }
+          } }, "Log out")));
+      });
+    }).catch(function (e) { list.textContent = e.message; });
+    return card;
+  }
+
+  function deleteAccountCard() {
+    var pw = el("input", { type: "password", autocomplete: "current-password", id: "del-pw" });
+    var confirmName = el("input", { id: "del-name", placeholder: me.username });
+    return el("div", { class: "card form danger" }, el("h2", { text: "Delete account" }),
+      el("p", { class: "muted small", text: "Deletes your account with all characters, chats, pictures and settings. This cannot be undone. Export your data first (Profile → Your data)." }),
+      el("div", { class: "two" },
+        el("div", null, el("label", { for: "del-name", text: "Type your username" }), confirmName),
+        el("div", null, el("label", { for: "del-pw", text: "Password" }), pw)),
+      el("div", null, el("button", { class: "danger-btn", onclick: async function () {
+        try {
+          await api("/api/auth/delete-account", { method: "POST", body: { password: pw.value, confirm: confirmName.value } });
+          me = null; location.hash = ""; location.reload();
+        } catch (e) { toast(e.message); }
+      } }, "Delete my account")));
+  }
+
+  async function refreshMe() {
+    var v = me && me._v;
+    me = await api("/api/auth/me");
+    me._v = v || Date.now();
+    var ini = $("me-ini");
+    ini.replaceWith(Object.assign(userAvatar(me, "sm"), { id: "me-ini" }));
   }
 
   function aboutCard() {
@@ -808,7 +1225,8 @@
         version),
       el("div", { class: "row", style: "flex-wrap:wrap;margin-top:14px" },
         el("button", { onclick: function () { openPopover("changelog", null); } }, "Changelog"),
-        el("button", { onclick: function () { openPopover("impressum", null); } }, "Impressum")));
+        el("button", { onclick: function () { openPopover("impressum", null); } }, "Impressum"),
+        el("button", { onclick: function () { openPopover("datenschutz", null); } }, "Datenschutz")));
   }
 
   function languageCard() {
@@ -1110,8 +1528,14 @@
     body.appendChild(panel("Nightly backup", settingsForm([
       { key: "backup_time", label: "Time (24-hour clock)", type: "text", help: "Backups run once a day at this time." },
       { key: "backup_keep_days", label: "Keep backups for (days)", type: "int" },
-      { key: "backup_include_pictures", label: "Include character pictures", type: "bool" }
+      { key: "backup_include_pictures", label: "Include character pictures", type: "bool" },
+      { key: "backup_offsite", label: "Also copy to a second place", type: "bool", help: "For example a NAS or USB disk: set BACKUP_OFFSITE_DIR in .env to its folder. Old copies are removed with the same rule." }
     ], "Last run: " + (adminSettings.backup_last_run || "never") + " · status: " + adminSettings.backup_last_status)));
+    api("/api/admin/backups-offsite").then(function (o) {
+      body.appendChild(panel("Second place", el("p", { class: "small" },
+        el("span", { class: "pill " + (o.writable ? "ok" : ""), text: o.writable ? "Ready" : "Not available" }), " ",
+        el("span", { class: "muted", text: o.writable ? "Backups can be copied there." : "Mount a folder with BACKUP_OFFSITE_DIR in .env and restart." }))));
+    }).catch(function () {});
     var list = el("div", { class: "table-wrap" });
     async function drawList() {
       var rows = await api("/api/admin/backups");
@@ -1211,7 +1635,7 @@
     var same = popover && popover.kind === kind;
     closePopover();
     if (same && button) return; // second click on the same button closes it
-    var title = kind === "changelog" ? "Changelog" : "Impressum";
+    var title = kind === "changelog" ? "Changelog" : kind === "datenschutz" ? "Datenschutz" : "Impressum";
     var body = el("div", null, el("p", { class: "muted small", text: "Loading…" }));
     var node = el("div", { class: "popover" + (button ? "" : " floating"), role: "dialog", "aria-label": title },
       el("div", { class: "popover-head" }, el("h2", { text: title }),
@@ -1223,11 +1647,12 @@
     if (button) button.setAttribute("aria-expanded", "true");
     popover = { kind: kind, node: node, backdrop: backdrop, button: button };
     try {
-      var r = await fetch(kind === "changelog" ? "/api/changelog" : "/api/legal/impressum", { credentials: "same-origin" });
+      var r = await fetch(kind === "changelog" ? "/api/changelog" : "/api/legal/" + kind, { credentials: "same-origin" });
       var text = r.ok ? await r.text() : "";
       body.textContent = "";
-      if (!text) body.appendChild(el("p", { class: "muted", text: kind === "impressum" ? "The Impressum is not set up yet. The operator creates the file .impressum (template: .impressum-example)." : "No changelog found." }));
-      else body.appendChild(mdLite(kind === "impressum" ? text.replace(/^# Impressum\s*\n/, "") : text.replace(/^# Changelog\s*\n/, "")));
+      if (!text) body.appendChild(el("p", { class: "muted", text: kind === "impressum" ? "The Impressum is not set up yet. The operator creates the file .impressum (template: .impressum-example)."
+        : kind === "datenschutz" ? "The privacy policy is not set up yet. The operator creates the file .datenschutz (template: .datenschutz-example)." : "No changelog found." }));
+      else body.appendChild(mdLite(text.replace(/^# [^\n]*\n/, "")));
     } catch (e) { body.textContent = e.message; }
     if (kind === "changelog" && appVersion && me) {
       $("tb-dot").hidden = true;
@@ -1244,6 +1669,7 @@
 
   $("tb-changelog").addEventListener("click", function () { openPopover("changelog", this); });
   $("tb-impressum").addEventListener("click", function () { openPopover("impressum", this); });
+  $("tb-datenschutz").addEventListener("click", function () { openPopover("datenschutz", this); });
   document.querySelectorAll("[data-pop]").forEach(function (a) {
     a.addEventListener("click", function (e) { e.preventDefault(); openPopover(a.getAttribute("data-pop"), null); });
   });
@@ -1321,7 +1747,7 @@
     $("view-login").classList.add("hidden");
     $("app").classList.remove("hidden");
     $("bottombar").classList.remove("hidden");
-    $("me-ini").textContent = initials(me.display_name || me.username);
+    $("me-ini").replaceWith(Object.assign(userAvatar(me, "sm"), { id: "me-ini" }));
     $("me-name").textContent = me.display_name || me.username;
     $("me-role").textContent = me.role === "admin" ? "Admin" : "User";
     buildNav();
@@ -1345,14 +1771,33 @@
     e.preventDefault();
     $("login-error").textContent = "";
     try {
-      await api("/api/auth/login", { method: "POST", body: {
+      var res = await api("/api/auth/login", { method: "POST", body: {
         username: $("user").value, password: $("pw").value, remember: $("remember").checked } });
-      me = await api("/api/auth/me");
       $("pw").value = "";
+      if (res.mfa_required) {
+        $("login-form").classList.add("hidden");
+        $("mfa-form").classList.remove("hidden");
+        $("mfa-code").focus();
+        return;
+      }
+      me = await api("/api/auth/me");
       showApp();
     } catch (err) {
       $("login-error").textContent = err.message;
     }
+  });
+
+  $("mfa-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    $("mfa-error").textContent = "";
+    try {
+      await api("/api/auth/login/2fa", { method: "POST", body: { code: $("mfa-code").value } });
+      $("mfa-code").value = "";
+      $("mfa-form").classList.add("hidden");
+      $("login-form").classList.remove("hidden");
+      me = await api("/api/auth/me");
+      showApp();
+    } catch (err) { $("mfa-error").textContent = err.message; }
   });
 
   $("remember").addEventListener("change", function () {
@@ -1362,6 +1807,10 @@
   window.addEventListener("hashchange", function () { if (me) go(location.hash.slice(1) || "home"); });
 
   /* ---------- boot ---------- */
+  // Installable app (PWA). Service workers need HTTPS or localhost; elsewhere the app works without it.
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+    navigator.serviceWorker.register("/sw.js").catch(function () { /* not essential */ });
+  }
   if (window.CompainI18n) window.CompainI18n.start();
   applyPrefs();
   fetch("/static/sprite.svg").then(function (r) { return r.text(); }).then(function (svg) {

@@ -14,13 +14,17 @@ const REPLY_TIMEOUT = Number(process.env.REPLY_TIMEOUT || 180000);
 
 // Wait until the conversation shows a finished reply after sending (mock or real model).
 async function waitForReply(p) {
+  // Finished = nothing is being written, the send button is no Stop button any more, and the chat was
+  // reloaded from the server (messages have their action buttons again).
   await p.waitForFunction(() => {
     const box = document.querySelector("#messages");
     if (!box) return false;
     const typing = box.querySelector(".typing, .bubble.cursor");
-    const last = [...box.querySelectorAll(".msg.char .bubble")].pop();
-    return !typing && last && last.textContent.trim().length > 0 && !document.querySelector(".send[disabled]");
+    const last = [...box.querySelectorAll(".msg.char")].pop();
+    return !typing && !document.querySelector(".send.stopping") && last && last.querySelector(".meta-line")
+      && last.querySelector(".bubble").textContent.trim().length > 0;
   }, null, { timeout: REPLY_TIMEOUT });
+  await p.waitForTimeout(500);
 }
 
 // After logging in: answer the one-time age question if it appears. Returns true if it was shown.
@@ -90,6 +94,7 @@ await page.evaluate(() => fetch("/api/auth/preferences", { method: "PUT", creden
 await page.reload();
 await page.waitForSelector("#app:not(.hidden)");
 await page.waitForFunction(() => document.documentElement.getAttribute("data-design") === "classic", null, { timeout: 10000 });
+await page.waitForSelector("#view-home .stat-card", { timeout: 15000 });
 await page.screenshot({ path: SHOTS + "01-home-desktop.png" });
 check("home shows the hosted quota", (await page.textContent("#view-home")).includes("Hosted API today"));
 
@@ -136,12 +141,72 @@ check("a reply can be marked important", true);
 check("important counter updates", (await page.textContent("#conv .conv-stats")).includes("1 of 10"));
 
 // Per-chat model switch to hosted (mock)
-await page.selectOption("#conv select.model-select", "hosted");
+await page.selectOption("#chat-model", "hosted");
 await page.waitForTimeout(400);
 check("model can be changed per chat", true);
 
 // Export link exists
 check("chat export link is present", (await page.getAttribute("#conv a[download]", "href")).includes("/api/export/chat/"));
+await page.selectOption("#chat-model", "self");
+await page.waitForTimeout(300);
+
+// Markdown: *actions* are shown in italics, the asterisks disappear
+await page.waitForSelector("#messages .msg.char .bubble em", { timeout: 5000 }).catch(() => {});
+const shownText = await page.textContent("#messages");
+check("Markdown: actions in italics, no visible asterisks",
+  (await page.locator("#messages .msg.char .bubble em").count()) > 0 && !/\*[^*\s][^*]*\*/.test(shownText));
+
+// Regenerate: a second version, flip between them
+await page.click("#messages .msg.char:last-child .mark:has-text('Regenerate')");
+await page.waitForSelector("#messages .variants", { timeout: REPLY_TIMEOUT });
+await waitForReply(page);
+check("regenerate keeps two versions", (await page.textContent("#messages .variants")).includes("2 / 2"));
+await page.click("#messages .variants button[aria-label='Previous version']");
+await page.waitForFunction(() => (document.querySelector("#messages .variants") || {}).textContent?.includes("1 / 2"), null, { timeout: 10000 }).catch(() => {});
+check("versions can be flipped", (await page.textContent("#messages .variants")).includes("1 / 2"));
+
+// Continue: the character writes on without a new message (counted on the server)
+const chatId = Number((await page.getAttribute("#conv a[download]", "href")).split("/").pop());
+const countMsgs = () => page.evaluate(async (id) => (await (await fetch("/api/chats/" + id, { credentials: "same-origin" })).json()).messages.length, chatId);
+const msgsBefore = await countMsgs();
+await page.click("#conv .quick .accent-chip");
+await page.waitForSelector("#conv .send.stopping", { timeout: 10000 }).catch(() => {});
+await waitForReply(page);
+const msgsAfter = await countMsgs();
+check("continue adds a reply of the character", msgsAfter === msgsBefore + 1, `before ${msgsBefore}, after ${msgsAfter}, toast "${await page.textContent("#toast")}"`);
+
+// Edit the own message
+await page.locator("#messages .msg.user .mark:has-text('Edit')").first().click();
+await page.fill("#messages .edit-box textarea", "Where were you at *six*?");
+await page.click("#messages .edit-box button:has-text('Save')");
+await page.waitForFunction(() => document.querySelector("#messages .msg.user .bubble em"), null, { timeout: 10000 }).catch(() => {});
+check("own message can be edited (with Markdown)", (await page.textContent("#messages .msg.user")).includes("Where were you at six?"));
+
+// Stop while the character writes: the written part stays
+await page.fill("#conv textarea", "Tell me everything about the harbour, in detail.");
+await page.keyboard.press("Enter");
+await page.waitForSelector("#messages .bubble.cursor", { timeout: REPLY_TIMEOUT });
+await page.waitForTimeout(800);
+await page.click("#conv .send");
+await page.waitForSelector("#toast.show", { timeout: 10000 });
+check("Stop ends the reply and keeps the part", (await page.textContent("#toast")).includes("Stopped"));
+await page.waitForTimeout(1500);
+
+// Search in the chat
+await page.click("#conv .tools button[aria-label='Search in this chat']");
+await page.fill(".chat-search input", "harbour");
+check("search finds messages in the chat", (await page.locator("#messages .msg.hit").count()) > 0);
+await page.click("#conv .tools button[aria-label='Search in this chat']");
+
+// Switch the character in the running chat
+await page.evaluate(() => fetch("/api/characters", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "Iris Kade", tagline: "Airship captain" }) }));
+await page.focus("#chat-character");
+await page.waitForTimeout(800);
+await page.selectOption("#chat-character", { label: "Iris Kade" });
+await page.waitForFunction(() => (document.querySelector("#conv .conv-head .name") || {}).textContent === "Iris Kade", null, { timeout: 10000 }).catch(() => {});
+check("character can be switched in the running chat", (await page.textContent("#conv .conv-head .name")) === "Iris Kade");
+await page.screenshot({ path: SHOTS + "12-chat-tools.png" });
 
 // Settings: theme and appearance
 await page.click("#nav-desktop button[data-go=settings]");
@@ -221,6 +286,27 @@ await page.click("#nav-desktop button[data-go=community]");
 await page.waitForSelector("#view-community:not(.hidden)");
 await page.waitForSelector("#view-community .featured, #view-community .empty-card", { timeout: 10000 });
 check("approved character shows in Community", (await page.textContent("#view-community")).includes("Mara Stone"));
+await page.locator("#view-community .like").first().click();
+await page.waitForSelector("#view-community .like.on", { timeout: 10000 }).catch(() => {});
+check("a Community character can be liked", (await page.locator("#view-community .like.on").count()) > 0);
+await page.locator("#view-community .like.on").first().click();
+
+// Persona in the profile
+await page.click("#nav-desktop button[data-go=profile]");
+await page.fill("#persona-name", "Jay");
+await page.fill("#persona-desc", "A dock worker who owes Mara a favour.");
+await page.click("#view-profile button:has-text('Save persona')");
+await page.waitForFunction(() => (document.querySelector("#toast") || {}).textContent?.includes("Persona"), null, { timeout: 10000 }).catch(() => {});
+check("persona can be saved", (await page.textContent("#toast")).includes("Persona"));
+
+// Privacy policy popover and installable app
+await page.click("#tb-datenschutz");
+await page.waitForSelector(".popover h2", { timeout: 5000 });
+check("privacy policy opens as a popover", (await page.textContent(".popover")).includes("Datenschutz"));
+await page.keyboard.press("Escape");
+const sw = await page.evaluate(async () => !!(await navigator.serviceWorker?.getRegistration?.()));
+const manifest = await page.request.get(BASE + "/manifest.webmanifest");
+check("installable app: manifest and service worker", manifest.status() === 200 && sw);
 await page.screenshot({ path: SHOTS + "04-community-desktop.png" });
 await page.click("#view-community .grid .ghost:has-text('Add')").catch(() => {});
 
@@ -276,7 +362,7 @@ await page.waitForSelector("#view-admin td:has-text('compain-')", { timeout: 600
 check("backup can be created from the browser", true);
 await page.click("#view-admin .subtabs button:has-text('Models')");
 await page.click("#view-admin button:has-text('Run speed test')");
-await page.waitForSelector("text=pieces per second", { timeout: 60000 });
+await page.waitForSelector("text=pieces per second", { timeout: REPLY_TIMEOUT });
 check("speed test shows a result", true);
 await page.click("#view-admin .subtabs button:has-text('Hosted API')");
 await page.waitForSelector("#h-prov");
