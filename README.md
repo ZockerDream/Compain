@@ -1,3 +1,5 @@
+<p align="center"><img src="app/compain/static/icons/mark-tile.svg" width="112" alt="Compain logo: a crescent moon with a spark"></p>
+
 # Compain
 
 A private, self-hosted AI roleplay chat app. Compain is a personal replacement for commercial character-chat apps like Chai. Chats and characters stay on the owner's server, and the hosted model is limited to a free daily quota, so cost is not tied to a subscription.

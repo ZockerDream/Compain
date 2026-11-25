@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.9.0 – 2026-11-25
+
+- **New logo: the crescent.** A moon that opens into a C, glowing from candle light to ember and dusk rose, with a spark inside: someone keeps you company at night. It is in the sidebar, the top bar, on the login, two-factor and age pages (with a spark as the dot of the *i*), as the browser tab icon and as the app icon for *Add to Home Screen* (also as a maskable icon for Android).
+- The logo is the same in every colour theme; the app's window colour is now the night tone of the logo.
+- Files: `app/compain/static/icons/` (`mark.svg`, `mark-tile.svg`, `icon.svg`, `app-icon.svg` and the PNG sizes).
+
 ## 1.8.1 – 2026-11-25
 
 - `examples/demo-characters.json`: the placeholder pictures are now anime illustrations (via nekos.best) instead of cartoon avatars. Artist and source of every picture are in `picture_credit`; replace them with your own pictures for real use.

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="t" cx="0.42" cy="0.5" r="0.62"><stop offset="0" stop-color="#3a1a24"/><stop offset="0.6" stop-color="#160f19"/><stop offset="1" stop-color="#0b090e"/></radialGradient>
+    <linearGradient id="e" x1="0.15" y1="0.05" x2="0.75" y2="1"><stop offset="0" stop-color="#ffc48a"/><stop offset="0.45" stop-color="#e8642c"/><stop offset="1" stop-color="#9e2152"/></linearGradient>
+    <mask id="m"><rect width="200" height="200" fill="#fff"/><circle cx="127" cy="84" r="61" fill="#000"/></mask>
+    <filter id="sb" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+    <mask id="mg" maskUnits="userSpaceOnUse" x="-60" y="-60" width="320" height="320"><rect x="-60" y="-60" width="320" height="320" fill="#fff"/><circle cx="125" cy="86" r="62" fill="#000" filter="url(#sb)"/></mask>
+    <filter id="b" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="8"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#t)"/>
+  <g transform="translate(256 256) scale(1.8) translate(-100 -100)">
+    <g mask="url(#mg)"><circle cx="100" cy="100" r="80" fill="#e8642c" filter="url(#b)" opacity="0.6"/></g>
+    <circle cx="100" cy="100" r="80" fill="url(#e)" mask="url(#m)"/>
+    <circle cx="100" cy="100" r="79" fill="none" stroke="#ffe2c4" stroke-opacity="0.3" stroke-width="1" mask="url(#m)"/>
+    <path d="M139 103 C140.8 117.2 140.8 117.2 155 119 C140.8 120.8 140.8 120.8 139 135 C137.2 120.8 137.2 120.8 123 119 C137.2 117.2 137.2 117.2 139 103 Z" fill="#fff4e6"/>
+    <path d="M162 64 C162.6 68.4 162.6 68.4 167 69 C162.6 69.6 162.6 69.6 162 74 C161.4 69.6 161.4 69.6 157 69 C161.4 68.4 161.4 68.4 162 64 Z" fill="#fff4e6" opacity="0.75"/>
+  </g>
+</svg>
