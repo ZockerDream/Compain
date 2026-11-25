@@ -2,6 +2,13 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.6.1 – 2026-11-25
+
+- **Phones: the input field of a chat is visible again.** An open chat now ends right above the bottom bar in every design; the top buttons (Changelog, Impressum, Datenschutz) step aside while a chat is open.
+- Phones: the chat header shows the name again, with the tools in a second row; the chat facts (messages, important, model) are one row that scrolls sideways.
+- Settings on phones: the background choices of the glass designs wrap instead of running off the screen.
+- Home: the *You* card shows your profile picture; long chat titles under *Recent chats* end with … inside the card.
+
 ## 1.6.0 – 2026-11-25
 
 - **Email address on every account.** You log in with your username or your email address, whichever you like. Creating an account with an invite code asks for an email address.

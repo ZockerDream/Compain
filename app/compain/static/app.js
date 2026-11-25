@@ -281,7 +281,7 @@
       return el("li", null,
         avatar(c.character_name, c.character_id, c.character_has_picture, "sm"),
         el("div", { class: "grow", style: "min-width:0" },
-          el("div", { text: c.character_name + " · " + c.title }),
+          el("div", { class: "ellipsis", text: c.character_name + " · " + c.title }),
           el("div", { class: "muted small ellipsis", text: plain(c.last_message) || "No messages yet" })),
         el("span", { class: "time", text: fmtTime(c.updated_at) }));
     });
@@ -295,7 +295,7 @@
       el("div", { class: "card" },
         el("h2", { style: "margin-bottom:16px", text: "You" }),
         el("div", { class: "row", style: "margin-bottom:16px" },
-          el("span", { class: "avatar lg alt", text: initials(me.display_name || me.username) }),
+          userAvatar(me, "lg"),
           el("div", { class: "grow" },
             el("div", { style: "font-weight:600;font-size:17px", text: me.display_name || me.username }),
             el("div", { class: "muted small", text: me.role === "admin" ? "Admin" : "User" }))),
@@ -2539,6 +2539,13 @@
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
     navigator.serviceWorker.register("/sw.js").catch(function () { /* not essential */ });
   }
+  // Height of the phone bottom bar, so an open chat ends right above it (designs.css, 1.6.1).
+  function syncBottombar() {
+    var bar = document.querySelector(".bottombar");
+    if (bar && bar.offsetHeight) document.documentElement.style.setProperty("--bottombar-h", bar.offsetHeight + "px");
+  }
+  window.addEventListener("resize", syncBottombar);
+  setInterval(syncBottombar, 2000); // also after fonts, translation and the login have changed the bar
   if (window.CompainI18n) window.CompainI18n.start();
   applyPrefs();
   fetch("/static/sprite.svg").then(function (r) { return r.text(); }).then(function (svg) {

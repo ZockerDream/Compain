@@ -317,3 +317,28 @@ pre.codes { padding: 12px 14px; border-radius: 12px; background: var(--surface-2
 /* character assistant in the editor */
 .assist-box { border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .assist-box textarea { min-height: 64px; }
+
+/* ---------- 1.6.1: phone layout ---------- */
+/* Choice rows (glass background, appearance) wrap instead of pushing the card wider than the screen. */
+.segmented { flex-wrap: wrap; max-width: 100%; }
+@media (max-width: 900px) {
+  .segmented { border-radius: 16px; }
+  /* An open chat fills the screen between the top edge and the bottom bar, so the input field is always visible.
+     --bottombar-h is measured by app.js (syncBottombar). */
+  body[data-chat="1"] .topbar { display: none; }
+  :root[data-design] body[data-chat="1"] main.content { padding-top: env(safe-area-inset-top, 0px); }
+  body[data-chat="1"] .chats-shell {
+    height: calc(100vh - var(--bottombar-h, 70px) - env(safe-area-inset-top, 0px));
+    height: calc(100dvh - var(--bottombar-h, 70px) - env(safe-area-inset-top, 0px));
+  }
+  /* Header: back, picture and name in the first row, the tools in a second row. */
+  body[data-chat="1"] .conv-head { flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; }
+  body[data-chat="1"] .conv-head .grow { flex: 1 1 0; }
+  body[data-chat="1"] .conv-head .tools { order: 3; width: 100%; justify-content: space-between; margin-left: 0; }
+  /* Chat facts in one row that scrolls sideways instead of three rows. */
+  body[data-chat="1"] .conv-stats:not(.hidden) { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; }
+  body[data-chat="1"] .conv-stats .model-select { width: auto; }
+}
+/* Lists in cards (recent chats): rows may shrink, so long titles end with … inside the card. */
+.feed { grid-template-columns: minmax(0, 1fr); }
+.feed > li { min-width: 0; }

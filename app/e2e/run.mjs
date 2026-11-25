@@ -64,6 +64,8 @@ async function layoutProblems(page) {
     els.forEach((e) => {
       const r = e.getBoundingClientRect();
       if (r.right > vw + 1) out.push("overflow: " + (e.className || e.tagName).toString().slice(0, 40));
+      // Content wider than its card is cut off (cards hide overflow), for example a row of choices.
+      else if (e.classList.contains("card") && e.scrollWidth > e.clientWidth + 1) out.push(`cut off in card: ${(e.querySelector("h2") || e).textContent.slice(0, 30)}`);
     });
     return out;
   });
@@ -548,12 +550,16 @@ const roleSel = `select[data-role-for="${helpUser}"]`;
 await page.waitForSelector(roleSel, { timeout: 5000 }).catch(() => {});
 check("admin creates a user with an email address", (await page.textContent("#view-admin table")).includes(helpMail));
 check("own role cannot be changed", await page.isDisabled(`select[data-role-for="${ADMIN_USER}"]`));
+const rolePatched = () => page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/api/admin/users/"), { timeout: 10000 }).catch(() => {});
+let patched = rolePatched();
 await page.selectOption(roleSel, "admin");
-await page.waitForFunction((u) => document.querySelector(`select[data-role-for="${u}"]`)?.value === "admin" && !document.querySelector("#toast")?.textContent.includes("cannot"), helpUser, { timeout: 5000 }).catch(() => {});
+await patched;
 const roleNow = async () => page.evaluate(async (u) => (await (await fetch("/api/admin/users", { credentials: "same-origin" })).json()).find((x) => x.username === u).role, helpUser);
 check("admin makes a user an admin", (await roleNow()) === "admin");
+await page.waitForSelector(roleSel);
+patched = rolePatched();
 await page.selectOption(roleSel, "user");
-await page.waitForTimeout(800);
+await patched;
 check("admin makes an admin a user again", (await roleNow()) === "user");
 
 // Help: FAQ, guide, Markdown reference, and a ticket between a user and the admin (live, both ways)
@@ -656,6 +662,33 @@ await phone.click(".conv-head .back-btn");
 await phone.waitForSelector(".list-pane", { state: "visible" });
 await phone.screenshot({ path: SHOTS + "06-chats-phone.png" });
 check("phone: no layout problems in chats", (await layoutProblems(phone)).length === 0, (await layoutProblems(phone)).join("; "));
+
+// Every design on a phone: the input field of an open chat stays above the bottom bar, the chat header
+// fits, and the Settings cards (with the glass choices) fit the screen.
+for (const design of ["glass", "modern-glass", "modern", "classic"]) {
+  await phone.evaluate(() => { location.hash = "settings"; });
+  await phone.waitForSelector("#view-settings:not(.hidden) .design-card");
+  await phone.click(`#view-settings .design-card[data-design-id='${design}']`);
+  await phone.waitForFunction((d) => document.documentElement.getAttribute("data-design") === d, design, { timeout: 5000 }).catch(() => {});
+  await phone.waitForTimeout(400);
+  check(`phone ${design}: settings fit the screen`, (await layoutProblems(phone)).length === 0, (await layoutProblems(phone)).join("; "));
+  await phone.click("#bottombar button[data-go=chats]");
+  await phone.waitForSelector("#chat-list .c-row", { timeout: 10000 });
+  await phone.click("#chat-list .c-row");
+  await phone.waitForSelector("#conv .composer textarea", { state: "visible" });
+  await phone.waitForTimeout(2500); // the bottom bar height is measured every 2 s
+  const fit = await phone.evaluate(() => {
+    const comp = document.querySelector("#conv .composer").getBoundingClientRect();
+    const bar = document.getElementById("bottombar").getBoundingClientRect();
+    const tools = document.querySelector("#conv .conv-head .tools").getBoundingClientRect();
+    const name = document.querySelector("#conv .conv-head .name").getBoundingClientRect();
+    return { compBottom: Math.round(comp.bottom), barTop: Math.round(bar.top), toolsRight: Math.round(tools.right), nameW: Math.round(name.width), vw: document.documentElement.clientWidth };
+  });
+  check(`phone ${design}: the input field is above the bottom bar`, fit.compBottom <= fit.barTop + 1, JSON.stringify(fit));
+  check(`phone ${design}: the chat header fits`, fit.toolsRight <= fit.vw && fit.nameW > 60, JSON.stringify(fit));
+  if (design === "glass") await phone.screenshot({ path: SHOTS + "05b-chat-phone-glass.png" });
+  await phone.click(".conv-head .back-btn");
+}
 
 await phone.click("#bottombar button[data-go=profile]");
 await phone.waitForSelector("#view-profile:not(.hidden)");
