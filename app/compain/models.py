@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, false, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, false, text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -88,6 +88,15 @@ class Chat(Base):
     summary: Mapped[str] = mapped_column(Text, default="")  # story memory
     summary_upto: Mapped[int] = mapped_column(Integer, default=0)  # id of the last message in the summary
     read_upto: Mapped[int] = mapped_column(Integer, default=0)  # id of the last message the owner has seen
+    # Relationship: how the character feels about the user, judged by the model every few messages
+    # (routes/chats.py, update_relation) or set by the user. It goes into the system prompt.
+    relation_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    relation_trust: Mapped[int] = mapped_column(Integer, default=50, server_default=text("50"))  # 0-100
+    relation_affection: Mapped[int] = mapped_column(Integer, default=50, server_default=text("50"))  # 0-100
+    relation_mood: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    relation_note: Mapped[str] = mapped_column(String(400), default="", server_default="")
+    relation_upto: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))  # last message judged
+    relation_set: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # judged or edited once
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

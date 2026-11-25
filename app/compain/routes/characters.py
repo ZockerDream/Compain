@@ -9,11 +9,13 @@ Rules (concept.md):
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
 
+from .. import settings as cfg
 from ..content import minor_violation
+from ..llm import extract_json
 from ..config import Settings
 from ..deps import current_user, get_db, get_settings
 from ..models import Character, User
@@ -39,6 +41,45 @@ class CharacterPatch(BaseModel):
     greeting: str | None = Field(default=None, max_length=4000)
     scenario: str | None = Field(default=None, max_length=4000)
     tags: str | None = Field(default=None, max_length=256)
+
+
+class AssistIn(BaseModel):
+    idea: str = Field(min_length=3, max_length=2000)
+    language: str = "auto"  # auto | de | en
+
+
+# Field limits of a character, used to trim a draft from the model.
+DRAFT_FIELDS = {"name": 128, "tagline": 256, "description": 8000, "personality": 4000,
+                "greeting": 4000, "scenario": 4000, "tags": 256}
+ASSIST_LANGUAGE = {
+    "de": "Write every field in German.",
+    "en": "Write every field in English.",
+    "auto": "Write every field in the language of the idea.",
+}
+ASSIST_PROMPT = (
+    "You write characters for a roleplay chat app for adults. From the user's idea, create one character "
+    "that is fun to roleplay with: a clear personality, a voice of their own, and a situation that invites a story. "
+    "Answer only with one JSON object, nothing else, with these keys:\n"
+    '"name": the character\'s name (keep a name the idea gives),\n'
+    '"tagline": one short line that sums them up,\n'
+    '"description": appearance and background, 80 to 150 words,\n'
+    '"personality": traits, how they talk, what they like and dislike, 50 to 100 words,\n'
+    '"scenario": the situation where the roleplay starts, addressing the user as "you", 40 to 80 words,\n'
+    '"greeting": the character\'s first message that opens the scene: actions in *asterisks* and speech as plain text, 40 to 90 words,\n'
+    '"tags": 3 to 5 short comma-separated keywords, for example "fantasy, drama".\n'
+    "All characters are adults (18 or older). Never write for the user."
+)
+
+
+def draft_from(data: dict) -> dict:
+    """The fields of a character from the model's JSON, trimmed to the limits; empty strings for missing ones."""
+    out = {}
+    for key, limit in DRAFT_FIELDS.items():
+        value = data.get(key, "")
+        if isinstance(value, list):
+            value = ", ".join(str(v) for v in value)
+        out[key] = str(value or "").strip()[:limit]
+    return out
 
 
 def character_out(c: Character, viewer: User) -> dict:
@@ -73,6 +114,32 @@ def get_character_or_404(db: DbSession, character_id: int) -> Character:
     if c is None:
         raise HTTPException(status_code=404, detail="Character not found")
     return c
+
+
+@router.post("/characters/assist")
+async def assist_character(body: AssistIn, request: Request, user: User = Depends(current_user),
+                           db: DbSession = Depends(get_db), settings: Settings = Depends(get_settings)):
+    """Character assistant: the model writes a draft of all fields from a short idea. Nothing is saved;
+    the editor shows the draft and the user saves it."""
+    from .chats import ask_model, charge_hosted
+
+    check_content(body.idea)
+    kind = cfg.get(db, "default_model")
+    charge_hosted(db, user, settings, kind)
+    prompt = [
+        {"role": "system", "content": ASSIST_PROMPT + " " + ASSIST_LANGUAGE.get(body.language, ASSIST_LANGUAGE["auto"])},
+        {"role": "user", "content": "Idea: " + body.idea.strip()},
+    ]
+    try:
+        text = await ask_model(settings, request.app.state.session_factory, kind, prompt, 1100)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Model not reachable: {type(exc).__name__}")
+    data = extract_json(text)
+    if not data or not str(data.get("name") or "").strip():
+        raise HTTPException(status_code=502, detail="The model's answer could not be read. Try again.")
+    draft = draft_from(data)
+    check_content(*draft.values())
+    return draft
 
 
 @router.get("/characters")

@@ -46,6 +46,8 @@ def _chat_dict(db: DbSession, c: Chat) -> dict:
         "character_card": _character_dict(c.character),
         "model": c.model or "self",
         "summary": c.summary,
+        "relation": {"enabled": c.relation_enabled, "set": c.relation_set, "trust": c.relation_trust,
+                     "affection": c.relation_affection, "mood": c.relation_mood, "note": c.relation_note},
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "messages": [
             {
@@ -198,6 +200,18 @@ class _Importer:
             last = msg.id
         chat.read_upto = last
         chat.summary_upto = last if chat.summary else 0
+        rel = raw.get("relation") if isinstance(raw.get("relation"), dict) else {}
+        if rel:
+            def score(v):
+                try:
+                    return max(0, min(100, int(v)))
+                except (TypeError, ValueError):
+                    return 50
+            chat.relation_enabled = rel.get("enabled") is not False
+            chat.relation_set = bool(rel.get("set"))
+            chat.relation_trust, chat.relation_affection = score(rel.get("trust", 50)), score(rel.get("affection", 50))
+            chat.relation_mood, chat.relation_note = _text(rel.get("mood"), 64), _text(rel.get("note"), 400)
+            chat.relation_upto = last if chat.relation_set else 0
         chat.updated_at = utcnow()
         return chat
 

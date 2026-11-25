@@ -93,7 +93,7 @@ Known risks:
   - `compain/modelqueue.py`: waiting line for the self-hosted model and its `/health` state.
   - `compain/ws.py`: live sync hub and `/ws` endpoint.
   - `compain/llm.py`: OpenAI-compatible streaming client. `mock` URL gives a test reply.
-  - `compain/routes/`: `auth.py`, `characters.py`, `chats.py` (streaming replies), `admin.py`, `help.py` (support tickets).
+  - `compain/routes/`: `auth.py`, `characters.py` (also the character assistant), `chats.py` (streaming replies, story memory, relationship), `admin.py`, `help.py` (support tickets).
   - `compain/main.py`: app factory, router wiring, first admin from environment.
   - `tests/test_api.py`: API tests.
   - `.venv/`: local virtualenv (git-ignored).

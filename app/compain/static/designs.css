@@ -306,3 +306,14 @@ pre.codes { padding: 12px 14px; border-radius: 12px; background: var(--surface-2
 @keyframes lb-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .lightbox { animation: none; } .char-cover img { transition: none; } }
 @media (max-width: 900px) { .char-cover.featured-pic { width: 120px; } .picture-preview { width: 150px; } }
+
+/* 1.5.0: relationship panel in the chat header */
+.relation-box { display: flex; flex-direction: column; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.relation-box.hidden { display: none; }
+.rel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 24px; }
+.rel-meter .row { margin-bottom: 4px; }
+.rel-note { margin: 0; line-height: 1.5; }
+.relation-box input[type=range] { width: 100%; }
+/* character assistant in the editor */
+.assist-box { border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line)); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.assist-box textarea { min-height: 64px; }

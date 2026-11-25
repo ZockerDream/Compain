@@ -2,6 +2,11 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.5.0 – 2026-11-25
+
+- **Relationship:** every chat keeps track of how the character feels about you: trust and affection (0 to 100), a mood and one sentence on how they see you. The model judges it again every 10 messages (Server Management, Models) and the character acts on it. The heart in the chat header shows it; there you can judge it now, adjust it, reset it or turn it off for the chat. Chat exports take it along.
+- **Character assistant:** describe your idea in two or three sentences at the top of the character editor and press *Write a draft*. The model fills in name, tagline, description, personality, scenario, greeting and tags; you change what you like and save.
+
 ## 1.4.0 – 2026-11-24
 
 - **Install and update with two commands.** `git pull` and `docker compose up -d` are enough: the app is rebuilt, the database is updated, and the model server always starts with it. On the first start it downloads the model by itself (Gemma 4, about 17 GB); no profile and no download script needed any more.

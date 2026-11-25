@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session as DbSession
 from .. import settings as cfg
 from ..config import Settings
 from ..deps import current_user, get_db, get_settings
-from ..llm import build_messages, stream_chat
+from ..llm import build_messages, extract_json, stream_chat
 from ..models import ApiUsage, Chat, Character, Message, User, utcnow
 from ..modelqueue import QUEUE, model_state
 
@@ -36,6 +36,8 @@ router = APIRouter(prefix="/api/chats", tags=["chats"])
 MAX_IMPORTANT = 10
 CONTEXT_MESSAGES = 60
 SUMMARY_EVERY = 40  # new messages between two story summaries
+RELATION_MESSAGES = 20  # recent messages the model reads to judge the relationship
+RELATION_STEP = 25  # largest change of trust or affection in one check
 # Token caps per reply length. Generous on purpose: the length guide in the prompt sets the size,
 # the cap only stops runaway replies (a cut-off reply reads badly).
 REPLY_TOKENS = {"short": 90, "medium": 220, "long": 420, "xlong": 800}
@@ -83,6 +85,26 @@ class VariantIn(BaseModel):
     index: int = Field(ge=0)
 
 
+class RelationPatch(BaseModel):
+    enabled: bool | None = None
+    trust: int | None = Field(default=None, ge=0, le=100)
+    affection: int | None = Field(default=None, ge=0, le=100)
+    mood: str | None = Field(default=None, max_length=64)
+    note: str | None = Field(default=None, max_length=400)
+
+
+def relation_out(c: Chat) -> dict:
+    return {
+        "enabled": c.relation_enabled,
+        "set": c.relation_set,
+        "trust": c.relation_trust,
+        "affection": c.relation_affection,
+        "mood": c.relation_mood,
+        "note": c.relation_note,
+        "new_messages": sum(1 for m in c.messages if m.id > c.relation_upto),
+    }
+
+
 def chat_out(c: Chat) -> dict:
     last = c.messages[-1] if c.messages else None
     return {
@@ -99,6 +121,7 @@ def chat_out(c: Chat) -> dict:
         "bookmark_count": sum(1 for m in c.messages if m.bookmarked),
         "unread": sum(1 for m in c.messages if m.role == "assistant" and m.id > c.read_upto),
         "replying": replying(c.id),
+        "relation": relation_out(c),
         "last_message": last.content[:160] if last else "",
         "updated_at": c.updated_at.isoformat(),
     }
@@ -193,7 +216,7 @@ LANGUAGE_GUIDE = {
 
 def system_prompt(
     c: Character, summary: str, important_texts: list[str], reply_length: str = "medium", language: str = "auto",
-    persona_name: str = "", persona_description: str = "", others: list[str] | None = None,
+    persona_name: str = "", persona_description: str = "", others: list[str] | None = None, relation: str = "",
 ) -> str:
     parts = [
         f"You are {c.name}. {c.tagline}".strip(),
@@ -211,6 +234,8 @@ def system_prompt(
     if persona_name or persona_description:
         who = persona_name or "the user"
         parts.append(f"The user plays {who}." + (f" About {who}: {persona_description}" if persona_description else ""))
+    if relation:
+        parts.append(relation)
     if others:
         parts.append("Earlier in this story other characters spoke: " + ", ".join(others)
                      + f". Their lines are marked with their name in brackets. You are {c.name} now; do not write their lines.")
@@ -220,6 +245,20 @@ def system_prompt(
         parts.append("Important moments and facts that must stay in mind (lines from the user are context "
                      "they gave you and are true in this story):\n- " + "\n- ".join(important_texts))
     return "\n\n".join(p for p in parts if p)
+
+
+def relation_line(chat: Chat, name: str, who: str) -> str:
+    """How the character feels about the user now, for the system prompt. Empty until judged or set once."""
+    if not chat.relation_enabled or not chat.relation_set:
+        return ""
+    text = f"How {name} feels about {who} right now: trust {chat.relation_trust}/100, affection {chat.relation_affection}/100"
+    if chat.relation_mood:
+        text += f", mood: {chat.relation_mood}"
+    text += "."
+    if chat.relation_note:
+        text += f" {chat.relation_note}"
+    return (text + f" Let this shape how {name} acts toward {who}; it changes slowly as the story goes on. "
+            "Never mention these numbers.")
 
 
 def important_lines(msgs: list[Message], names: dict, character: Character, persona_name: str = "") -> list[str]:
@@ -260,7 +299,9 @@ def build_context(
             history[-1]["content"] += "\n\n" + content
         else:
             history.append({"role": m.role, "content": content})
-    system = system_prompt(character, chat.summary, important, reply_length, language, persona_name, persona_description, others)
+    relation = relation_line(chat, character.name, persona_name or "the user")
+    system = system_prompt(character, chat.summary, important, reply_length, language, persona_name, persona_description,
+                           others, relation)
 
     # Stay inside the model's context window: drop the oldest turns first. Rough estimate:
     # about 3.5 characters per token, plus room for the reply.
@@ -335,6 +376,108 @@ async def update_summary(session_factory, settings: Settings, chat_id: int, kind
         chat.summary = "".join(pieces).strip()
         chat.summary_upto = last_id
         db.commit()
+
+
+async def ask_model(settings: Settings, session_factory, kind: str, messages: list[dict], max_tokens: int) -> str:
+    """One whole answer from the model (not streamed to anyone), in line with the replies of the self-hosted model."""
+    with session_factory() as db:
+        base_url, api_key, model_name = endpoint_for(settings, kind, db)
+        slots = int(cfg.get(db, "model_slots"))
+    pieces: list[str] = []
+    turn = QUEUE.join("self") if kind == "self" else None
+    try:
+        if turn is not None:
+            await QUEUE.take(turn, slots)
+        async for piece in stream_chat(base_url, api_key, model_name, messages, max_tokens):
+            pieces.append(piece)
+    finally:
+        QUEUE.leave(turn)
+    return "".join(pieces).strip()
+
+
+_RELATION_BUSY: set[int] = set()  # chats whose relationship is being judged right now
+
+
+def _step(old: int, value) -> int:
+    """New score from the model: a number 0-100, at most RELATION_STEP away from the old one."""
+    try:
+        new = int(round(float(value)))
+    except (TypeError, ValueError):
+        return old
+    new = max(0, min(100, new))
+    return max(old - RELATION_STEP, min(old + RELATION_STEP, new))
+
+
+async def update_relation(session_factory, settings: Settings, chat_id: int, kind: str, hub=None, force: bool = False) -> bool:
+    """Let the model judge how the character feels about the user after the newest messages.
+    Runs every relation_every new messages (Server Management) or when the user asks. Model errors are raised."""
+    if chat_id in _RELATION_BUSY:
+        return False
+    _RELATION_BUSY.add(chat_id)
+    try:
+        with session_factory() as db:
+            chat = db.get(Chat, chat_id)
+            if chat is None or not chat.relation_enabled or not chat.messages:
+                return False
+            new = [m for m in chat.messages if m.id > chat.relation_upto]
+            every = int(cfg.get(db, "relation_every"))
+            if not force and (every <= 0 or len(new) < every):
+                return False
+            character = chat.character
+            owner = db.get(User, chat.owner_id)
+            who = owner.persona_name or "the user"
+            names = character_names(db, chat)
+            lines = []
+            for m in (new or chat.messages)[-RELATION_MESSAGES:]:
+                if m.role == "user":
+                    speaker = who
+                elif m.character_id and m.character_id in names:
+                    speaker = names[m.character_id][0]
+                else:
+                    speaker = character.name
+                lines.append(f"{speaker}: {m.content[:700]}")
+            state = (f"trust {chat.relation_trust}/100, affection {chat.relation_affection}/100, "
+                     f"mood: {chat.relation_mood or 'neutral'}. {chat.relation_note}").strip()
+            prompt = [
+                {"role": "system", "content": (
+                    f"You keep track of how {character.name} feels about {who} in an ongoing roleplay. "
+                    "Read the current state and the newest messages and answer only with JSON, nothing else: "
+                    '{"trust": 0-100, "affection": 0-100, "mood": "one to three words", '
+                    f'"note": "one short sentence on how {character.name} sees {who} now"}}. '
+                    "Trust is how much the character relies on and believes the other; affection is how much they like them. "
+                    "Change the numbers gradually, at most 15 points, unless something dramatic happened. "
+                    "Write mood and note in the language the story is written in.")},
+                {"role": "user", "content": (
+                    f"{character.name}: {character.tagline}. {character.personality[:500]}\n\n"
+                    f"Current state: {state}\n\nNewest messages:\n" + "\n".join(lines))},
+            ]
+            last_id = chat.messages[-1].id
+        data = extract_json(await ask_model(settings, session_factory, kind, prompt, 160))
+        if not data:
+            return False
+        with session_factory() as db:
+            chat = db.get(Chat, chat_id)
+            if chat is None:
+                return False
+            chat.relation_trust = _step(chat.relation_trust, data.get("trust"))
+            chat.relation_affection = _step(chat.relation_affection, data.get("affection"))
+            chat.relation_mood = str(data.get("mood") or "").strip()[:64]
+            chat.relation_note = str(data.get("note") or "").strip()[:400]
+            chat.relation_upto = last_id
+            chat.relation_set = True
+            db.commit()
+            owner_id = chat.owner_id
+        await notify(hub, owner_id)
+        return True
+    finally:
+        _RELATION_BUSY.discard(chat_id)
+
+
+async def _relation_in_background(session_factory, settings: Settings, chat_id: int, kind: str, hub) -> None:
+    try:
+        await update_relation(session_factory, settings, chat_id, kind, hub)
+    except Exception:
+        pass  # the model is not reachable now; the next reply tries again
 
 
 @dataclass
@@ -453,9 +596,14 @@ async def stream_reply(settings: Settings, job: Job, session_factory, hub=None) 
     with session_factory() as db:
         chat = db.get(Chat, job.chat_id)
         due = sum(1 for m in chat.messages if m.id > chat.summary_upto) >= SUMMARY_EVERY
+        every = int(cfg.get(db, "relation_every"))
+        relation_due = (chat.relation_enabled and every > 0
+                        and sum(1 for m in chat.messages if m.id > chat.relation_upto) >= every)
     await notify(hub, job.user_id)
     if due:
         asyncio.create_task(update_summary(session_factory, settings, job.chat_id, job.kind))
+    if relation_due:
+        asyncio.create_task(_relation_in_background(session_factory, settings, job.chat_id, job.kind, hub))
     yield _event({"done": True, "message_id": msg_id})
 
 
@@ -767,6 +915,60 @@ async def reply(chat_id: int, body: ReplyIn, request: Request, user: User = Depe
     charge_hosted(db, user, settings, kind)
     job = Job(c.id, user.id, kind, body.mode, body, user.persona_name, user.persona_description)
     return _streaming(settings, job, request)
+
+
+@router.patch("/{chat_id}/relation")
+async def set_relation(chat_id: int, body: RelationPatch, request: Request, user: User = Depends(current_user),
+                       db: DbSession = Depends(get_db)):
+    """Set the relationship by hand, or turn it on or off for this chat."""
+    c = owned_chat(db, chat_id, user)
+    changes = body.model_dump(exclude_unset=True)
+    if changes.get("enabled") is not None:
+        c.relation_enabled = changes["enabled"]
+    for key in ("trust", "affection", "mood", "note"):
+        if changes.get(key) is not None:
+            setattr(c, "relation_" + key, changes[key].strip() if isinstance(changes[key], str) else changes[key])
+            c.relation_set = True
+    db.commit()
+    await notify(request.app.state.hub, user.id)
+    return relation_out(c)
+
+
+@router.post("/{chat_id}/relation/check")
+async def check_relation(chat_id: int, request: Request, user: User = Depends(current_user),
+                         db: DbSession = Depends(get_db), settings: Settings = Depends(get_settings)):
+    """Judge the relationship now from the newest messages, without waiting for the next automatic check."""
+    c = owned_chat(db, chat_id, user)
+    if not c.relation_enabled:
+        raise HTTPException(status_code=409, detail="The relationship is turned off in this chat.")
+    if not c.messages:
+        raise HTTPException(status_code=409, detail="There are no messages to judge yet.")
+    if c.id in _RELATION_BUSY:
+        raise HTTPException(status_code=409, detail="The relationship is being judged right now.")
+    kind = c.model or "self"
+    charge_hosted(db, user, settings, kind)
+    try:
+        changed = await update_relation(request.app.state.session_factory, settings, c.id, kind,
+                                        request.app.state.hub, force=True)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Model not reachable: {type(exc).__name__}")
+    if not changed:
+        raise HTTPException(status_code=502, detail="The model's answer could not be read. Try again.")
+    db.expire_all()
+    return relation_out(owned_chat(db, chat_id, user))
+
+
+@router.delete("/{chat_id}/relation")
+async def reset_relation(chat_id: int, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Back to the start: neutral, and judged again from the newest messages at the next check."""
+    c = owned_chat(db, chat_id, user)
+    c.relation_trust = c.relation_affection = 50
+    c.relation_mood = c.relation_note = ""
+    c.relation_upto = 0
+    c.relation_set = False
+    db.commit()
+    await notify(request.app.state.hub, user.id)
+    return relation_out(c)
 
 
 @router.get("/{chat_id}/stream")

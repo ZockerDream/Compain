@@ -584,6 +584,65 @@
     var bookmarkBtn = el("button", { class: "ghost icon-only", id: "bookmarks-btn", "aria-label": "Bookmarks in this chat", "aria-pressed": "false",
       onclick: function () { var open = bookmarkBox.classList.toggle("hidden") === false; bookmarkBtn.setAttribute("aria-pressed", open ? "true" : "false"); } },
       icon("i-bookmark"), marks.length ? el("span", { class: "mini-count", text: String(marks.length) }) : null);
+    // Relationship: how the character feels about you. Judged by the model every few messages; you can adjust it.
+    var rel = chat.relation;
+    var relationBox = el("div", { class: "relation-box hidden", id: "relation-box" });
+    function relationMeter(label, value, id) {
+      return el("div", { class: "rel-meter" },
+        el("div", { class: "row", style: "justify-content:space-between" }, el("span", { text: label }), el("b", { id: id, text: String(value) })),
+        el("div", { class: "meter" }, el("span", { style: "width:" + value + "%" })));
+    }
+    async function relationCall(path, method, body, busyBtn) {
+      if (busyBtn) { busyBtn.disabled = true; busyBtn.textContent = "Checking…"; }
+      try { await api("/api/chats/" + chatId + "/relation" + path, { method: method, body: body }); state.keepPanels = { relation: true }; renderChats(); }
+      catch (e) { toast(e.message); if (busyBtn) { busyBtn.disabled = false; busyBtn.textContent = "Check now"; } }
+    }
+    function drawRelation(editing) {
+      relationBox.textContent = "";
+      relationBox.appendChild(el("div", { class: "caps", text: "Relationship" }));
+      if (!rel.enabled) {
+        relationBox.appendChild(el("p", { class: "muted small", text: "Turned off in this chat: the character does not keep track of how they feel about you." }));
+        relationBox.appendChild(el("div", { class: "row" }, el("button", { class: "primary", id: "relation-on", onclick: function () { relationCall("", "PATCH", { enabled: true }); } }, "Turn on")));
+        return;
+      }
+      if (editing) {
+        var trust = el("input", { type: "range", min: "0", max: "100", value: String(rel.trust), id: "rel-trust", "aria-label": "Trust" });
+        var aff = el("input", { type: "range", min: "0", max: "100", value: String(rel.affection), id: "rel-affection", "aria-label": "Affection" });
+        var tOut = el("b", { text: String(rel.trust) }), aOut = el("b", { text: String(rel.affection) });
+        trust.addEventListener("input", function () { tOut.textContent = trust.value; });
+        aff.addEventListener("input", function () { aOut.textContent = aff.value; });
+        var mood = el("input", { id: "rel-mood", maxlength: "64", placeholder: "for example curious", value: rel.mood });
+        var note = el("input", { id: "rel-note", maxlength: "400", placeholder: "How the character sees you", value: rel.note });
+        relationBox.appendChild(el("div", { class: "form", style: "gap:10px" },
+          el("label", { for: "rel-trust" }, el("span", { text: "Trust" }), " ", tOut), trust,
+          el("label", { for: "rel-affection" }, el("span", { text: "Affection" }), " ", aOut), aff,
+          el("div", null, el("label", { for: "rel-mood", text: "Mood" }), mood),
+          el("div", null, el("label", { for: "rel-note", text: "How the character sees you" }), note),
+          el("div", { class: "row", style: "flex-wrap:wrap" },
+            el("button", { class: "primary", id: "relation-save", onclick: function () {
+              relationCall("", "PATCH", { trust: +trust.value, affection: +aff.value, mood: mood.value, note: note.value }); } }, "Save"),
+            el("button", { onclick: function () { drawRelation(false); } }, "Cancel"))));
+        return;
+      }
+      relationBox.appendChild(el("div", { class: "rel-grid" },
+        relationMeter("Trust", rel.trust, "rel-trust-value"), relationMeter("Affection", rel.affection, "rel-affection-value")));
+      if (rel.mood || rel.note) relationBox.appendChild(el("p", { class: "rel-note", id: "rel-text" },
+        rel.mood ? el("span", { class: "pill", text: rel.mood }) : null, rel.note ? " " + rel.note : ""));
+      relationBox.appendChild(el("p", { class: "muted small", text: rel.set
+        ? "The character knows this and acts on it. It is judged again every few messages."
+        : "Not judged yet. The model judges it every few messages, or press Check now." }));
+      var checkBtn = el("button", { class: "primary", id: "relation-check", onclick: function () { relationCall("/check", "POST", null, checkBtn); } }, "Check now");
+      relationBox.appendChild(el("div", { class: "row", style: "flex-wrap:wrap" }, checkBtn,
+        el("button", { id: "relation-edit", onclick: function () { drawRelation(true); } }, "Adjust"),
+        el("button", { class: "ghost", id: "relation-reset", onclick: function () { relationCall("", "DELETE"); } }, "Reset"),
+        el("button", { class: "ghost", id: "relation-off", onclick: function () { relationCall("", "PATCH", { enabled: false }); } }, "Turn off")));
+    }
+    drawRelation(false);
+    var relationBtn = el("button", { class: "ghost icon-only", id: "relation-btn", "aria-label": "Relationship with " + chat.character_name, "aria-pressed": "false",
+      title: rel.enabled && rel.set ? "Trust " + rel.trust + " · Affection " + rel.affection + (rel.mood ? " · " + rel.mood : "") : "",
+      onclick: function () { var open = relationBox.classList.toggle("hidden") === false; relationBtn.setAttribute("aria-pressed", open ? "true" : "false"); } },
+      icon("i-heart"), rel.enabled && rel.set ? el("span", { class: "mini-count", text: String(rel.affection) }) : null);
+
     var summaryBox = el("div", { class: "conv-stats hidden", style: "display:block;font-size:13px;line-height:1.55;color:var(--fg)" },
       el("div", { class: "caps", style: "margin-bottom:6px", text: "Story so far" }),
       el("div", { text: chat.summary || "No summary yet. It is written automatically after every 40 messages and keeps long stories consistent." }));
@@ -633,9 +692,10 @@
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "name ellipsis", text: chat.character_name }),
         el("div", { class: "meta ellipsis", text: chat.title + (chat.character_tagline ? " · " + chat.character_tagline : "") })),
-      el("div", { class: "tools" }, searchBtn, bookmarkBtn, pinBtn, infoBtn, exportLink)));
+      el("div", { class: "tools" }, searchBtn, relationBtn, bookmarkBtn, pinBtn, infoBtn, exportLink)));
     pane.appendChild(searchBar);
     pane.appendChild(bookmarkBox);
+    pane.appendChild(relationBox);
 
     var important = chat.messages.filter(function (m) { return m.important; }).length;
     pane.appendChild(el("div", { class: "conv-stats" },
@@ -839,6 +899,7 @@
     state.keepScroll = null;
     if (state.keepPanels && state.keepPanels.bookmarks) { bookmarkBox.classList.remove("hidden"); bookmarkBtn.setAttribute("aria-pressed", "true"); }
     if (state.keepPanels && state.keepPanels.exportMenu) setExportMenu(true);
+    if (state.keepPanels && state.keepPanels.relation) { relationBox.classList.remove("hidden"); relationBtn.setAttribute("aria-pressed", "true"); }
     state.keepPanels = null;
     // Coming from the search, a bookmark, or after (un)bookmarking: show that message.
     if (state.jumpTo) { var target = state.jumpTo, quietJump = state.jumpQuiet; state.jumpTo = null; state.jumpQuiet = false; jump(target, quietJump); }
@@ -1095,6 +1156,31 @@
     });
     var err = el("p", { class: "small", style: "color:var(--warn);min-height:1.2em" });
 
+    // Character assistant: the model writes a draft of every field from a short idea. Nothing is saved yet.
+    var idea = el("textarea", { id: "assist-idea", rows: "2", maxlength: "2000", placeholder: "For example: a grumpy mercenary with a soft heart who waits for jobs in a tavern" });
+    var assistNote = el("p", { class: "muted small", id: "assist-note", text: "Describe your idea in two or three sentences. The model fills in every field; you change what you like and save." });
+    var assistBtn = el("button", { class: "primary", id: "assist-btn", onclick: async function () {
+      if (idea.value.trim().length < 3) { assistNote.textContent = "Write a few words about your idea first."; return; }
+      var filled = ["name", "description", "personality", "greeting", "scenario"].some(function (k) { return fields[k].value.trim(); });
+      if (filled && assistBtn.dataset.armed !== "1") {
+        assistBtn.dataset.armed = "1"; assistBtn.textContent = "Click again to replace the fields";
+        setTimeout(function () { assistBtn.dataset.armed = ""; assistBtn.textContent = "Write a draft"; }, 4000);
+        return;
+      }
+      assistBtn.dataset.armed = ""; assistBtn.disabled = true; assistBtn.textContent = "Writing…";
+      assistNote.textContent = "The model writes the character. This can take a minute.";
+      try {
+        var d = await api("/api/characters/assist", { method: "POST", body: { idea: idea.value, language: prefs.language } });
+        ["name", "tagline", "description", "personality", "greeting", "scenario", "tags"].forEach(function (k) { if (d[k] !== undefined) fields[k].value = d[k]; });
+        assistNote.textContent = "Draft ready. Change what you like, then save the character.";
+        fields.name.focus();
+      } catch (e) { assistNote.textContent = e.message; }
+      assistBtn.disabled = false; assistBtn.textContent = "Write a draft";
+    } }, "Write a draft");
+    var assistBox = el("div", { class: "assist-box" },
+      el("label", { for: "assist-idea", text: "Character assistant" }), idea, assistNote,
+      el("div", { class: "row" }, assistBtn));
+
     async function save() {
       var body = {};
       ["name", "tagline", "description", "personality", "greeting", "scenario", "tags"].forEach(function (k) { body[k] = fields[k].value; });
@@ -1123,6 +1209,7 @@
       el("div", null, el("div", { class: "caps eyebrow", text: "Character" }), el("h1", { text: isNew ? "New character" : "Edit " + c.name }),
         el("p", { text: "Adults only (18+). Pictures: PNG, JPG or WebP, up to 10 MB." }))));
     view.appendChild(el("div", { class: "card form", style: "max-width:720px" },
+      assistBox,
       el("div", { class: "two" }, field("name", "Name", false, c.name), field("tagline", "Tagline", false, c.tagline)),
       field("description", "Description", true, c.description),
       field("personality", "Personality", true, c.personality),
@@ -2085,7 +2172,8 @@
       { key: "self_hosted_model_name", label: "Name of the self-hosted model", type: "text", help: "Shown in chats. Start: Mistral Small 3.2 abliteration (Q4_K_M)." },
       { key: "default_model", label: "Default for new chats", type: "select", options: [["self", "Self-hosted model"], ["hosted", "Hosted API"]] },
       { key: "context_tokens", label: "Context window per request (tokens)", type: "int", help: "Must fit the model server. Compose starts it with 16384 tokens for 2 slots, so 8192 each." },
-      { key: "model_slots", label: "Replies at the same time", type: "int", help: "Slots of the self-hosted model (LLM_SLOTS in .env, default 2). More requests wait in line and see their place." }
+      { key: "model_slots", label: "Replies at the same time", type: "int", help: "Slots of the self-hosted model (LLM_SLOTS in .env, default 2). More requests wait in line and see their place." },
+      { key: "relation_every", label: "Relationship check every … messages", type: "int", help: "After this many new messages the model judges again how the character feels about the user (one short extra request). 0 = only when the user asks." }
     ])));
     body.appendChild(panel("Speed test", el("div", null,
       el("p", { class: "muted small", text: "Measures how fast the self-hosted model writes. Run it after changing the model or the server." }),
@@ -2284,8 +2372,9 @@
         var mbox = $("messages");
         if (mbox && !state.jumpTo) state.keepScroll = mbox.scrollHeight - mbox.scrollTop - mbox.clientHeight < 40 ? null : mbox.scrollTop;
         var openBm = $("bookmark-box"), field = document.querySelector("#conv .composer textarea");
-        var openEx = $("export-menu");
-        state.keepPanels = { bookmarks: !!(openBm && !openBm.classList.contains("hidden")), exportMenu: !!(openEx && !openEx.classList.contains("hidden")) };
+        var openEx = $("export-menu"), openRel = $("relation-box");
+        state.keepPanels = { bookmarks: !!(openBm && !openBm.classList.contains("hidden")), exportMenu: !!(openEx && !openEx.classList.contains("hidden")),
+          relation: !!(openRel && !openRel.classList.contains("hidden")) };
         if (field && field.value.trim() && state.chatId) { state.drafts = state.drafts || {}; state.drafts[state.chatId] = field.value; }
         if (field && document.activeElement === field) state.refocus = state.chatId;
         renderChats();

@@ -37,6 +37,7 @@ SCHEMA: dict[str, tuple[str, object]] = {
     # Models
     "default_model": ("str", "self"),
     "context_tokens": ("int", 8192),
+    "relation_every": ("int", 10),  # new messages between two relationship checks; 0 = no automatic checks
     "model_slots": ("int", 2),  # replies the self-hosted model writes at the same time (llama.cpp -np, LLM_SLOTS)  # context window per request of the self-hosted model
     "self_hosted_model_name": ("str", "Gemma 4 26B-A4B uncensored"),
     "last_speed_test": ("json", {}),
@@ -119,6 +120,8 @@ def set_values(db: DbSession, values: dict) -> list[str]:
             raise ValueError("backup_time must look like 03:00")
         if key == "password_min_length" and value < 8:
             raise ValueError("password_min_length must be at least 8")
+        if key == "relation_every" and not (0 <= value <= 200):
+            raise ValueError("relation_every must be between 0 and 200")
         if key == "model_slots" and not (1 <= value <= 16):
             raise ValueError("model_slots must be between 1 and 16")
         if key == "upload_max_mb" and not (1 <= value <= 50):

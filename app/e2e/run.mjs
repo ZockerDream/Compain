@@ -138,6 +138,21 @@ const minorMsg = await page.textContent("#view-characters").catch(() => "");
 check("adults-only rule is shown to the user", minorMsg.includes("must be adults"), minorMsg.slice(0, 0));
 await page.click("text=Cancel");
 
+// Character assistant: the model writes a draft of every field from a short idea; nothing is saved by it
+await page.click("#view-characters .new-tile");
+await page.fill("#assist-idea", "A grumpy mercenary with a soft heart who waits for jobs in a tavern.");
+await page.click("#assist-btn");
+const drafted = await page.waitForFunction(() => document.getElementById("f-name").value.trim() && document.getElementById("f-greeting").value.trim(),
+  null, { timeout: REPLY_TIMEOUT }).then(() => true, () => false);
+check("the character assistant fills in a draft", drafted && (await page.inputValue("#f-description")).length > 40 && (await page.inputValue("#f-personality")).length > 20,
+  await page.textContent("#assist-note"));
+await page.fill("#assist-idea", "Same idea once more.");
+await page.click("#assist-btn");
+check("a second draft asks before it replaces the fields", (await page.textContent("#assist-btn")).includes("again"));
+const draftCount = (await page.evaluate(async () => (await (await fetch("/api/characters", { credentials: "same-origin" })).json()).length));
+check("a draft is not saved on its own", draftCount === 1, String(draftCount));
+await page.click("text=Cancel");
+
 // Chat with the character and stream a reply
 await page.click("#view-characters .char-card .primary:has-text('Chat')");
 await page.waitForSelector("#conv .composer", { timeout: 10000 });
@@ -238,6 +253,27 @@ const mdHref = await page.getAttribute("#export-menu a:has-text('Markdown')", "h
 const mdResp = await page.request.get(BASE + mdHref);
 check("chat downloads as Markdown", mdResp.status() === 200 && (mdResp.headers()["content-type"] || "").includes("markdown") && (await mdResp.text()).includes("**Mara Stone:**"));
 await page.click("#conv .conv-head .name");
+
+// Relationship: judged by the model, shown in the header, adjustable, can be turned off
+await page.click("#relation-btn");
+check("the relationship panel opens", await page.isVisible("#relation-box"));
+await page.click("#relation-check");
+const judged = await page.waitForSelector("#relation-box:not(.hidden) #rel-text", { timeout: REPLY_TIMEOUT }).then(() => true, () => false);
+const relNow = await page.evaluate(async (id) => (await (await fetch("/api/chats/" + id, { credentials: "same-origin" })).json()).relation, chatId);
+check("the model judges the relationship", judged && relNow.set && relNow.mood.length > 0, JSON.stringify(relNow));
+check("the header shows the affection", (await page.textContent("#relation-btn")).trim() === String(relNow.affection));
+await page.click("#relation-edit");
+await page.fill("#rel-trust", "88");
+await page.fill("#rel-mood", "devoted");
+await page.click("#relation-save");
+await page.waitForFunction(() => (document.getElementById("rel-trust-value") || {}).textContent === "88", null, { timeout: 5000 }).catch(() => {});
+check("the relationship can be adjusted", (await page.textContent("#rel-trust-value")) === "88" && (await page.textContent("#rel-text")).includes("devoted"));
+await page.click("#relation-off");
+check("the relationship can be turned off", await page.waitForSelector("#relation-on", { timeout: 5000 }).then(() => true, () => false)
+  && (await page.locator("#relation-btn .mini-count").count()) === 0);
+await page.click("#relation-on");
+await page.waitForSelector("#relation-check", { timeout: 5000 }).catch(() => {});
+await page.click("#relation-btn");
 
 // The reply stream tells the browser what happens before the first word (place in line, loading, reading)
 const firstEvent = await page.evaluate(async (id) => {
