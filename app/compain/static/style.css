@@ -153,7 +153,9 @@
   .segmented { display: inline-flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 999px; }
   .segmented button { border: 0; background: transparent; box-shadow: none; padding: 7px 14px; color: var(--muted); }
   .segmented button[aria-pressed="true"], .segmented button[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
-  .form { display: grid; gap: 16px; }
+  .form { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  .form > * { min-width: 0; }
+  .form input[type="file"] { max-width: 100%; }
   .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
   .table-wrap { overflow-x: auto; margin: 0 -4px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }

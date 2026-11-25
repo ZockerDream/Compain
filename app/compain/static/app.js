@@ -1521,6 +1521,8 @@
     return "help/" + state.helpTab + (state.helpTab === "support" && state.ticketId ? "/" + state.ticketId : "");
   }
   function setHelpHash() { var h = "#" + helpHash(); if (location.hash !== h) history.replaceState(null, "", h); }
+  // FAQ and guide are documents: full Markdown (lists, code blocks with commands, links), not translated again.
+  function helpDoc(text) { var d = mdDoc(text); d.classList.add("help-doc"); return d; }
   function md(text) { var d = el("div", { class: "md", "data-no-i18n": "" }); d.appendChild(mdRender(text)); return d; }
   function statusPill(s) {
     var cls = s === "answered" ? " ok" : s === "open" ? " accent" : "";
@@ -1575,7 +1577,7 @@
       list.textContent = "";
       var hits = T.faq.filter(function (f) { return !q || (f.q + " " + f.a).toLowerCase().indexOf(q) !== -1; });
       hits.forEach(function (f) {
-        list.appendChild(el("details", { class: "card faq" }, el("summary", { "data-no-i18n": "", text: f.q }), md(f.a)));
+        list.appendChild(el("details", { class: "card faq" }, el("summary", { "data-no-i18n": "", text: f.q }), helpDoc(f.a)));
       });
       if (!hits.length) list.appendChild(el("p", { class: "muted", text: T.ui.noFaq }));
     }
@@ -1594,7 +1596,7 @@
     T.guide.forEach(function (g, i) {
       var id = "guide-" + i;
       toc.appendChild(el("button", { class: "ghost", onclick: function () { var t = $(id); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); } }, g.title));
-      grid.appendChild(el("div", { class: "card guide-card", id: id }, el("h2", { text: g.title }), md(g.body)));
+      grid.appendChild(el("div", { class: "card guide-card", id: id }, el("h2", { text: g.title }), helpDoc(g.body)));
     });
     body.appendChild(toc);
     body.appendChild(grid);

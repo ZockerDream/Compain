@@ -666,6 +666,13 @@ await up.fill("#faq-search", "recovery");
 check("help: FAQ search filters", (await up.locator("#view-help .faq").count()) === 1);
 await up.click("#help-tabs button[data-tab=guide]");
 check("help: guide covers the features", (await up.locator("#view-help .guide-card").count()) >= 8);
+const updGuide = await up.evaluate(() => { const c = [...document.querySelectorAll("#view-help .guide-card")].find((x) => /Updates/.test(x.querySelector("h2").textContent));
+  return c ? { pre: (c.querySelector("pre") || {}).textContent || "", ticks: c.textContent.includes("```") } : null; });
+check("help: the update guide shows the server commands as a code block", updGuide && /git pull/.test(updGuide.pre) && !updGuide.ticks, JSON.stringify(updGuide));
+await up.click("#help-tabs button[data-tab=faq]");
+await up.fill("#faq-search", "update the Android app");
+check("help: FAQ explains how to update the app", (await up.locator("#view-help .faq").count()) >= 1 && (await up.textContent("#view-help")).includes("Update to"));
+await up.click("#help-tabs button[data-tab=guide]");
 await up.click("#help-tabs button[data-tab=md]");
 await up.fill("#md-try", "*waves* **hello**");
 check("help: Markdown preview renders", (await up.innerHTML("#md-preview")).includes("<em>waves</em>") && !(await up.textContent("#md-preview")).includes("*"));
@@ -775,6 +782,30 @@ for (const design of ["glass", "modern-glass", "modern", "classic"]) {
   check(`phone ${design}: the chat header fits`, fit.toolsRight <= fit.vw && fit.nameW > 60, JSON.stringify(fit));
   if (design === "glass") await phone.screenshot({ path: SHOTS + "05b-chat-phone-glass.png" });
   await phone.click(".conv-head .back-btn");
+}
+
+// Phone: the character editor fits the screen (long texts, picture field, assistant), in every design.
+for (const design of ["classic", "modern-glass"]) {
+  await phone.evaluate(() => { location.hash = "settings"; });
+  await phone.waitForSelector("#view-settings:not(.hidden) .design-card");
+  await phone.click(`#view-settings .design-card[data-design-id='${design}']`);
+  await phone.waitForTimeout(300);
+  await phone.click("#bottombar button[data-go=characters]");
+  await phone.waitForSelector("#view-characters:not(.hidden) button:has-text('New character')");
+  await phone.click("#view-characters button:has-text('New character')");
+  await phone.waitForSelector("#f-name");
+  await phone.fill("#f-name", "Cleo | (best friend)");
+  await phone.fill("#f-tagline", "She stole your hoodie. Now she's wondering whether you will ever notice it is gone for good.");
+  await phone.fill("#f-description", "Cleo, 24, goth, your best friend for six years. ".repeat(6));
+  await phone.waitForTimeout(300);
+  const wide = await phone.evaluate(() => {
+    const vw = document.documentElement.clientWidth;
+    return [...document.querySelectorAll("#view-characters *")].filter((e) => e.offsetParent !== null && e.getBoundingClientRect().right > vw + 1)
+      .slice(0, 6).map((e) => e.tagName.toLowerCase() + (e.id ? "#" + e.id : "") + "." + String(e.className).split(" ")[0] + " " + Math.round(e.getBoundingClientRect().right));
+  });
+  check(`phone ${design}: the character editor fits the screen`, wide.length === 0 && (await layoutProblems(phone)).length === 0, wide.join(", ") + " " + (await layoutProblems(phone)).join("; "));
+  if (design === "modern-glass") await phone.screenshot({ path: SHOTS + "15-character-editor-phone.png", fullPage: false });
+  await phone.click("#view-characters button:has-text('Cancel')");
 }
 
 // Phone chat header: only back, picture, name and ⋮; the tools are in the ⋮ menu.

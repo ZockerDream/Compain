@@ -2,6 +2,11 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.12.1 – 2026-11-26
+
+- **Phones: the character editor fits the screen again.** Forms no longer grow wider than their card (long texts, the picture field, the character assistant); this fixes every form, not only the editor.
+- **Help, written out:** new FAQ answers on installing and updating the Android app, connecting it to another server, *I still see an old version* and *Text is hard to read*; new guide sections *Android app* and *Updates (admins)* (server update with `git pull` and `docker compose up -d`, publishing the app, the model). FAQ and guide now show full Markdown, so commands appear as code blocks.
+
 ## 1.12.0 – 2026-11-25
 
 - **Update the Android app from inside the app.** Settings → App → *Update to …*: the app downloads the newest version from your own Compain server, checks its checksum and hands it to Android's installer; login and chats stay. The first time, Android asks to allow Compain to install apps. Android app 1.1.0 (from 1.0.0, install 1.1.0 once by hand: *Update* there downloads the file).
