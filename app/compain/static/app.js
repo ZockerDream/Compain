@@ -174,6 +174,58 @@
     document.documentElement.setAttribute("data-palette", prefs.palette);
     if (prefs.mode === "system") document.documentElement.removeAttribute("data-mode");
     else document.documentElement.setAttribute("data-mode", prefs.mode);
+    applyContrast();
+  }
+
+  /* ---------- readable colours (WCAG contrast) ----------
+     Every colour theme, light or dark: text on the accent colour and accent-coloured text must stay readable
+     (at least 4.5 : 1). Worked out from the accent the theme really uses, so new themes are covered too:
+     --accent-fg  text on accent surfaces (white or near black, whichever reads better)
+     --accent-bg  the accent for surfaces with text, nudged a little if neither text colour reaches 4.5
+     --accent-2   the second colour of accent gradients (own messages, hero, initials), moving away from the text
+     --accent-text  accent-coloured text and links on the page background */
+  function rgbOf(value) {
+    var probe = document.createElement("span");
+    probe.style.color = value;
+    probe.style.display = "none";
+    document.body.appendChild(probe);
+    var c = getComputedStyle(probe).color;
+    probe.remove();
+    var n = (c.match(/-?[\d.]+/g) || []).map(Number);
+    if (c.indexOf("color(srgb") === 0) n = n.map(function (v, i) { return i < 3 ? v * 255 : v; });
+    return n.length >= 3 ? n.slice(0, 3) : null;
+  }
+  function luminance(c) {
+    return c.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+      .reduce(function (sum, v, i) { return sum + v * [0.2126, 0.7152, 0.0722][i]; }, 0);
+  }
+  function contrast(a, b) { var x = luminance(a), y = luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  function mixRgb(a, b, t) { return a.map(function (v, i) { return Math.round(v + (b[i] - v) * t); }); }
+  function css(c) { return "rgb(" + c.join(" ") + ")"; }
+  function applyContrast() {
+    if (!document.body) return;
+    var root = document.documentElement, cs = getComputedStyle(root);
+    ["--accent-fg", "--accent-bg", "--accent-2", "--accent-text"].forEach(function (k) { root.style.removeProperty(k); });
+    var accent = rgbOf(cs.getPropertyValue("--accent").trim());
+    var bg = rgbOf(cs.getPropertyValue("--bg").trim());
+    var fg = rgbOf(cs.getPropertyValue("--fg").trim());
+    if (!accent || !bg || !fg) return;
+    var WHITE = [255, 255, 255], DARK = [12, 12, 15];
+    var onAccent = contrast(accent, WHITE) >= contrast(accent, DARK) ? WHITE : DARK;
+    var away = onAccent === WHITE ? [0, 0, 0] : WHITE;
+    var surface = accent;
+    for (var t = 0; t <= 0.5 && contrast(surface, onAccent) < 4.6; t += 0.05) surface = mixRgb(accent, away, t);
+    var second = mixRgb(surface, away, onAccent === WHITE ? 0.3 : 0.25);
+    var text = accent;
+    for (var u = 0; u <= 0.9 && contrast(text, bg) < 4.6; u += 0.05) text = mixRgb(accent, fg, u);
+    root.style.setProperty("--accent-fg", css(onAccent));
+    root.style.setProperty("--accent-bg", css(surface));
+    root.style.setProperty("--accent-2", css(second));
+    root.style.setProperty("--accent-text", css(text));
+  }
+  if (window.matchMedia) {
+    var schemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    if (schemeQuery.addEventListener) schemeQuery.addEventListener("change", function () { applyContrast(); });
   }
 
   /* ---------- state ---------- */

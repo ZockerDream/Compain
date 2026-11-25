@@ -2,6 +2,11 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.11.0 – 2026-11-25
+
+- **Readable in every colour theme.** Text on the accent colour (own messages, buttons, the welcome box, initials, badges) now picks white or dark text by contrast, worked out from the accent the theme really uses; accent gradients keep that contrast to the end, and accent-coloured text and links are adjusted to stay readable on the background. Before, *Mono* in dark mode showed white text on a white message bubble.
+- Browser tests measure all 7 colour themes in light and dark mode (at least 4.5 : 1, WCAG AA).
+
 ## 1.10.0 – 2026-11-25
 
 - **Android app** in `mobile_app/`: Compain as an APK, in full screen, with everything the browser can do (login that stays, live updates, pictures and imports, downloads of exports, cards and backups, sound, back gesture). On the first start it asks for the server address. Build with `mobile_app/build.sh` (needs only Docker); see `mobile_app/README.md`.

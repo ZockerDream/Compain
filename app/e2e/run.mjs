@@ -518,6 +518,49 @@ await page.evaluate(() => fetch("/api/auth/preferences", { method: "PUT", creden
   headers: { "Content-Type": "application/json" }, body: JSON.stringify({ palette: "ember", design: "classic" }) }));
 await second.close();
 
+// Readable colours: in every colour theme, light and dark, text on the accent and accent-coloured text
+// reach at least 4.5 : 1 (WCAG AA). Measured on an open chat with own messages.
+{
+  const bad = [];
+  for (const palette of ["ember", "indigo", "emerald", "ocean", "rose", "amber", "mono"]) {
+    for (const mode of ["light", "dark"]) {
+      await page.evaluate((b) => fetch("/api/auth/preferences", { method: "PUT", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }), { palette, mode, design: "classic" });
+      await page.waitForFunction((x) => document.documentElement.getAttribute("data-palette") === x.palette && document.documentElement.getAttribute("data-mode") === x.mode, { palette, mode }, { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(150);
+      const r = await page.evaluate(() => {
+        const nums = (c) => { const n = (c.match(/-?[\d.]+/g) || []).map(Number); return c.startsWith("color(srgb") ? n.slice(0, 3).map((v) => v * 255) : n.slice(0, 3); };
+        const lum = (c) => c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+        const out = {};
+        const bubble = document.querySelector(".msg.user .bubble");
+        if (bubble) {
+          const cs = getComputedStyle(bubble);
+          const stops = (cs.backgroundImage.match(/(rgba?\([^)]*\)|color\(srgb[^)]*\))/g) || []).map(nums);
+          out.bubble = Math.min(...stops.map((s) => ratio(nums(cs.color), s)));
+        }
+        const probe = document.createElement("button"); probe.className = "primary"; probe.textContent = "x"; document.body.appendChild(probe);
+        out.button = ratio(nums(getComputedStyle(probe).color), nums(getComputedStyle(probe).backgroundColor)); probe.remove();
+        const a = document.createElement("a"); a.href = "#"; a.textContent = "x"; document.body.appendChild(a);
+        const bgRaw = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+        const s2 = document.createElement("span"); s2.style.color = bgRaw; document.body.appendChild(s2);
+        out.link = ratio(nums(getComputedStyle(a).color), nums(getComputedStyle(s2).color)); a.remove(); s2.remove();
+        return out;
+      });
+      if (r.bubble === undefined) bad.push(`${palette}/${mode} no own message measured`);
+      for (const [k, v] of Object.entries(r)) if (!(v >= 4.5)) bad.push(`${palette}/${mode} ${k} ${v ? v.toFixed(2) : v}`);
+    }
+  }
+  check("every colour theme keeps text readable (contrast 4.5:1, light and dark)", bad.length === 0, bad.join(", "));
+  await page.evaluate(() => fetch("/api/auth/preferences", { method: "PUT", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ palette: "mono", mode: "dark", design: "modern-glass" }) }));
+  await page.waitForFunction(() => document.documentElement.getAttribute("data-design") === "modern-glass", null, { timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: SHOTS + "14-mono-dark-modern-glass.png" });
+  await page.evaluate(() => fetch("/api/auth/preferences", { method: "PUT", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ palette: "ember", mode: "system", design: "classic" }) }));
+}
+
 // Admin: backup, speed test, invite code
 await page.click("#nav-desktop button[data-go=admin]");
 await page.waitForSelector("#view-admin:not(.hidden)");
