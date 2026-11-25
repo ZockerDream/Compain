@@ -4,6 +4,9 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.app.PendingIntent;
+import android.content.pm.PackageInstaller;
+import android.provider.Settings;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -31,6 +34,14 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,6 +56,8 @@ import java.util.List;
  *   Downloads folder (exports, cards, backups), live updates, sound, login that stays.
  * - Links to other sites open in the normal browser; the back gesture goes back inside the app.
  * - window.CompainApp (Bridge) lets the web app show the "App" card in Settings.
+ * - Update (Settings → App): the new APK comes from the own server (/static/android/), its SHA-256 is
+ *   checked, and Android's installer takes over (the same signing key, so the login and data stay).
  */
 public class MainActivity extends Activity {
     private static final String PREFS = "compain";
@@ -53,6 +66,8 @@ public class MainActivity extends Activity {
     private static final String OFFLINE_PAGE = "file:///android_asset/offline.html";
     private static final int PICK_FILES = 1;
     private static final int NIGHT = 0xFF0E0B12;
+    private static final String ACTION_INSTALL_STATUS = "app.compain.android.INSTALL_STATUS";
+    private volatile boolean updating = false;
 
     private FrameLayout root;
     private WebView web;
@@ -182,6 +197,12 @@ public class MainActivity extends Activity {
         return "http".equalsIgnoreCase(u.getScheme()) ? 80 : 443;
     }
 
+    @SuppressWarnings("deprecation")
+    private int appVersionCode() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode; }
+        catch (PackageManager.NameNotFoundException e) { return 0; }
+    }
+
     private String appVersion() {
         try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
         catch (PackageManager.NameNotFoundException e) { return "?"; }
@@ -191,6 +212,10 @@ public class MainActivity extends Activity {
     private class Bridge {
         @JavascriptInterface public String serverUrl() { return server(); }
         @JavascriptInterface public String version() { return appVersion(); }
+        @JavascriptInterface public int versionCode() { return appVersionCode(); }
+
+        /** Download the APK at url (on the own server), check its SHA-256, then install it. */
+        @JavascriptInterface public void startUpdate(String url, String sha256) { runOnUiThread(() -> update(url, sha256)); }
 
         @JavascriptInterface public boolean setServer(String raw) {
             String url = normalise(raw);
@@ -308,6 +333,101 @@ public class MainActivity extends Activity {
         DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
         dm.enqueue(r);
         Toast.makeText(this, "↓ " + name, Toast.LENGTH_SHORT).show();
+    }
+
+    // ---------- update of the app itself ----------
+
+    /** Tell the page how the update goes: window.compainUpdateStatus(state, detail). */
+    private void updateStatus(String state, String detail) {
+        String js = "window.compainUpdateStatus && window.compainUpdateStatus(" + quote(state) + "," + quote(detail) + ")";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
+    }
+
+    private static String quote(String s) {
+        if (s == null) return "null";
+        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ") + "\"";
+    }
+
+    private void update(String url, String sha256) {
+        if (updating) return;
+        Uri u = Uri.parse(url == null ? "" : url);
+        if (!onServer(u)) { updateStatus("error", "The update must come from your Compain server"); return; }
+        if (!getPackageManager().canRequestPackageInstalls()) {
+            updateStatus("permission", "");
+            try { startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()))); }
+            catch (ActivityNotFoundException ignored) { }
+            return;
+        }
+        updating = true;
+        new Thread(() -> {
+            File apk = new File(getCacheDir(), "update.apk");
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(60000);
+                if (c.getResponseCode() != 200) throw new Exception("HTTP " + c.getResponseCode());
+                long total = c.getContentLengthLong();
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(apk)) {
+                    byte[] buf = new byte[64 * 1024];
+                    long done = 0; int last = -1, n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        digest.update(buf, 0, n);
+                        done += n;
+                        int pct = total > 0 ? (int) (done * 100 / total) : -1;
+                        if (pct != last && pct % 5 == 0) { last = pct; updateStatus("progress", String.valueOf(pct)); }
+                    }
+                }
+                StringBuilder hex = new StringBuilder();
+                for (byte b : digest.digest()) hex.append(String.format("%02x", b));
+                if (sha256 != null && !sha256.isEmpty() && !hex.toString().equalsIgnoreCase(sha256)) {
+                    throw new Exception("The download is damaged (checksum does not match). Try again.");
+                }
+                updateStatus("installing", "");
+                install(apk);
+            } catch (Exception e) {
+                updating = false;
+                updateStatus("error", e.getMessage() == null ? e.toString() : e.getMessage());
+            }
+        }).start();
+    }
+
+    private void install(File apk) throws Exception {
+        PackageInstaller installer = getPackageManager().getPackageInstaller();
+        PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        params.setAppPackageName(getPackageName());
+        if (Build.VERSION.SDK_INT >= 31) params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+        int id = installer.createSession(params);
+        try (PackageInstaller.Session session = installer.openSession(id)) {
+            try (InputStream in = new FileInputStream(apk); OutputStream out = session.openWrite("compain.apk", 0, apk.length())) {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                session.fsync(out);
+            }
+            Intent status = new Intent(this, MainActivity.class).setAction(ACTION_INSTALL_STATUS);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+            PendingIntent pending = PendingIntent.getActivity(this, id, status, flags);
+            session.commit(pending.getIntentSender());
+        }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent == null || !ACTION_INSTALL_STATUS.equals(intent.getAction())) return;
+        int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
+        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            if (confirm != null) startActivity(confirm);   // Android asks: "Update this app?"
+            return;
+        }
+        updating = false;
+        if (status == PackageInstaller.STATUS_SUCCESS) updateStatus("done", "");
+        else if (status == PackageInstaller.STATUS_FAILURE_ABORTED) updateStatus("error", "Update cancelled");
+        else updateStatus("error", intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
     }
 
     // ---------- back gesture and lifecycle ----------

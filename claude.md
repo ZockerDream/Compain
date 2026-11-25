@@ -17,6 +17,7 @@ Compain is a private, self-hosted, multi-user AI roleplay chat app that replaces
 - The mockup uses canned data. Real behaviour (login, lockout, limits, sync, backups, community review) must be implemented and tested, not copied from the mockup.
 - Keep changes small. Verify by running the app before reporting success.
 - Use `graphify-out/` for codebase questions once code exists.
+- **Android app (`mobile_app/`):** whenever the app changes, raise `versionCode` and `versionName` in `mobile_app/app/build.gradle`, run `mobile_app/build.sh` and commit `app/compain/static/android/` (the newest APK and `version.json`) with the release. The server offers that APK: Settings → App → Update in the app, and a download card for Android phones in the browser. Never commit `mobile_app/keystore/`.
 
 ## Conventions
 

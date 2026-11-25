@@ -499,6 +499,10 @@ await page.click("#nav-desktop button[data-go=chats]");
 await page.waitForSelector("#view-chats:not(.hidden) #chat-list");
 await page.click("#chat-list .c-row");
 await page.waitForSelector("#conv textarea");
+// The second window has the same chat open, scrolled up to the start.
+await second.click("#chat-list .c-row");
+await second.waitForSelector("#messages .msg");
+await second.evaluate(() => { const b = document.getElementById("messages"); b.scrollTop = 0; b.dispatchEvent(new Event("scroll")); });
 const listBefore = await second.textContent("#chat-list");
 await page.fill("#conv textarea", "Live sync check");
 await page.keyboard.press("Enter");
@@ -507,6 +511,9 @@ await second.waitForFunction((b) => document.querySelector("#chat-list") && docu
 const liveSeen = (await second.textContent("#chat-list")) !== listBefore;
 await waitForReply(page);
 check("second window updates without reload (live sync)", liveSeen);
+await second.waitForTimeout(1500);
+const endGap = await second.evaluate(() => { const b = document.getElementById("messages"); return Math.round(b.scrollHeight - b.scrollTop - b.clientHeight); });
+check("a new message scrolls the chat to the end, also in another window", endGap < 80, "gap " + endGap + " px");
 
 // Theme belongs to the account: a change in one window reaches the other one live.
 await page.evaluate(() => fetch("/api/auth/preferences", { method: "PUT", credentials: "same-origin",
@@ -787,7 +794,8 @@ await phone.click(".conv-head .back-btn");
 {
   const ctx = await browser.newContext({ viewport: { width: 412, height: 891 } });
   await ctx.addInitScript(() => {
-    window.CompainApp = { serverUrl: () => location.origin + "/", version: () => "1.0.0", changeServer: () => { window.__changed = true; }, retry: () => {}, setServer: () => true };
+    window.CompainApp = { serverUrl: () => location.origin + "/", version: () => "1.0.0", versionCode: () => 1, changeServer: () => { window.__changed = true; }, retry: () => {}, setServer: () => true,
+      startUpdate: (url, sha) => { window.__update = { url, sha }; setTimeout(() => window.compainUpdateStatus("progress", "40"), 50); } };
   });
   const app = await ctx.newPage();
   app.on("pageerror", (e) => consoleErrors.push(e.message));
@@ -801,6 +809,17 @@ await phone.click(".conv-head .back-btn");
   await app.waitForSelector("#app-card", { timeout: 10000 }).catch(() => {});
   check("app: Settings show the App card", await app.isVisible("#app-card"));
   check("browser: not in app mode outside the app", !(await phone.evaluate(() => document.body.hasAttribute("data-in-app"))));
+  // Update: the server offers a newer APK (mobile_app/build.sh publishes it under /static/android/).
+  const latest = await (await app.request.get(BASE + "/static/android/version.json")).json();
+  const apkHead = await app.request.get(BASE + "/static/android/" + latest.file);
+  check("server offers the newest app with the right type", apkHead.status() === 200 && apkHead.headers()["content-type"].includes("android.package-archive"), apkHead.headers()["content-type"]);
+  await app.waitForFunction(() => !document.querySelector("#app-update")?.disabled, null, { timeout: 10000 }).catch(() => {});
+  check("app: Settings offer the update", (await app.textContent("#app-update")).includes(latest.versionName));
+  await app.click("#app-update");
+  await app.waitForFunction(() => /40/.test(document.querySelector("#app-update-note")?.textContent || ""), null, { timeout: 5000 }).catch(() => {});
+  const asked = await app.evaluate(() => window.__update);
+  check("app: Update hands the APK and its checksum to the app, progress shows", asked && asked.url.endsWith("/static/android/" + latest.file) && asked.sha === latest.sha256
+    && /40/.test(await app.textContent("#app-update-note")), JSON.stringify(asked));
   await app.click("#app-change-server");
   check("app: Change server reaches the app", await app.evaluate(() => window.__changed === true));
   await app.check("#app-chat-full");

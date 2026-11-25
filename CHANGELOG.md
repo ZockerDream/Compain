@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.12.0 – 2026-11-25
+
+- **Update the Android app from inside the app.** Settings → App → *Update to …*: the app downloads the newest version from your own Compain server, checks its checksum and hands it to Android's installer; login and chats stay. The first time, Android asks to allow Compain to install apps. Android app 1.1.0 (from 1.0.0, install 1.1.0 once by hand: *Update* there downloads the file).
+- The server now offers the newest APK under `/static/android/` (`mobile_app/build.sh` puts it there with `version.json`). Android phones in the browser see a *Download the app* card in Settings.
+- **Chats follow the end.** A new message, also one from another device, scrolls to the end; while you are at the end, the chat stays there when the keyboard opens or a picture loads.
+
 ## 1.11.0 – 2026-11-25
 
 - **Readable in every colour theme.** Text on the accent colour (own messages, buttons, the welcome box, initials, badges) now picks white or dark text by contrast, worked out from the accent the theme really uses; accent gradients keep that contrast to the end, and accent-coloured text and links are adjusted to stay readable on the background. Before, *Mono* in dark mode showed white text on a white message bubble.

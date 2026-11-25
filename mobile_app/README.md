@@ -39,8 +39,12 @@ uninstall the app (and log in again) before installing a new build.
 ## Updates
 
 - Compain itself (server): `git pull` and `docker compose up -d` on the server, as always. The app picks it up.
-- The app (this folder): raise `versionCode` and `versionName` in `app/build.gradle`, run `./build.sh`, and
-  install the new APK over the old one.
+- The app: `./build.sh` also publishes the APK with Compain, in `app/compain/static/android/` (the APK and
+  `version.json` with version and SHA-256). Commit that folder with the release; after `git pull` and
+  `docker compose up -d` on the server, the app shows **Settings → App → Update to …**: it downloads the APK
+  from the server, checks the SHA-256 and opens Android's installer. Android asks once to allow Compain to
+  install apps. Before a new build, raise `versionCode` and `versionName` in `app/build.gradle`.
+- Android phones in the browser see a *Download the app* card in Settings.
 
 ## Files
 

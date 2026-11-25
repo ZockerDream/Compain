@@ -983,6 +983,28 @@
       }, stopped ? 600 : 0);
     }
     box.scrollTop = box.scrollHeight;
+    // Follow the end of the chat. A new message (own, the character's, or from another device) always scrolls
+    // to the end. While the reader is at the end, it stays there when the size changes: the keyboard opens,
+    // a picture loads, the window or the app changes size.
+    state.msgCount = state.msgCount || {};
+    var seenCount = state.msgCount[chatId];
+    state.msgCount[chatId] = chat.messages.length;
+    if (seenCount !== undefined && chat.messages.length > seenCount) state.keepScroll = null;
+    var stick = !(state.keepScroll !== undefined && state.keepScroll !== null);
+    function toEnd() { if (stick) box.scrollTop = box.scrollHeight; }
+    box.addEventListener("scroll", function () { stick = box.scrollHeight - box.scrollTop - box.clientHeight < 80; }, { passive: true });
+    if (state.chatObserver) state.chatObserver.disconnect();
+    if (window.ResizeObserver) {
+      state.chatObserver = new ResizeObserver(toEnd);
+      state.chatObserver.observe(box);
+    }
+    if (window.MutationObserver) {
+      var grow = new MutationObserver(function () { if (stick) requestAnimationFrame(toEnd); });
+      grow.observe(box, { childList: true, subtree: true, characterData: true });
+      var prevDisconnect = state.chatObserver;
+      state.chatObserver = { disconnect: function () { grow.disconnect(); if (prevDisconnect) prevDisconnect.disconnect(); } };
+    }
+    box.querySelectorAll("img").forEach(function (img) { if (!img.complete) img.addEventListener("load", toEnd, { once: true }); });
     // A reply is still being written (sent before leaving the chat): show it and follow it.
     if (chat.replying && !busy) run("/api/chats/" + chatId + "/stream", null, null, true);
 
@@ -1840,6 +1862,7 @@
       el("div", { class: "card" }, el("div", { class: "row", style: "justify-content:space-between;flex-wrap:wrap;gap:14px" },
         el("div", null, el("h2", { text: "Appearance" }), el("p", { class: "muted small", text: "System follows your device." })), modes)),
       appCard(),
+      androidCard(),
       languageCard(),
       el("div", { class: "card form" }, el("h2", { text: "Replies" }),
         el("div", { class: "two" },
@@ -2022,7 +2045,53 @@
       el("div", { class: "row", style: "justify-content:space-between;gap:16px;flex-wrap:wrap" },
         el("span", { style: "min-width:0" }, el("b", { text: "Server" }), el("span", { class: "muted small ellipsis", style: "display:block;margin-top:4px", "data-no-i18n": "", text: server })),
         el("button", { id: "app-change-server", onclick: function () { try { window.CompainApp.changeServer(); } catch (e) { toast(e.message); } } }, "Change server")),
-      version ? el("p", { class: "muted small", "data-no-i18n": "", text: "App " + version }) : null);
+      updateRow(version));
+  }
+
+  function t(text) { return window.CompainI18n ? window.CompainI18n.t(text) : text; }
+
+  // Settings → App: compare with the newest APK on this server (mobile_app/build.sh publishes it) and update.
+  function updateRow(version) {
+    var note = el("span", { class: "muted small", id: "app-update-note", style: "display:block;margin-top:4px", "data-no-i18n": "", text: "App " + (version || "?") });
+    var btn = el("button", { id: "app-update", class: "primary", disabled: true }, "Update");
+    var row = el("div", { class: "row", style: "justify-content:space-between;gap:16px;flex-wrap:wrap" },
+      el("span", { style: "min-width:0" }, el("b", { text: "Updates" }), note), btn);
+    var code = 0;
+    try { code = window.CompainApp.versionCode ? window.CompainApp.versionCode() : 0; } catch (e) { /* older app */ }
+    fetch("/static/android/version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (latest) {
+      if (!latest) { note.textContent = "App " + version + " · " + t("No app update on this server"); btn.remove(); return; }
+      var apk = "/static/android/" + latest.file;
+      if (latest.versionCode <= code) { note.textContent = "App " + version + " · " + t("up to date"); btn.remove(); return; }
+      note.textContent = "App " + version + " → " + latest.versionName;
+      btn.disabled = false;
+      btn.textContent = t("Update to") + " " + latest.versionName;
+      btn.onclick = function () {
+        if (typeof window.CompainApp.startUpdate !== "function") { location.href = apk; return; } // app 1.0.0: download, then tap it
+        btn.disabled = true;
+        window.CompainApp.startUpdate(location.origin + apk, latest.sha256 || "");
+      };
+      window.compainUpdateStatus = function (status, detail) {
+        if (status === "progress") note.textContent = t("Downloading…") + " " + (Number(detail) >= 0 ? detail + " %" : "");
+        else if (status === "installing") note.textContent = t("Installing… Android asks you to confirm.");
+        else if (status === "permission") { btn.disabled = false; note.textContent = t("Allow Compain to install apps, come back and press Update again."); }
+        else if (status === "done") note.textContent = t("Updated. The app restarts.");
+        else if (status === "error") { btn.disabled = false; note.textContent = t("Update failed:") + " " + (detail || ""); }
+      };
+    }).catch(function () { btn.remove(); });
+    return row;
+  }
+
+  // Android phones in the browser: offer the app, if this server has one.
+  function androidCard() {
+    if (inApp || !/Android/i.test(navigator.userAgent)) return null;
+    var card = el("div", { class: "card form hidden", id: "android-card" }, el("h2", { text: "Android app" }));
+    fetch("/static/android/version.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (latest) {
+      if (!latest) return;
+      card.appendChild(el("p", { class: "muted small", text: "Compain as an app: full screen, the back gesture, downloads into your Downloads folder. Open the file after the download and allow the installation once." }));
+      card.appendChild(el("a", { class: "btn primary", href: "/static/android/" + latest.file, download: latest.file, style: "width:fit-content" }, t("Download the app") + " " + latest.versionName));
+      card.classList.remove("hidden");
+    }).catch(function () {});
+    return card;
   }
 
   function languageCard() {

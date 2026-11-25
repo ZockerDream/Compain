@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import mimetypes
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +23,10 @@ from .routes import admin, auth, characters, chats, export, help, legal, media
 from .security import hash_password
 from .loginguard import LoginGuard
 from .ws import Hub, router as ws_router
+
+
+# The Android app is offered under /static/android/ (mobile_app/build.sh puts it there).
+mimetypes.add_type("application/vnd.android.package-archive", ".apk")
 
 
 class NoCacheStatic(StaticFiles):
@@ -47,7 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         task.cancel()
 
-    app = FastAPI(title="Compain", version="1.11.0", lifespan=lifespan)
+    app = FastAPI(title="Compain", version="1.12.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = make_engine(settings.database_url)
     app.state.session_factory = make_session_factory(app.state.engine)

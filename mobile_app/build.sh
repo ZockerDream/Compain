@@ -24,6 +24,19 @@ docker run --rm -v "$PWD:/project" -v compain-gradle-cache:/home/gradle/.gradle 
   gradle --no-daemon -q assembleRelease
 
 VERSION=$(sed -n "s/.*versionName '\(.*\)'.*/\1/p" app/build.gradle)
+CODE=$(sed -n "s/.*versionCode \([0-9]*\).*/\1/p" app/build.gradle)
 mkdir -p dist
 cp app/build/outputs/apk/release/app-release.apk "dist/compain-$VERSION.apk"
 echo "dist/compain-$VERSION.apk"
+
+# Publish with Compain: the server offers the newest APK under /static/android/ (Settings → App → Update,
+# and the download link for phones). Commit app/compain/static/android/ together with the release.
+PUB=../app/compain/static/android
+mkdir -p "$PUB"
+rm -f "$PUB"/compain-*.apk
+cp "dist/compain-$VERSION.apk" "$PUB/"
+SHA=$(sha256sum "$PUB/compain-$VERSION.apk" | cut -d' ' -f1)
+SIZE=$(stat -c %s "$PUB/compain-$VERSION.apk")
+printf '{\n  "versionCode": %s,\n  "versionName": "%s",\n  "file": "compain-%s.apk",\n  "sha256": "%s",\n  "size": %s\n}\n' \
+  "$CODE" "$VERSION" "$VERSION" "$SHA" "$SIZE" > "$PUB/version.json"
+echo "published: app/compain/static/android/compain-$VERSION.apk (versionCode $CODE)"
