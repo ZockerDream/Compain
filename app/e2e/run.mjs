@@ -677,7 +677,7 @@ check("no layout problems on desktop", (await layoutProblems(page)).length === 0
 await page.close();
 
 // ---------- phone ----------
-const phone = await newPage(390, 844);
+const phone = await newPage(412, 891); // Galaxy S25 Ultra (1440 × 3120 at 3.5)
 await phone.goto(BASE + "/");
 await phone.waitForSelector("#login-form", { state: "visible" });
 await phone.fill("#user", ADMIN_USER);

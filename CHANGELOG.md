@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.9.1 – 2026-11-25
+
+- **Updates reach phones at once.** App files are now sent with `Cache-Control: no-cache`, the service worker takes them from the server first (the cache only offline) and an open or installed app reloads itself once when a new version is there. Before, a phone (especially the installed app on Android) could keep an old version for days, for example with the input field under the bottom bar.
+- The installed app looks for a new version every time it comes back to the front.
+- Browser tests: the phone is now a Galaxy S25 Ultra (412 × 891).
+
 ## 1.9.0 – 2026-11-25
 
 - **New logo: the crescent.** A moon that opens into a C, glowing from candle light to ember and dusk rose, with a spark inside: someone keeps you company at night. It is in the sidebar, the top bar, on the login, two-factor and age pages (with a spark as the dot of the *i*), as the browser tab icon and as the app icon for *Add to Home Screen* (also as a maskable icon for Android).

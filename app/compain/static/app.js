@@ -2688,7 +2688,17 @@
   /* ---------- boot ---------- */
   // Installable app (PWA). Service workers need HTTPS or localhost; elsewhere the app works without it.
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-    navigator.serviceWorker.register("/sw.js").catch(function () { /* not essential */ });
+    // When a new version takes over, load it once, so nobody keeps working on an old copy.
+    var hadController = !!navigator.serviceWorker.controller, reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (!hadController || reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then(function (reg) {
+      // Installed apps on phones stay open for days: look for a new version when the app comes back to the front.
+      document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") reg.update().catch(function () {}); });
+    }).catch(function () { /* not essential */ });
   }
   // Height of the phone bottom bar, so an open chat ends right above it (designs.css, 1.6.1).
   function syncBottombar() {

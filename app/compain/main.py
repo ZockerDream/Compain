@@ -23,6 +23,16 @@ from .security import hash_password
 from .loginguard import LoginGuard
 from .ws import Hub, router as ws_router
 
+
+class NoCacheStatic(StaticFiles):
+    """App files may be kept, but must be checked with the server before use (ETag, cheap 304). Without this,
+    phone browsers guess a cache time themselves and an installed app can keep an old version for days."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
 log = logging.getLogger("compain")
 
 
@@ -37,7 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         task.cancel()
 
-    app = FastAPI(title="Compain", version="1.9.0", lifespan=lifespan)
+    app = FastAPI(title="Compain", version="1.9.1", lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = make_engine(settings.database_url)
     app.state.session_factory = make_session_factory(app.state.engine)
@@ -56,7 +66,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ws_router)
 
     static_dir = Path(__file__).parent / "static"
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    app.mount("/static", NoCacheStatic(directory=static_dir), name="static")
 
     @app.get("/", response_class=HTMLResponse)
     def index():
@@ -65,7 +75,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Installable web app (PWA): the manifest and the service worker must live at the root.
     @app.get("/manifest.webmanifest", include_in_schema=False)
     def manifest():
-        return FileResponse(static_dir / "manifest.webmanifest", media_type="application/manifest+json")
+        return FileResponse(static_dir / "manifest.webmanifest", media_type="application/manifest+json",
+                            headers={"Cache-Control": "no-cache"})
 
     @app.get("/sw.js", include_in_schema=False)
     def service_worker():
