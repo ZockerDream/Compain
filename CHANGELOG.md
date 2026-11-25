@@ -2,6 +2,13 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.7.0 – 2026-11-25
+
+- **Import many characters with pictures.** A Compain character list (`"format": "compain-characters-v1"`) can now carry a picture per character: `picture` as a data address (`data:image/png;base64,…`) for everyone, or `picture_url` as a web address for admins. The server checks every picture like an upload (PNG, JPG or WebP, size limit) and never fetches addresses inside its own network. A picture that fails does not stop the import; the message says which one.
+- `"visibility": "public"` in the list puts characters straight into the Community when an admin imports them (others: waiting for review).
+- **Import card** on the Characters page also accepts Compain character lists.
+- New `examples/demo-characters.json`: 50 test characters in anime style (40 women, 10 men, all adults) with placeholder pictures, to bring a fresh server to life.
+
 ## 1.6.2 – 2026-11-25
 
 - **Server: the built-in HTTPS proxy (Caddy) stays off by default.** `docker compose up -d` starts only the app, the database and the model, so your own reverse proxy can sit in front. Caddy starts only with `COMPOSE_PROFILES=https` in `.env`; `scripts/update.sh` no longer turns it on just because `COMPAIN_DOMAIN` is set.

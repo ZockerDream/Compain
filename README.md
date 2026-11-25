@@ -55,7 +55,8 @@ Run the browser tests against the running stack: `cd app/e2e && npm install && B
    - **Built-in Caddy (only without your own proxy):** point a domain to the server, set `COMPAIN_DOMAIN` and `COMPOSE_PROFILES=https` in `.env`, open ports 80 and 443, and run `docker compose up -d`.
 
    Then turn on "HTTPS is set up" in Server Management, Domain & HTTPS.
-7. Backups run every night (Server Management, Backups). They are stored in the `compain-data` volume; copy them off the server from time to time.
+7. Optional test characters: Characters → **Import card**, choose `examples/demo-characters.json` (50 characters with placeholder pictures, public in the Community).
+8. Backups run every night (Server Management, Backups). They are stored in the `compain-data` volume; copy them off the server from time to time.
 
 Update later: `git pull` and `docker compose up -d` (the app is rebuilt and the migrations run on start). `./scripts/update.sh` does the same with a few checks.
 

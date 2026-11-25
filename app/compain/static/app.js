@@ -1048,22 +1048,41 @@
         try {
           var d = await postFile("/api/export/import", files[i]);
           chats += d.chats; chars += d.characters; first = first || d.first_chat_id;
+          pictureNote(d);
         } catch (e) { toast(files[i].name + ": " + e.message); }
       }
       if (!chats && !chars) return;
-      if (!chats) { toast(chars === 1 ? "1 character imported" : chars + " characters imported"); return; }
+      if (!chats) { toast(chars === 1 ? "1 character imported" : chars + " characters imported"); renderCharacters(); return; }
       toast(chats === 1 ? "1 chat imported" : chats + " chats imported");
       if (first) go("chat/" + first); else renderChats();
     });
   }
 
+  // Pictures that could not be loaded during an import: shown once, the characters are there anyway.
+  function pictureNote(d) {
+    if (d && d.picture_errors && d.picture_errors.length) {
+      console.warn("Pictures not imported:", d.picture_errors);
+      setTimeout(function () { toast(d.picture_errors.length + " pictures could not be loaded: " + d.picture_errors[0]); }, 2500);
+    }
+  }
+
   async function importCards(files) {
     var names = [];
     for (var i = 0; i < files.length; i++) {
-      try { var d = await postFile("/api/characters/import", files[i]); (d.characters || [d]).forEach(function (c) { names.push(c.name); }); }
+      try {
+        // A Compain export or character list (JSON with "format": "compain-…") goes to the full import.
+        var head = files[i].name.toLowerCase().endsWith(".json") ? await files[i].slice(0, 400).text() : "";
+        if (/"format"\s*:\s*"compain-/.test(head)) {
+          var x = await postFile("/api/export/import", files[i]);
+          pictureNote(x);
+          for (var k = 0; k < x.characters; k++) names.push("");
+          continue;
+        }
+        var d = await postFile("/api/characters/import", files[i]); (d.characters || [d]).forEach(function (c) { names.push(c.name); });
+      }
       catch (e) { toast(files[i].name + ": " + e.message); }
     }
-    if (names.length) { toast(names.length === 1 ? "Imported " + names[0] : names.length + " characters imported"); renderCharacters(); }
+    if (names.length) { toast(names.length === 1 ? (names[0] ? "Imported " + names[0] : "1 character imported") : names.length + " characters imported"); renderCharacters(); }
   }
 
   /* ---------- characters ---------- */
