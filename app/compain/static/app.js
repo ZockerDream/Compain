@@ -1739,6 +1739,7 @@
           el("button", { class: "toggle", role: "switch", "aria-checked": prefs.sound ? "true" : "false", "aria-label": "Sound when a reply is complete",
             onclick: function () { prefs.sound = !prefs.sound; savePrefs(); renderSettings(); if (prefs.sound) chime(); } }))),
       aboutCard(),
+      accountCard(),
       passwordCard(),
       twoFactorCard(),
       devicesCard(),
@@ -1747,6 +1748,26 @@
           el("button", { onclick: logout }, "Log out on this device"),
           el("button", { class: "ghost", onclick: logoutAll }, "Log out on all devices"))),
       deleteAccountCard()));
+  }
+
+  // Username and email: both log you in. The password confirms a change.
+  function accountCard() {
+    var un = el("input", { id: "acc-user", autocomplete: "username", value: me.username });
+    var em = el("input", { id: "acc-email", type: "email", autocomplete: "email", value: me.email || "" });
+    var cur = el("input", { id: "acc-pw", type: "password", autocomplete: "current-password" });
+    return el("div", { class: "card form", id: "account-card" }, el("h2", { text: "Username and email" }),
+      el("p", { class: "muted small", text: "You can log in with either." }),
+      el("div", { class: "two" },
+        el("div", null, el("label", { for: "acc-user", text: "Username" }), un),
+        el("div", null, el("label", { for: "acc-email", text: "Email" }), em),
+        el("div", null, el("label", { for: "acc-pw", text: "Current password" }), cur)),
+      el("div", null, el("button", { class: "primary", id: "acc-save", onclick: async function () {
+        try {
+          var r = await api("/api/auth/account", { method: "PATCH", body: { username: un.value, email: em.value, current: cur.value } });
+          me.username = r.username; me.email = r.email; cur.value = "";
+          toast("Saved");
+        } catch (e) { toast(e.message); }
+      } }, "Save")));
   }
 
   function passwordCard() {
@@ -2015,23 +2036,53 @@
 
   async function adminUsers(body) {
     var users = await api("/api/admin/users");
-    var nu = { u: el("input", { placeholder: "username", "aria-label": "New username" }), p: el("input", { type: "password", placeholder: "password", "aria-label": "New password" }) };
+    function roleSelect(value, attrs) {
+      var sel = el("select", attrs);
+      [["user", "User"], ["admin", "Admin"]].forEach(function (o) { sel.appendChild(el("option", { value: o[0], selected: value === o[0], text: o[1] })); });
+      return sel;
+    }
+    var nu = { u: el("input", { placeholder: "username", "aria-label": "New username", id: "nu-user" }),
+               e: el("input", { type: "email", placeholder: "email (optional)", "aria-label": "Email of the new user", id: "nu-email" }),
+               p: el("input", { type: "password", placeholder: "password", "aria-label": "New password", id: "nu-pw" }),
+               r: roleSelect("user", { "aria-label": "Role of the new user", id: "nu-role", style: "width:auto" }) };
     var table = el("table", null,
-      el("thead", null, el("tr", null, el("th", { text: "User" }), el("th", { text: "Role" }), el("th", { text: "Status" }), el("th", null))),
+      el("thead", null, el("tr", null, el("th", { text: "User" }), el("th", { text: "Email" }), el("th", { text: "Role" }), el("th", { text: "Status" }), el("th", null))),
       el("tbody", null, users.map(function (u) {
+        var self = u.id === me.id;
+        // Admin or User. Your own role stays: an admin cannot lock themselves out.
+        var role = roleSelect(u.role, { "aria-label": "Role of " + u.username, "data-role-for": u.username, disabled: self, style: "width:auto",
+          title: self ? "You cannot change your own role" : "" });
+        role.addEventListener("change", async function () {
+          try { await api("/api/admin/users/" + u.id, { method: "PATCH", body: { role: role.value } }); toast(u.username + ": " + role.options[role.selectedIndex].text); renderAdmin(); }
+          catch (e) { toast(e.message); role.value = u.role; }
+        });
         return el("tr", null,
           el("td", { text: u.username }),
-          el("td", null, el("span", { class: "pill" + (u.role === "admin" ? " accent" : ""), text: u.role })),
+          el("td", { class: "muted", text: u.email || "–" }),
+          el("td", null, role),
           el("td", null, el("span", { class: "pill " + (u.active ? "ok" : ""), text: u.active ? "Active" : "Disabled" })),
           el("td", null, el("div", { class: "row", style: "gap:6px;flex-wrap:wrap" },
-            u.id === me.id ? null : el("button", { class: "ghost", onclick: async function () {
+            self ? null : el("button", { class: "ghost", onclick: async function () {
               try { await api("/api/admin/users/" + u.id, { method: "PATCH", body: { active: !u.active } }); renderAdmin(); }
               catch (e) { toast(e.message); }
             } }, u.active ? "Disable" : "Enable"),
+            // Change username and email, for example after a typo.
+            el("button", { class: "ghost", "data-edit": u.username, onclick: function () {
+              var cell = this.parentNode;
+              if (cell.querySelector("input")) return;
+              var nm = el("input", { value: u.username, "aria-label": "Username of " + u.username, style: "width:auto;min-width:130px" });
+              var ml = el("input", { type: "email", value: u.email, placeholder: "email", "aria-label": "Email of " + u.username, style: "width:auto;min-width:170px" });
+              cell.appendChild(nm); cell.appendChild(ml);
+              cell.appendChild(el("button", { class: "primary", onclick: async function () {
+                try { await api("/api/admin/users/" + u.id, { method: "PATCH", body: { username: nm.value, email: ml.value } }); toast("Saved"); renderAdmin(); }
+                catch (e) { toast(e.message); }
+              } }, "Save"));
+              nm.focus();
+            } }, "Edit"),
             // For a user who forgot the password: set a new one and tell them.
             el("button", { class: "ghost", "data-user": u.username, onclick: function () {
               var cell = this.parentNode;
-              if (cell.querySelector("input")) return;
+              if (cell.querySelector("input[type=password]")) return;
               var pw = el("input", { type: "password", placeholder: "New password", "aria-label": "New password for " + u.username, style: "width:auto;min-width:150px" });
               cell.appendChild(pw);
               cell.appendChild(el("button", { class: "primary", onclick: async function () {
@@ -2043,9 +2094,9 @@
       })));
     body.appendChild(panel("Users", el("div", null,
       el("div", { class: "table-wrap" }, table),
-      el("div", { class: "row", style: "flex-wrap:wrap;margin-top:16px" }, nu.u, nu.p,
-        el("button", { class: "primary", onclick: async function () {
-          try { await api("/api/admin/users", { method: "POST", body: { username: nu.u.value, password: nu.p.value } }); toast("User created"); renderAdmin(); }
+      el("div", { class: "row", style: "flex-wrap:wrap;margin-top:16px" }, nu.u, nu.e, nu.p, nu.r,
+        el("button", { class: "primary", id: "nu-add", onclick: async function () {
+          try { await api("/api/admin/users", { method: "POST", body: { username: nu.u.value, email: nu.e.value, password: nu.p.value, role: nu.r.value } }); toast("User created"); renderAdmin(); }
           catch (e) { toast(e.message); }
         } }, "Add user")))));
     body.appendChild(panel("Settings for new accounts", settingsForm([
@@ -2506,7 +2557,7 @@
     $("register-error").textContent = "";
     try {
       await api("/api/auth/register", { method: "POST", body: {
-        username: $("reg-user").value, password: $("reg-pw").value, invite: $("reg-invite").value } });
+        username: $("reg-user").value, email: $("reg-email").value, password: $("reg-pw").value, invite: $("reg-invite").value } });
       $("register-error").textContent = "Account created. You can log in now.";
       $("user").value = $("reg-user").value;
       $("pw").value = "";

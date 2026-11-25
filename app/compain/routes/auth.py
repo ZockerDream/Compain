@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from .. import settings as cfg
 from .. import totp
+from ..accounts import clean_email, clean_username, find_login
 from ..config import Settings
 from ..deps import SESSION_COOKIE, current_session, current_user, get_db, get_settings
 from ..models import AuditLog, Character
@@ -28,13 +29,14 @@ MFA_MINUTES = 5
 
 
 class LoginIn(BaseModel):
-    username: str
+    username: str  # the username or the email address
     password: str
     remember: bool = False
 
 
 class RegisterIn(BaseModel):
     username: str = Field(min_length=2, max_length=64)
+    email: str = Field(default="", max_length=254)
     password: str = Field(min_length=1, max_length=256)
     invite: str = ""
 
@@ -77,11 +79,13 @@ def _refuse(kind: str | None) -> None:
 def login(body: LoginIn, request: Request, response: Response, db: DbSession = Depends(get_db)):
     ip = client_ip(request)
     guard = _guard(request)
-    _refuse(guard.check(ip, body.username))
-    user = db.query(User).filter(User.username == body.username).one_or_none()
+    # The lock counts per account, whether it was named by username or by email.
+    user = find_login(db, body.username)
+    key = user.username if user is not None else body.username.strip()
+    _refuse(guard.check(ip, key))
     if user is None or not user.active or not verify_password(body.password, user.password_hash):
-        guard.failed(ip, body.username, int(cfg.get(db, "failed_login_limit")), int(cfg.get(db, "lock_minutes")))
-        raise HTTPException(status_code=401, detail="Wrong username or password")
+        guard.failed(ip, key, int(cfg.get(db, "failed_login_limit")), int(cfg.get(db, "lock_minutes")))
+        raise HTTPException(status_code=401, detail="Wrong username, email or password")
 
     now = datetime.now(timezone.utc)
     token = new_token()
@@ -149,9 +153,9 @@ def register(body: RegisterIn, request: Request, db: DbSession = Depends(get_db)
         raise HTTPException(status_code=403, detail="Sign-up is closed or the invite code is wrong")
     if len(body.password) < int(cfg.get(db, "password_min_length")):
         raise HTTPException(status_code=422, detail=f"Password must be at least {cfg.get(db, 'password_min_length')} characters")
-    if db.query(User).filter(User.username == body.username).one_or_none():
-        raise HTTPException(status_code=409, detail="Username already exists")
-    db.add(User(username=body.username, role="user", password_hash=hash_password(body.password)))
+    username = clean_username(db, body.username)
+    email = clean_email(db, body.email, required=True)
+    db.add(User(username=username, email=email, role="user", password_hash=hash_password(body.password)))
     db.commit()
     return {"ok": True}
 
@@ -188,6 +192,7 @@ def me(user: User = Depends(current_user), db: DbSession = Depends(get_db), sett
     return {
         "id": user.id,
         "username": user.username,
+        "email": user.email or "",
         "display_name": user.display_name,
         "role": user.role,
         "hosted_used_today": usage_today(db, user),
@@ -307,6 +312,26 @@ def update_profile(body: ProfileIn, user: User = Depends(current_user), db: DbSe
     db.commit()
     return {"username": user.username, "display_name": user.display_name, "role": user.role,
             "persona_name": user.persona_name, "persona_description": user.persona_description}
+
+
+class AccountIn(BaseModel):
+    username: str | None = Field(default=None, max_length=64)
+    email: str | None = Field(default=None, max_length=254)  # "" removes the address
+    current: str = Field(min_length=1, max_length=256)  # the current password, to confirm
+
+
+@router.patch("/account")
+def update_account(body: AccountIn, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Change the own username or email address. Both are used to log in, so the password confirms it."""
+    if not verify_password(body.current, user.password_hash):
+        raise HTTPException(status_code=401, detail="The current password is wrong")
+    if body.username is not None and body.username.strip() != user.username:
+        user.username = clean_username(db, body.username, user.id)
+    if body.email is not None:
+        user.email = clean_email(db, body.email, user.id)
+    db.add(AuditLog(user_id=user.id, action="account.update", detail=user.username))
+    db.commit()
+    return {"username": user.username, "email": user.email or ""}
 
 
 async def _save_image(request: Request, db: DbSession, settings: Settings, folder: str, name: str) -> str:

@@ -2,6 +2,13 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.6.0 – 2026-11-25
+
+- **Email address on every account.** You log in with your username or your email address, whichever you like. Creating an account with an invite code asks for an email address.
+- **Settings, Username and email** (next to the password): change your username and email address; your current password confirms it.
+- **Server Management, Users:** a role field per user (*Admin* or *User*) changes the role at once; your own role stays, so you cannot lock yourself out. *Edit* changes username and email; new users get an email address and a role right away. Role changes go into the audit log.
+- Usernames are unique regardless of case and must not contain @.
+
 ## 1.5.0 – 2026-11-25
 
 - **Relationship:** every chat keeps track of how the character feels about you: trust and affection (0 to 100), a mood and one sentence on how they see you. The model judges it again every 10 messages (Server Management, Models) and the character acts on it. The heart in the chat header shows it; there you can judge it now, adjust it, reset it or turn it off for the chat. Chat exports take it along.

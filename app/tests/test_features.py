@@ -65,8 +65,10 @@ def test_sign_up_needs_an_invite_code(tmp_path):
     assert client.get("/api/auth/status").json()["signup_open"] is True
     assert client.post("/api/auth/register", json={"username": "newbie", "password": "long-enough-pass", "invite": "wrong"}).status_code == 403
     assert client.post("/api/auth/register", json={"username": "newbie", "password": "short", "invite": code}).status_code == 422
-    assert client.post("/api/auth/register", json={"username": "newbie", "password": "long-enough-pass", "invite": code}).status_code == 201
+    assert client.post("/api/auth/register", json={"username": "newbie", "password": "long-enough-pass", "invite": code}).status_code == 422  # no email
+    assert client.post("/api/auth/register", json={"username": "newbie", "email": "New@Example.org", "password": "long-enough-pass", "invite": code}).status_code == 201
     assert login(client, "newbie", "long-enough-pass").status_code == 200
+    assert login(client, "new@example.org", "long-enough-pass").status_code == 200
     client.__exit__(None, None, None)
 
 

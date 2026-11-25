@@ -534,17 +534,33 @@ await page.waitForTimeout(500);
 check("invite code can be created", (await page.textContent("#view-admin")).length > 0);
 await page.screenshot({ path: SHOTS + "08-admin-security-desktop.png" });
 
-// Help: FAQ, guide, Markdown reference, and a ticket between a user and the admin (live, both ways)
+// Users: create one with email and role, switch the role between User and Admin
 const helpUser = "help" + Date.now().toString(36);
 const helpPw = "help-user-pass-123";
-await page.evaluate(async ([u, p]) => {
-  const r = await fetch("/api/admin/users", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: u, password: p }) });
-  if (!r.ok) throw new Error("user not created: " + r.status);
-}, [helpUser, helpPw]);
+const helpMail = helpUser + "@example.org";
+await page.click("#view-admin .subtabs button:has-text('Users')");
+await page.waitForSelector("#nu-user");
+await page.fill("#nu-user", helpUser);
+await page.fill("#nu-email", helpMail.toUpperCase());
+await page.fill("#nu-pw", helpPw);
+await page.click("#nu-add");
+const roleSel = `select[data-role-for="${helpUser}"]`;
+await page.waitForSelector(roleSel, { timeout: 5000 }).catch(() => {});
+check("admin creates a user with an email address", (await page.textContent("#view-admin table")).includes(helpMail));
+check("own role cannot be changed", await page.isDisabled(`select[data-role-for="${ADMIN_USER}"]`));
+await page.selectOption(roleSel, "admin");
+await page.waitForFunction((u) => document.querySelector(`select[data-role-for="${u}"]`)?.value === "admin" && !document.querySelector("#toast")?.textContent.includes("cannot"), helpUser, { timeout: 5000 }).catch(() => {});
+const roleNow = async () => page.evaluate(async (u) => (await (await fetch("/api/admin/users", { credentials: "same-origin" })).json()).find((x) => x.username === u).role, helpUser);
+check("admin makes a user an admin", (await roleNow()) === "admin");
+await page.selectOption(roleSel, "user");
+await page.waitForTimeout(800);
+check("admin makes an admin a user again", (await roleNow()) === "user");
+
+// Help: FAQ, guide, Markdown reference, and a ticket between a user and the admin (live, both ways)
 const up = await newPage(1280, 860);
 await up.goto(BASE + "/");
 await up.waitForSelector("#login-form", { state: "visible" });
-await up.fill("#user", helpUser);
+await up.fill("#user", helpMail);
 await up.fill("#pw", helpPw);
 await up.click("#login-form button[type=submit]");
 await passAgeGate(up);
@@ -597,6 +613,21 @@ await up.click("#ticket-close");
 await up.waitForSelector("#ticket-reopen");
 check("help: user can close the ticket", (await up.textContent(".ticket-head .t-status")).includes("Closed"));
 check("help: no layout problems", (await layoutProblems(up)).length === 0, (await layoutProblems(up)).join("; "));
+check("a user logs in with the email address", (await up.evaluate(async () => (await (await fetch("/api/auth/me", { credentials: "same-origin" })).json()).email)) === helpMail);
+
+// Settings: change the own username and email; the current password confirms it
+await up.click("#nav-desktop button[data-go=settings]");
+await up.waitForSelector("#account-card");
+await up.fill("#acc-email", "new-" + helpMail);
+await up.fill("#acc-pw", "wrong-password");
+await up.click("#acc-save");
+await up.waitForTimeout(600);
+check("a wrong password keeps the email", (await up.textContent("#toast")).includes("wrong"));
+await up.fill("#acc-pw", helpPw);
+await up.click("#acc-save");
+await up.waitForTimeout(600);
+const afterMail = await up.evaluate(async () => (await (await fetch("/api/auth/me", { credentials: "same-origin" })).json()).email);
+check("a user changes the own email", afterMail === "new-" + helpMail, afterMail);
 await up.close();
 
 check("no layout problems on desktop", (await layoutProblems(page)).length === 0, (await layoutProblems(page)).join("; "));

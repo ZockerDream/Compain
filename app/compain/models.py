@@ -17,6 +17,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # Login with username or email (accounts.py). Lower case; None for accounts without an address.
+    email: Mapped[str | None] = mapped_column(String(254), unique=True, index=True, nullable=True)
     display_name: Mapped[str] = mapped_column(String(128), default="")
     role: Mapped[str] = mapped_column(String(16), default="user")  # "admin" or "user"
     active: Mapped[bool] = mapped_column(Boolean, default=True)

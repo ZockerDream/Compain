@@ -16,6 +16,7 @@ from .. import backup as backup_mod
 from .. import settings as cfg
 from ..modelqueue import QUEUE
 from ..config import Settings
+from ..accounts import clean_email, clean_username
 from ..deps import get_db, get_settings, require_admin
 from ..llm import stream_chat
 from ..models import ApiUsage, AuditLog, Character, Chat, Message, Ticket, User
@@ -27,11 +28,14 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 class NewUser(BaseModel):
     username: str = Field(min_length=2, max_length=64)
+    email: str = Field(default="", max_length=254)
     password: str = Field(min_length=1, max_length=256)
     role: str = "user"
 
 
 class UserPatch(BaseModel):
+    username: str | None = Field(default=None, max_length=64)
+    email: str | None = Field(default=None, max_length=254)  # "" removes the address
     active: bool | None = None
     role: str | None = None
     password: str | None = Field(default=None, min_length=1, max_length=256)
@@ -50,7 +54,7 @@ def audit(db: DbSession, admin: User, action: str, detail: str = "") -> None:
 
 
 def user_out(u: User) -> dict:
-    return {"id": u.id, "username": u.username, "role": u.role, "active": u.active}
+    return {"id": u.id, "username": u.username, "email": u.email or "", "role": u.role, "active": u.active}
 
 
 def _disk(settings: Settings) -> dict:
@@ -102,9 +106,9 @@ def create_user(body: NewUser, admin: User = Depends(require_admin), db: DbSessi
     if body.role not in {"user", "admin"}:
         raise HTTPException(status_code=422, detail="Role must be 'user' or 'admin'")
     # Admins may bypass the password policy (min length) when they set a password.
-    if db.query(User).filter(User.username == body.username).one_or_none():
-        raise HTTPException(status_code=409, detail="Username already exists")
-    user = User(username=body.username, role=body.role, password_hash=hash_password(body.password))
+    username = clean_username(db, body.username)
+    email = clean_email(db, body.email)
+    user = User(username=username, email=email, role=body.role, password_hash=hash_password(body.password))
     db.add(user)
     audit(db, admin, "user.create", body.username)
     db.commit()
@@ -127,7 +131,15 @@ def update_user(user_id: int, body: UserPatch, admin: User = Depends(require_adm
     if body.role is not None:
         if body.role not in {"user", "admin"}:
             raise HTTPException(status_code=422, detail="Role must be 'user' or 'admin'")
+        if user.id == admin.id and body.role != "admin":
+            raise HTTPException(status_code=409, detail="You cannot take away your own admin role")
+        if user.role != body.role:
+            audit(db, admin, "user.role", f"{user.username}: {user.role} -> {body.role}")
         user.role = body.role
+    if body.username is not None and body.username.strip() != user.username:
+        user.username = clean_username(db, body.username, user.id)
+    if body.email is not None:
+        user.email = clean_email(db, body.email, user.id)
     if body.password is not None:
         # Admins may bypass the password policy (min length) when they set a password.
         user.password_hash = hash_password(body.password)

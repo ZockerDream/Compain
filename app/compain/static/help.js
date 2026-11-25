@@ -51,13 +51,13 @@
       { title: "Community",
         body: "Characters other users published. **Like** them, **Add to my characters** or **Start chat** directly. The most liked come first." },
       { title: "Profile and persona",
-        body: "Display name and profile picture. The **persona** is who *you* play: a role name and a description. Every character knows it." },
+        body: "Display name and profile picture. The **persona** is who *you* play: a role name and a description. Every character knows it.\n\n**Username and email** (Settings, next to the password): you log in with either. Changing them needs your current password." },
       { title: "Settings",
         body: "- **Replies**: reply length, reply language, context size, sound when a reply is complete.\n- **Appearance**: four designs (*Classic*, *Glass*, *Modern*, *Modern Glass*), seven colour themes, light/dark/system, background, glass blur and opacity, your own background picture.\n- **Account**: password, two-factor login with recovery codes, logged-in devices, delete account.\nEverything syncs live to all your devices." },
       { title: "Support tickets",
         body: "Help → **Support**: open a ticket with a subject, a category and your message. You can answer, close and reopen it. Status: *Open* (waits for an admin), *In progress*, *Answered* (waits for you), *Closed*. Writing in a closed ticket opens it again. Up to 10 open tickets." },
       { title: "For admins",
-        body: "**Server Management**: users, Community review, models and hosted API, security, domain, backups, storage and logs. In **Help → Support** admins see *All tickets*, answer, write **internal notes** (only admins see them), set status, priority and category, assign a ticket to an admin and delete tickets. The overview shows the **model queue**: replies being written and waiting. *Replies at the same time* (Models) must match LLM_SLOTS." }
+        body: "**Server Management**: users (role *Admin* or *User*, username, email, password), Community review, models and hosted API, security, domain, backups, storage and logs. In **Help → Support** admins see *All tickets*, answer, write **internal notes** (only admins see them), set status, priority and category, assign a ticket to an admin and delete tickets. The overview shows the **model queue**: replies being written and waiting. *Replies at the same time* (Models) must match LLM_SLOTS." }
     ],
     md: {
       intro: "Messages, character texts and tickets understand a small Markdown. In roleplay you write **actions in stars** and speech as plain text.",
@@ -132,13 +132,13 @@
       { title: "Community",
         body: "Charaktere, die andere veröffentlicht haben. **Liken**, **Zu meinen Charakteren** hinzufügen oder direkt **Chat starten**. Die beliebtesten stehen oben." },
       { title: "Profil und Persona",
-        body: "Anzeigename und Profilbild. Die **Persona** ist, wen *du* spielst: ein Rollenname und eine Beschreibung. Jeder Charakter kennt sie." },
+        body: "Anzeigename und Profilbild. Die **Persona** ist, wen *du* spielst: ein Rollenname und eine Beschreibung. Jeder Charakter kennt sie.\n\n**Benutzername und E-Mail** (Einstellungen, beim Passwort): Du meldest dich mit einem von beiden an. Zum Ändern brauchst du dein aktuelles Passwort." },
       { title: "Einstellungen",
         body: "- **Antworten**: Antwortlänge, Antwortsprache, Kontextgröße, Ton wenn eine Antwort fertig ist.\n- **Aussehen**: vier Designs (*Classic*, *Glass*, *Modern*, *Modern Glass*), sieben Farbthemen, hell/dunkel/System, Hintergrund, Glas-Unschärfe und Deckkraft, eigenes Hintergrundbild.\n- **Konto**: Passwort, Zwei-Faktor-Anmeldung mit Wiederherstellungscodes, angemeldete Geräte, Konto löschen.\nAlles wird live auf alle deine Geräte übertragen." },
       { title: "Support-Tickets",
         body: "Hilfe → **Support**: Ticket mit Betreff, Kategorie und Nachricht öffnen. Du kannst antworten, schließen und wieder öffnen. Status: *Offen* (wartet auf einen Admin), *In Bearbeitung*, *Beantwortet* (wartet auf dich), *Geschlossen*. Eine Nachricht in einem geschlossenen Ticket öffnet es wieder. Bis zu 10 offene Tickets." },
       { title: "Für Admins",
-        body: "**Server-Verwaltung**: Benutzer, Community-Prüfung, Modelle und gehostete API, Sicherheit, Domain, Backups, Speicher und Protokolle. Unter **Hilfe → Support** sehen Admins *Alle Tickets*, antworten, schreiben **interne Notizen** (nur Admins sehen sie), setzen Status, Priorität und Kategorie, weisen Tickets einem Admin zu und löschen Tickets. Die Übersicht zeigt die **Modell-Warteschlange**: Antworten, die gerade geschrieben werden und warten. *Antworten gleichzeitig* (Modelle) muss zu LLM_SLOTS passen." }
+        body: "**Server-Verwaltung**: Benutzer (Rolle *Admin* oder *Benutzer*, Benutzername, E-Mail, Passwort), Community-Prüfung, Modelle und gehostete API, Sicherheit, Domain, Backups, Speicher und Protokolle. Unter **Hilfe → Support** sehen Admins *Alle Tickets*, antworten, schreiben **interne Notizen** (nur Admins sehen sie), setzen Status, Priorität und Kategorie, weisen Tickets einem Admin zu und löschen Tickets. Die Übersicht zeigt die **Modell-Warteschlange**: Antworten, die gerade geschrieben werden und warten. *Antworten gleichzeitig* (Modelle) muss zu LLM_SLOTS passen." }
     ],
     md: {
       intro: "Nachrichten, Charaktertexte und Tickets verstehen ein kleines Markdown. Im Rollenspiel schreibst du **Aktionen in Sternchen** und Gesprochenes als normalen Text.",
