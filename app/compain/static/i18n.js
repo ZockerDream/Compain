@@ -68,7 +68,7 @@
     "Replies": "Antworten", "Reply length": "Antwortlänge", "Short": "Kurz", "Medium": "Mittel", "Long": "Lang",
     "Context sent to the model": "Kontext für das Modell", "Last 20 messages": "Letzte 20 Nachrichten",
     "Last 60 messages + summary": "Letzte 60 Nachrichten + Zusammenfassung", "Last 200 messages + summary": "Letzte 200 Nachrichten + Zusammenfassung",
-    "Language": "Sprache", "Interface": "Oberfläche", "Replies in": "Antworten auf", "Automatic (my language)": "Automatisch (meine Sprache)",
+    "Language": "Sprache", "Interface": "Oberfläche", "Replies in": "Antworten auf", "Same as the interface": "Wie die Oberfläche",
     "Log out on this device": "Auf diesem Gerät abmelden", "Log out on all devices": "Auf allen Geräten abmelden",
     // admin
     "Admins only": "Nur für Admins", "The server, the users and the models.": "Server, Benutzer und Modelle.",
@@ -205,7 +205,7 @@
     "Published in the Community": "In der Community veröffentlicht", "Waiting for review": "Wartet auf Prüfung",
     "Only you see it here until an admin approves it.": "Nur du siehst ihn hier, bis ein Admin ihn freigibt.",
     // 1.3.0: export, import, cards, search, bookmarks, model queue
-    "Export this chat": "Diesen Chat exportieren", "Markdown (to read)": "Markdown (zum Lesen)", "JSON (to import again)": "JSON (zum erneuten Import)",
+    "Export this chat": "Diesen Chat exportieren", "Delete this chat": "Diesen Chat löschen", "Delete this chat with all its messages? This cannot be undone. The character stays.": "Diesen Chat mit allen Nachrichten löschen? Das lässt sich nicht rückgängig machen. Der Charakter bleibt.", "Delete chat": "Chat löschen", "Chat deleted": "Chat gelöscht", "Markdown (to read)": "Markdown (zum Lesen)", "JSON (to import again)": "JSON (zum erneuten Import)",
     "Bookmark": "Lesezeichen", "Bookmarked": "Lesezeichen gesetzt", "Bookmark removed": "Lesezeichen entfernt",
     "Bookmark this scene for yourself": "Diese Szene für dich merken", "Bookmarks": "Lesezeichen", "Bookmarks in this chat": "Lesezeichen in diesem Chat",
     "No bookmarks yet. Use Bookmark under a message to find a scene again.": "Noch keine Lesezeichen. Mit „Lesezeichen“ unter einer Nachricht findest du eine Szene wieder.",

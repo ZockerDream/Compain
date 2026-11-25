@@ -208,10 +208,25 @@ LENGTH_GUIDE = {
              "actions in *asterisks* and speech.",
 }
 LANGUAGE_GUIDE = {
-    "de": "Always write in German.",
-    "en": "Always write in English.",
+    "de": "Language: write every reply in German only, even when the character description, the greeting, "
+          "earlier messages or the user's messages are in another language.",
+    "en": "Language: write every reply in English only, even when the character description, the greeting, "
+          "earlier messages or the user's messages are in another language.",
     "auto": "Reply in the language the user writes in.",
 }
+LANGUAGE_REMINDER = {"de": "(Antworte auf Deutsch.)", "en": "(Reply in English.)"}
+
+
+def reply_language(user: User, requested: str) -> str:
+    """The language of the replies: the choice in Settings, and for "Automatic" the language of the account
+    (Settings, Interface). Only accounts without any language setting keep following the user's messages."""
+    if requested in {"en", "de"}:
+        return requested
+    try:
+        ui = json.loads(user.preferences or "{}").get("uiLanguage")
+    except (ValueError, AttributeError):
+        ui = None
+    return ui if ui in {"en", "de"} else "auto"
 
 
 def system_prompt(
@@ -229,7 +244,6 @@ def system_prompt(
         "Only write for your own character: never decide what the user says, thinks or does. "
         "All characters are adults.",
         LENGTH_GUIDE.get(reply_length, LENGTH_GUIDE["medium"]),
-        LANGUAGE_GUIDE.get(language, LANGUAGE_GUIDE["auto"]),
     ]
     if persona_name or persona_description:
         who = persona_name or "the user"
@@ -244,6 +258,8 @@ def system_prompt(
     if important_texts:
         parts.append("Important moments and facts that must stay in mind (lines from the user are context "
                      "they gave you and are true in this story):\n- " + "\n- ".join(important_texts))
+    # Last, so it wins over a character card, greeting or story written in another language.
+    parts.append(LANGUAGE_GUIDE.get(language, LANGUAGE_GUIDE["auto"]))
     return "\n\n".join(p for p in parts if p)
 
 
@@ -317,6 +333,9 @@ def build_context(
     # The model answers a user turn; to let the character continue, add a short stage direction.
     if not history or history[-1]["role"] == "assistant":
         history.append({"role": "user", "content": CONTINUE_PROMPT})
+    # A short reminder right before the reply: the model follows the latest turn most closely. Not stored.
+    if language in LANGUAGE_REMINDER:
+        history[-1] = {**history[-1], "content": history[-1]["content"] + "\n\n" + LANGUAGE_REMINDER[language]}
     return build_messages(system, history)
 
 
@@ -595,6 +614,8 @@ async def stream_reply(settings: Settings, job: Job, session_factory, hub=None) 
     msg_id = _store(session_factory, job, "".join(pieces).strip(), character_id, regenerate_id)
     with session_factory() as db:
         chat = db.get(Chat, job.chat_id)
+        if chat is None:  # the chat was deleted while the reply was written
+            return
         due = sum(1 for m in chat.messages if m.id > chat.summary_upto) >= SUMMARY_EVERY
         every = int(cfg.get(db, "relation_every"))
         relation_due = (chat.relation_enabled and every > 0
@@ -810,7 +831,11 @@ async def update_chat(chat_id: int, body: ChatPatch, request: Request, user: Use
 
 @router.delete("/{chat_id}")
 async def delete_chat(chat_id: int, request: Request, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Delete a chat completely: all messages, versions, bookmarks, the story summary and the relationship.
+    A reply that is still being written is stopped first."""
     c = owned_chat(db, chat_id, user)
+    await _cancel_run(chat_id)
+    db.refresh(c)
     db.delete(c)
     db.commit()
     await notify(request.app.state.hub, user.id)
@@ -896,6 +921,7 @@ async def send_message(chat_id: int, body: MessageIn, request: Request, user: Us
     _not_busy(c.id)
     kind = c.model or "self"
     charge_hosted(db, user, settings, kind)
+    body.language = reply_language(user, body.language)
     job = Job(c.id, user.id, kind, "send", body, user.persona_name, user.persona_description, body.content)
     return _streaming(settings, job, request)
 
@@ -913,6 +939,7 @@ async def reply(chat_id: int, body: ReplyIn, request: Request, user: User = Depe
     _not_busy(c.id)
     kind = c.model or "self"
     charge_hosted(db, user, settings, kind)
+    body.language = reply_language(user, body.language)
     job = Job(c.id, user.id, kind, body.mode, body, user.persona_name, user.persona_description)
     return _streaming(settings, job, request)
 
@@ -983,16 +1010,20 @@ def follow_reply(chat_id: int, user: User = Depends(current_user), db: DbSession
     return _sse(follow(run))
 
 
-@router.post("/{chat_id}/stop")
-async def stop_reply(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
-    """Stop the reply being written. The part written so far is kept."""
-    owned_chat(db, chat_id, user)
+async def _cancel_run(chat_id: int) -> bool:
     run = RUNS.get(chat_id)
     if run is None or run.done or run.task is None:
-        return {"stopped": False}
+        return False
     run.task.cancel()
     try:
         await asyncio.wait_for(asyncio.shield(run.task), timeout=5)
     except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
         pass
-    return {"stopped": True}
+    return True
+
+
+@router.post("/{chat_id}/stop")
+async def stop_reply(chat_id: int, user: User = Depends(current_user), db: DbSession = Depends(get_db)):
+    """Stop the reply being written. The part written so far is kept."""
+    owned_chat(db, chat_id, user)
+    return {"stopped": await _cancel_run(chat_id)}

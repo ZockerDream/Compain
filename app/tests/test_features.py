@@ -244,7 +244,7 @@ def test_greeting_opens_the_chat_and_turns_alternate(tmp_path):
     roles = [m["role"] for m in msgs]
     assert roles == ["system", "user", "assistant", "user"]
     assert "German" in msgs[0]["content"] and "25 words" in msgs[0]["content"]
-    assert msgs[-1]["content"] == "one\n\ntwo"
+    assert msgs[-1]["content"] == "one\n\ntwo\n\n(Antworte auf Deutsch.)"  # language reminder for the model
     client.__exit__(None, None, None)
 
 

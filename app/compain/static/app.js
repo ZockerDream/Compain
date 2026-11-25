@@ -220,7 +220,7 @@
   function go(route) {
     var parts = String(route || "home").split("/");
     var name = parts[0];
-    if (name === "chat") { name = "chats"; if (parts[1]) state.chatId = Number(parts[1]); }
+    if (name === "chat" || (name === "chats" && parts[1])) { name = "chats"; if (parts[1]) state.chatId = Number(parts[1]); }
     if (name === "help") {
       if (parts[1] && HELP_TABS.indexOf(parts[1]) !== -1) state.helpTab = parts[1];
       state.ticketId = parts[1] === "support" && parts[2] ? Number(parts[2]) : (parts[1] ? null : state.ticketId);
@@ -572,6 +572,33 @@
     var exportBtn = el("button", { class: "ghost icon-only", id: "export-btn", "aria-label": "Export this chat", "aria-haspopup": "menu", "aria-expanded": "false",
       onclick: function () { if (exportMenu.classList.contains("hidden")) setExportMenu(true); } }, icon("i-down"));
     var exportLink = el("div", { class: "pop-wrap" }, exportBtn, exportMenu);
+    // Delete the whole chat (messages, versions, bookmarks, summary, relationship), after asking once.
+    var deleteMenu = el("div", { class: "pop-menu delete-menu hidden", id: "delete-menu", role: "dialog", "aria-label": "Delete this chat" },
+      el("p", { class: "small", text: "Delete this chat with all its messages? This cannot be undone. The character stays." }),
+      el("div", { class: "row", style: "gap:6px;justify-content:flex-end" },
+        el("button", { class: "ghost", onclick: function () { deleteMenu.classList.add("hidden"); } }, "Cancel"),
+        el("button", { class: "danger-btn", id: "delete-chat-confirm", onclick: async function () {
+          this.disabled = true;
+          state.chatId = null; // so that a live update during the delete does not load this chat again
+          try {
+            await api("/api/chats/" + chatId, { method: "DELETE" });
+            toast("Chat deleted");
+            go("chats");
+            renderChats();
+          } catch (e) { this.disabled = false; state.chatId = chatId; toast(e.message); }
+        } }, "Delete chat")));
+    var deleteBtn = el("button", { class: "ghost icon-only", id: "delete-chat", "aria-label": "Delete this chat", "aria-haspopup": "dialog",
+      onclick: function (ev) {
+        ev.stopPropagation();
+        var open = deleteMenu.classList.toggle("hidden") === false;
+        if (open) setTimeout(function () {
+          document.addEventListener("click", function close(e2) {
+            if (deleteMenu.contains(e2.target)) { document.addEventListener("click", close, { once: true }); return; }
+            deleteMenu.classList.add("hidden");
+          }, { once: true });
+        }, 0);
+      } }, icon("i-trash"));
+    var deleteWrap = el("div", { class: "pop-wrap" }, deleteBtn, deleteMenu);
 
     // Bookmarks of this chat: a list to jump back to a scene.
     var marks = chat.messages.filter(function (m) { return m.bookmarked; });
@@ -692,7 +719,7 @@
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "name ellipsis", text: chat.character_name }),
         el("div", { class: "meta ellipsis", text: chat.title + (chat.character_tagline ? " · " + chat.character_tagline : "") })),
-      el("div", { class: "tools" }, searchBtn, relationBtn, bookmarkBtn, pinBtn, infoBtn, exportLink)));
+      el("div", { class: "tools" }, searchBtn, relationBtn, bookmarkBtn, pinBtn, infoBtn, exportLink, deleteWrap)));
     pane.appendChild(searchBar);
     pane.appendChild(bookmarkBox);
     pane.appendChild(relationBox);
@@ -1070,15 +1097,8 @@
     var names = [];
     for (var i = 0; i < files.length; i++) {
       try {
-        // A Compain export or character list (JSON with "format": "compain-…") goes to the full import.
-        var head = files[i].name.toLowerCase().endsWith(".json") ? await files[i].slice(0, 400).text() : "";
-        if (/"format"\s*:\s*"compain-/.test(head)) {
-          var x = await postFile("/api/export/import", files[i]);
-          pictureNote(x);
-          for (var k = 0; k < x.characters; k++) names.push("");
-          continue;
-        }
-        var d = await postFile("/api/characters/import", files[i]); (d.characters || [d]).forEach(function (c) { names.push(c.name); });
+        // Compain character lists (examples/demo-characters.json) are recognised by the server.
+        var d = await postFile("/api/characters/import", files[i]); pictureNote(d); (d.characters || [d]).forEach(function (c) { names.push(c.name); });
       }
       catch (e) { toast(files[i].name + ": " + e.message); }
     }
@@ -1915,7 +1935,7 @@
       setTimeout(function () { location.reload(); }, 300); // redraw every screen in the new language
     });
     var rl = el("select", { id: "rp-lang" });
-    [["auto", "Automatic (my language)"], ["en", "English"], ["de", "Deutsch"]].forEach(function (o) { rl.appendChild(el("option", { value: o[0], selected: prefs.language === o[0], text: o[1] })); });
+    [["auto", "Same as the interface"], ["en", "English"], ["de", "Deutsch"]].forEach(function (o) { rl.appendChild(el("option", { value: o[0], selected: prefs.language === o[0], text: o[1] })); });
     rl.addEventListener("change", function () { prefs.language = rl.value; savePrefs(); toast("Saved"); });
     return el("div", { class: "card form" }, el("h2", { text: "Language" }),
       el("div", { class: "two" },
@@ -2332,26 +2352,138 @@
   var appVersion = null;
 
   // Small Markdown for the two texts: "# ", "## ", "- " and `code`. Built with text nodes only (no HTML from the file).
-  function mdLite(text) {
-    var box = el("div", { class: "md" });
-    var list = null;
-    function inline(line) {
-      var parts = line.split("`");
-      return parts.map(function (part, i) { return i % 2 ? el("code", { text: part }) : part; });
+  /* ---------- Markdown for documents (Changelog, Impressum, Datenschutz) ----------
+     Full Markdown: headings, paragraphs, bold/italic/strikethrough, code and code blocks, links, nested and
+     numbered lists, task lists, quotes, tables and rules. Built as DOM nodes, never as HTML, so a document
+     cannot inject markup. Pictures are shown as links. Chats keep their own, smaller renderer (mdRender). */
+  function safeUrl(url) {
+    url = String(url || "").trim();
+    return /^(https?:|mailto:|#|\/(?!\/))/i.test(url) ? url : null;
+  }
+
+  function docInline(text) {
+    var out = [];
+    var buf = "";
+    function flushText() { if (buf) { out.push(document.createTextNode(buf)); buf = ""; } }
+    function link(label, url) {
+      var href = safeUrl(url);
+      if (!href) return docInline(label);
+      var a = el("a", { href: href });
+      if (/^https?:/i.test(href)) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+      docInline(label).forEach(function (n) { a.appendChild(n); });
+      return [a];
     }
-    text.split("\n").forEach(function (raw) {
-      var line = raw.replace(/\s+$/, "");
-      if (line.indexOf("- ") === 0) {
-        if (!list) { list = el("ul"); box.appendChild(list); }
-        list.appendChild(el("li", null, inline(line.slice(2))));
-        return;
+    var i = 0;
+    while (i < text.length) {
+      var rest = text.slice(i), m;
+      if (rest[0] === "\\" && /^\\[\\`*_{}\[\]()#+\-.!~|>]/.test(rest)) { buf += rest[1]; i += 2; continue; }
+      if ((m = /^(`+)([\s\S]*?[^`])\1(?!`)/.exec(rest))) { flushText(); out.push(el("code", { text: m[2].trim() })); i += m[0].length; continue; }
+      if ((m = /^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/.exec(rest))) { flushText(); out = out.concat(link(m[1] || m[2], m[2])); i += m[0].length; continue; }
+      if ((m = /^\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/.exec(rest))) { flushText(); out = out.concat(link(m[1], m[2])); i += m[0].length; continue; }
+      if ((m = /^<((?:https?:\/\/|mailto:)[^>\s]+)>/.exec(rest))) { flushText(); out = out.concat(link(m[1].replace(/^mailto:/, ""), m[1])); i += m[0].length; continue; }
+      if ((m = /^https?:\/\/[^\s<]*[^\s<.,;:!?)\]'"]/.exec(rest)) && !/[\w\/]$/.test(buf)) { flushText(); out = out.concat(link(m[0], m[0])); i += m[0].length; continue; }
+      if ((m = /^(\*\*\*|___)(?=\S)([\s\S]*?\S)\1/.exec(rest))) { flushText(); var se = el("strong"), em3 = el("em"); docInline(m[2]).forEach(function (n) { em3.appendChild(n); }); se.appendChild(em3); out.push(se); i += m[0].length; continue; }
+      if ((m = /^(\*\*|__)(?=\S)([\s\S]*?\S)\1/.exec(rest))) { flushText(); var st = el("strong"); docInline(m[2]).forEach(function (n) { st.appendChild(n); }); out.push(st); i += m[0].length; continue; }
+      if ((m = /^~~(?=\S)([\s\S]*?\S)~~/.exec(rest))) { flushText(); var de = el("del"); docInline(m[1]).forEach(function (n) { de.appendChild(n); }); out.push(de); i += m[0].length; continue; }
+      if ((m = /^\*(?=[^\s*])([\s\S]*?[^\s*])\*(?!\*)/.exec(rest)) || (!/\w$/.test(buf) && (m = /^_(?=[^\s_])([\s\S]*?[^\s_])_(?!\w)/.exec(rest)))) {
+        flushText(); var em = el("em"); docInline(m[1]).forEach(function (n) { em.appendChild(n); }); out.push(em); i += m[0].length; continue;
       }
-      list = null;
-      if (line.indexOf("## ") === 0) box.appendChild(el("h2", null, inline(line.slice(3))));
-      else if (line.indexOf("# ") === 0) box.appendChild(el("h1", null, inline(line.slice(2))));
-      else if (line) box.appendChild(el("p", null, inline(line)));
-    });
+      if ((m = /^ {2,}\n/.exec(rest)) || (m = /^\\\n/.exec(rest))) { flushText(); out.push(el("br")); i += m[0].length; continue; }
+      buf += rest[0] === "\n" ? " " : rest[0];
+      i += 1;
+    }
+    flushText();
+    return out;
+  }
+
+  function mdDoc(text) {
+    var box = el("div", { class: "md md-doc", "data-no-i18n": "" });
+    docBlocks(String(text || "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n"), box);
     return box;
+  }
+
+  function docBlocks(lines, parent) {
+    var i = 0;
+    function add(tag, inlineText, attrs) { var n = el(tag, attrs || null); docInline(inlineText).forEach(function (x) { n.appendChild(x); }); parent.appendChild(n); return n; }
+    function isBlockStart(line) {
+      return /^\s{0,3}(#{1,6}\s|>|```|~~~|([-*_])(\s*\2){2,}\s*$)/.test(line) || /^\s{0,3}([-*+]|\d+[.)])\s+/.test(line);
+    }
+    function cells(row) { return row.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split(/(?<!\\)\|/).map(function (c) { return c.trim(); }); }
+    while (i < lines.length) {
+      var line = lines[i], m;
+      if (!line.trim()) { i++; continue; }
+      // fenced code
+      if ((m = /^\s{0,3}(```|~~~)\s*([\w-]*)/.exec(line))) {
+        var fence = m[1], code = [];
+        i++;
+        while (i < lines.length && lines[i].trim().indexOf(fence) !== 0) code.push(lines[i++]);
+        i++;
+        parent.appendChild(el("pre", null, el("code", { text: code.join("\n") })));
+        continue;
+      }
+      // heading
+      if ((m = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/.exec(line))) { add("h" + m[1].length, m[2]); i++; continue; }
+      // rule
+      if (/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { parent.appendChild(el("hr")); i++; continue; }
+      // quote
+      if (/^\s{0,3}>/.test(line)) {
+        var q = [];
+        while (i < lines.length && lines[i].trim() && (/^\s{0,3}>/.test(lines[i]) || !isBlockStart(lines[i]))) q.push(lines[i++].replace(/^\s{0,3}>\s?/, ""));
+        var bq = el("blockquote"); docBlocks(q, bq); parent.appendChild(bq);
+        continue;
+      }
+      // table: header row, then a separator row like |---|:---:|
+      if (line.indexOf("|") >= 0 && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(lines[i + 1])) {
+        var head = cells(line), align = cells(lines[i + 1]).map(function (c) { return /^:-+:$/.test(c) ? "center" : /-:$/.test(c) ? "right" : ""; });
+        var table = el("table"), thead = el("thead"), tr = el("tr"), tbody = el("tbody");
+        head.forEach(function (c, k) { var th = el("th", align[k] ? { style: "text-align:" + align[k] } : null); docInline(c).forEach(function (x) { th.appendChild(x); }); tr.appendChild(th); });
+        thead.appendChild(tr); table.appendChild(thead); table.appendChild(tbody);
+        i += 2;
+        while (i < lines.length && lines[i].trim() && lines[i].indexOf("|") >= 0) {
+          var row = el("tr");
+          cells(lines[i]).forEach(function (c, k) { var td = el("td", align[k] ? { style: "text-align:" + align[k] } : null); docInline(c).forEach(function (x) { td.appendChild(x); }); row.appendChild(td); });
+          tbody.appendChild(row); i++;
+        }
+        parent.appendChild(el("div", { class: "md-table" }, table));
+        continue;
+      }
+      // list (nested by indentation, items can run over several lines)
+      if ((m = /^(\s*)([-*+]|\d+[.)])\s+/.exec(line))) {
+        var baseIndent = m[1].length, ordered = /\d/.test(m[2]);
+        var list = el(ordered ? "ol" : "ul");
+        if (ordered && parseInt(m[2], 10) !== 1) list.setAttribute("start", parseInt(m[2], 10));
+        var items = [], cur = null;
+        while (i < lines.length) {
+          var l = lines[i], im = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(l);
+          if (im && im[1].length <= baseIndent + 1 && /\d/.test(im[2]) === ordered) { cur = { first: im[3], more: [], width: im[0].length - im[3].length }; items.push(cur); i++; continue; }
+          if (im && im[1].length <= baseIndent + 1) break; // a list of the other kind starts
+          if (!l.trim()) {
+            var next = lines[i + 1];
+            if (next !== undefined && next.trim() && (/^\s+/.exec(next) || [""])[0].length > baseIndent) { cur.more.push(""); i++; continue; }
+            break;
+          }
+          var ind = (/^\s*/.exec(l) || [""])[0].length;
+          if (ind > baseIndent || !isBlockStart(l)) { cur.more.push(l.slice(Math.min(ind, cur.width))); i++; continue; }
+          break;
+        }
+        items.forEach(function (it) {
+          var li = el("li"), first = it.first, task = /^\[([ xX])\]\s+/.exec(first);
+          if (task) { li.className = "task"; li.appendChild(el("input", { type: "checkbox", disabled: true, checked: task[1] !== " " })); first = first.slice(task[0].length); }
+          var sub = it.more, split = sub.findIndex(function (x) { return !x.trim() || isBlockStart(x); });
+          var lead = [first].concat(split < 0 ? sub : sub.slice(0, split)).join("\n");
+          docInline(lead).forEach(function (x) { li.appendChild(x); });
+          if (split >= 0) docBlocks(sub.slice(split), li);
+          list.appendChild(li);
+        });
+        parent.appendChild(list);
+        continue;
+      }
+      // paragraph: lines until an empty line or another block
+      var para = [line];
+      i++;
+      while (i < lines.length && lines[i].trim() && !isBlockStart(lines[i]) && !(lines[i].indexOf("|") >= 0 && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1]))) para.push(lines[i++]);
+      add("p", para.join("\n").replace(/^\s+/, ""));
+    }
   }
 
   function closePopover() {
@@ -2383,7 +2515,7 @@
       body.textContent = "";
       if (!text) body.appendChild(el("p", { class: "muted", text: kind === "impressum" ? "The Impressum is not set up yet. The operator creates the file .impressum (template: .impressum-example)."
         : kind === "datenschutz" ? "The privacy policy is not set up yet. The operator creates the file .datenschutz (template: .datenschutz-example)." : "No changelog found." }));
-      else body.appendChild(mdLite(text.replace(/^# [^\n]*\n/, "")));
+      else body.appendChild(mdDoc(text.replace(/^# [^\n]*\n/, "")));
     } catch (e) { body.textContent = e.message; }
     if (kind === "changelog" && appVersion && me) {
       $("tb-dot").hidden = true;

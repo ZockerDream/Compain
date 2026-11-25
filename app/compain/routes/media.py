@@ -1,5 +1,6 @@
 """Character pictures: upload (PNG, JPG, WebP, max 10 MB) and fetch."""
 
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -98,6 +99,21 @@ async def import_card(
     if not data or len(data) > limit:
         raise HTTPException(status_code=413, detail=f"The file is empty or larger than {cfg.get(db, 'upload_max_mb')} MB")
     filename = request.headers.get("x-filename", "")
+    # A Compain character list or export (for example examples/demo-characters.json) goes to the full import.
+    if data.lstrip()[:1] == b"{":
+        try:
+            payload = json.loads(data.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            payload = None
+        if isinstance(payload, dict) and str(payload.get("format", "")).startswith("compain-"):
+            from .export import import_payload
+
+            result, new = await import_payload(payload, user, db, settings, request.app.state.hub)
+            if not new:
+                raise HTTPException(status_code=409, detail="All characters in this file are already there")
+            items = [{"id": c.id, "name": c.name} for c in new]
+            return {**items[0], "count": len(items), "characters": items,
+                    "pictures": result["pictures"], "picture_errors": result["picture_errors"]}
     try:
         cards = parse_cards(filename, data)
     except CardError as exc:

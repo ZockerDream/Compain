@@ -2,6 +2,18 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.8.0 – 2026-11-25
+
+- **Delete a whole chat.** The bin in the chat header deletes the chat with all messages, versions, bookmarks, the story summary and the relationship, after asking once. The character stays. Everyone can delete only their own chats; a reply that is still being written is stopped first.
+- **Replies in the language of your account.** *Replies in → Same as the interface* (before: *Automatic*) now follows the language set under *Interface*, instead of the language you happen to type in. The rule is also stronger: the character keeps that language even when its card, greeting or the story so far is written in another one.
+- **Changelog, Impressum and Datenschutz show full Markdown**:
+  - **bold**, *italic*, ~~struck~~, `code` and links
+  - numbered and nested lists, quotes, tables, code blocks and rules
+
+  Before, the signs (`**`, `` ` ``) were shown as they are.
+- **Import card** takes Compain character lists such as `examples/demo-characters.json` directly on the server (before: *The card has no name* when the browser still had the old app cached).
+- A link to a chat (`#chats/<number>`, for example after reloading) opens that chat again instead of the first one.
+
 ## 1.7.0 – 2026-11-25
 
 - **Import many characters with pictures.** A Compain character list (`"format": "compain-characters-v1"`) can now carry a picture per character: `picture` as a data address (`data:image/png;base64,…`) for everyone, or `picture_url` as a web address for admins. The server checks every picture like an upload (PNG, JPG or WebP, size limit) and never fetches addresses inside its own network. A picture that fails does not stop the import; the message says which one.

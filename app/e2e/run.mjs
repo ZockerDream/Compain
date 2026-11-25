@@ -360,6 +360,14 @@ await page.click("#tb-changelog");
 await page.waitForSelector(".popover .md li", { timeout: 5000 });
 check("changelog opens as a popover", await page.isVisible(".popover"));
 check("changelog dot is gone after reading", await page.locator("#tb-dot").isHidden());
+const changelogMd = await page.evaluate(() => {
+  const box = document.querySelector(".popover .md-doc");
+  const copy = box.cloneNode(true);
+  copy.querySelectorAll("code").forEach((c) => c.remove()); // code may show the signs on purpose
+  return { strong: box.querySelectorAll("strong").length, code: box.querySelectorAll("code").length, stars: (copy.textContent.match(/\*\*/g) || []).length, ticks: copy.textContent.includes("`") };
+});
+await page.screenshot({ path: SHOTS + "11-changelog.png" });
+check("changelog shows Markdown formatted (bold, code, no raw signs)", changelogMd.strong > 0 && changelogMd.code > 0 && changelogMd.stars === 0 && !changelogMd.ticks, JSON.stringify(changelogMd));
 await page.keyboard.press("Escape");
 await page.click("#tb-impressum");
 await page.waitForSelector(".popover h2", { timeout: 5000 });
@@ -561,6 +569,35 @@ patched = rolePatched();
 await page.selectOption(roleSel, "user");
 await patched;
 check("admin makes an admin a user again", (await roleNow()) === "user");
+
+// Delete a whole chat from its header (after asking once)
+const delChat = await page.evaluate(async () => {
+  const chars = await (await fetch("/api/characters", { credentials: "same-origin" })).json();
+  const r = await fetch("/api/chats", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ character_id: chars[0].id }) });
+  return (await r.json()).id;
+});
+await page.evaluate((id) => { location.hash = "chats/" + id; }, delChat);
+await page.waitForFunction((id) => document.querySelector("#conv a[download]")?.getAttribute("href").includes("/chat/" + id + "?"), delChat, { timeout: 10000 }).catch(() => {});
+check("a link to a chat (#chats/<id>) opens that chat", await page.evaluate((id) => document.querySelector("#conv a[download]")?.getAttribute("href").includes("/chat/" + id + "?"), delChat));
+await page.waitForSelector("#delete-chat", { state: "visible" });
+await page.click("#delete-chat");
+await page.waitForSelector("#delete-chat-confirm", { state: "visible" });
+check("deleting a chat asks first", await page.isVisible("#delete-menu"));
+await page.click("#delete-chat-confirm");
+await page.waitForFunction(() => document.querySelector("#toast")?.textContent.includes("deleted") || document.querySelector("#toast")?.textContent.includes("gelöscht"), null, { timeout: 5000 }).catch(() => {});
+const delStatus = (await page.request.get(BASE + "/api/chats/" + delChat)).status(); // outside the page: no console noise
+check("a chat can be deleted completely", delStatus === 404, "status " + delStatus);
+
+// Import card also takes the example list of 50 characters (pictures are fetched from the web)
+await page.click("#nav-desktop button[data-go=characters]");
+await page.waitForSelector("#view-characters:not(.hidden)");
+const cardChooser = page.waitForEvent("filechooser");
+await page.click("#view-characters button:has-text('Import card')");
+await (await cardChooser).setFiles(new URL("../../examples/demo-characters.json", import.meta.url).pathname);
+await page.waitForFunction(() => /50 characters imported|50 Charaktere importiert/.test(document.querySelector("#toast")?.textContent || ""), null, { timeout: 60000 }).catch(() => {});
+check("Import card takes the example file with 50 characters", /50 characters imported|50 Charaktere importiert/.test(await page.textContent("#toast")), await page.textContent("#toast"));
+const demoPics = await page.evaluate(async () => (await (await fetch("/api/characters", { credentials: "same-origin" })).json()).filter((c) => c.has_picture).length);
+check("the example characters come with pictures", demoPics >= 50, "with picture: " + demoPics);
 
 // Help: FAQ, guide, Markdown reference, and a ticket between a user and the admin (live, both ways)
 const up = await newPage(1280, 860);

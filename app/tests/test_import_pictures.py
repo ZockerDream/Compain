@@ -77,3 +77,28 @@ def test_private_addresses_are_not_public():
     assert not export_mod._public_host("127.0.0.1")
     assert not export_mod._public_host("10.0.0.5")
     assert not export_mod._public_host("169.254.169.254")
+
+
+def test_card_import_accepts_compain_character_lists(tmp_path):
+    app, client, h = admin_client(tmp_path)
+    uri = "data:image/png;base64," + base64.b64encode(PNG).decode()
+    body = payload({"name": "Sakura", "visibility": "public", "picture": uri}, {"name": "Ren"})
+    r = client.post("/api/characters/import", content=body.encode(), headers={**h, "X-Filename": "demo-characters.json"})
+    assert r.status_code == 201, r.text
+    assert r.json()["count"] == 2 and [c["name"] for c in r.json()["characters"]] == ["Sakura", "Ren"]
+    assert r.json()["pictures"] == 1
+    again = client.post("/api/characters/import", content=body.encode(), headers={**h, "X-Filename": "demo-characters.json"})
+    assert again.status_code == 409 and "already" in again.json()["detail"]
+
+
+def test_example_file_imports_through_the_card_import(tmp_path):
+    from pathlib import Path
+
+    app, client, h = admin_client(tmp_path)
+    data = json.loads((Path(__file__).resolve().parents[2] / "examples" / "demo-characters.json").read_text())
+    for c in data["characters"]:
+        c.pop("picture_url")  # no network in tests
+    r = client.post("/api/characters/import", content=json.dumps(data).encode(), headers={**h, "X-Filename": "demo-characters.json"})
+    assert r.status_code == 201, r.text
+    assert r.json()["count"] == 50
+    assert sum(1 for c in client.get("/api/community", headers=h).json() if c["visibility"] == "public") == 50

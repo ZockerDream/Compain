@@ -326,8 +326,17 @@ async def import_file(request: Request, user: User = Depends(current_user), db: 
         payload = json.loads(data.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         raise HTTPException(status_code=422, detail="This is not a Compain export file (JSON)")
+    result, _ = await import_payload(payload, user, db, settings, request.app.state.hub)
+    return result
+
+
+COMPAIN_FORMATS = {"compain-chat-v1", "compain-chats-v1", "compain-all-v1", "compain-characters-v1"}
+
+
+async def import_payload(payload, user: User, db: DbSession, settings: Settings, hub) -> tuple[dict, list[Character]]:
+    """Import a parsed Compain file. Also used by the card import, which accepts Compain character lists."""
     fmt = payload.get("format") if isinstance(payload, dict) else None
-    if fmt not in {"compain-chat-v1", "compain-chats-v1", "compain-all-v1", "compain-characters-v1"}:
+    if fmt not in COMPAIN_FORMATS:
         raise HTTPException(status_code=422, detail="This is not a Compain export file (JSON)")
 
     imp = _Importer(db, user)
@@ -341,6 +350,7 @@ async def import_file(request: Request, user: User = Depends(current_user), db: 
     db.commit()
     pictures, picture_errors = await _import_pictures(imp, settings, cfg.get(db, "upload_max_mb") * 1024 * 1024)
     db.commit()
-    await request.app.state.hub.publish(user.id, {"type": "chats"})
-    return {"chats": len(chats), "characters": imp.created_characters, "pictures": pictures,
-            "picture_errors": picture_errors[:20], "first_chat_id": chats[0].id if chats else None}
+    await hub.publish(user.id, {"type": "chats"})
+    return ({"chats": len(chats), "characters": imp.created_characters, "pictures": pictures,
+             "picture_errors": picture_errors[:20], "first_chat_id": chats[0].id if chats else None},
+            [c for c, _ in imp.new])
