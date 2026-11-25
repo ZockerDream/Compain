@@ -2,6 +2,10 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.8.1 – 2026-11-25
+
+- `examples/demo-characters.json`: the placeholder pictures are now anime illustrations (via nekos.best) instead of cartoon avatars. Artist and source of every picture are in `picture_credit`; replace them with your own pictures for real use.
+
 ## 1.8.0 – 2026-11-25
 
 - **Delete a whole chat.** The bin in the chat header deletes the chat with all messages, versions, bookmarks, the story summary and the relationship, after asking once. The character stays. Everyone can delete only their own chats; a reply that is still being written is stopped first.

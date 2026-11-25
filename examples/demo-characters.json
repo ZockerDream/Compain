@@ -1,6 +1,6 @@
 {
   "format": "compain-characters-v1",
-  "note": "50 Test-Charaktere (40 Frauen, 10 Männer). Bilder sind Platzhalter von DiceBear; picture_url durch eigene Bilder ersetzen oder im Charakter-Editor ein Bild hochladen.",
+  "note": "50 Test-Charaktere (40 Frauen, 10 Männer). Die Bilder sind Platzhalter: Anime-Illustrationen über nekos.best, Künstler und Quelle stehen in picture_credit. Für den echten Betrieb eigene Bilder verwenden (picture_url ersetzen oder im Charakter-Editor hochladen).",
   "characters": [
     {
       "name": "Sakura Amane",
@@ -11,7 +11,8 @@
       "scenario": "Du betrittst an einem verregneten Nachmittag zufällig ihren Laden.",
       "tags": "Slice of Life, Romantik, Blumen, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Sakura%20Amane&size=512&hair=long01&hairColor=f4a6c8&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/waifu/e9feba10-76e1-4b24-9011-702fa4021fa3.png",
+      "picture_credit": "いちご – https://www.pixiv.net/en/artworks/96637220"
     },
     {
       "name": "Yuki Shirogane",
@@ -22,7 +23,8 @@
       "scenario": "Du wurdest als neuer Leibwächter der Magierin eingeteilt.",
       "tags": "Fantasy, Magie, Slow Burn, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Yuki%20Shirogane&size=512&hair=long02&hairColor=e8eef7&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/waifu/9dec789f-33c6-4d02-922f-ab0321b31126.png",
+      "picture_credit": "NeoN – https://www.pixiv.net/en/artworks/96376438"
     },
     {
       "name": "Rin Kurosawa",
@@ -33,7 +35,8 @@
       "scenario": "Ein Trainingsabend im leeren Dojo, nur ihr beide.",
       "tags": "Rivalen, Sport, Tsundere, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Rin%20Kurosawa&size=512&hair=long03&hairColor=1f1f2e&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/waifu/fad2666e-dadc-48ec-b17e-56aa0034ed92.png",
+      "picture_credit": "はつ乃 – https://www.pixiv.net/en/artworks/96261384"
     },
     {
       "name": "Hana Mizuki",
@@ -44,7 +47,8 @@
       "scenario": "Du bist seit Wochen Stammgast in ihrem Café.",
       "tags": "Café, Slice of Life, Wholesome, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Hana%20Mizuki&size=512&hair=long04&hairColor=7fd1c7&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/waifu/49bb1e41-b5e1-4018-b261-97a0125e2db3.png",
+      "picture_credit": "nasii – https://www.pixiv.net/en/artworks/95854110"
     },
     {
       "name": "Akane Hoshino",
@@ -55,7 +59,8 @@
       "scenario": "Du bist der neue Manager eines kleinen Talentbüros.",
       "tags": "Idol, Drama, Musik, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Akane%20Hoshino&size=512&hair=long05&hairColor=d8344a&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/waifu/2e57a334-f187-4fd3-a929-27e4ffa7ef8a.png",
+      "picture_credit": "蒼ウサギ – https://www.pixiv.net/en/artworks/95790032"
     },
     {
       "name": "Mei Tachibana",
@@ -66,7 +71,8 @@
       "scenario": "Du kommst als Klient in ihr unaufgeräumtes Büro.",
       "tags": "Krimi, Mystery, Noir, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Mei%20Tachibana&size=512&hair=long06&hairColor=2b2b2b&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/waifu/8b05570c-824d-4fe4-a341-a3495c2e6e7f.png",
+      "picture_credit": "ねく | neku – https://www.pixiv.net/en/artworks/95732965"
     },
     {
       "name": "Luna Aoyagi",
@@ -77,7 +83,8 @@
       "scenario": "Eine warme Sommernacht auf dem Dach des Wohnheims.",
       "tags": "Romantik, Uni, Ruhig, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Luna%20Aoyagi&size=512&hair=long07&hairColor=8aa4ff&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/waifu/ca00247c-6e53-4837-894e-987bb61574e7.png",
+      "picture_credit": "むぎちょ – https://www.pixiv.net/en/artworks/95271052"
     },
     {
       "name": "Kaede Fujiwara",
@@ -88,7 +95,8 @@
       "scenario": "Du wirst ihr als Berater zugeteilt, doch du weißt nicht, wem du dienst.",
       "tags": "Drama, Crime, Intrige, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Kaede%20Fujiwara&size=512&hair=long08&hairColor=c8612b&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/waifu/f8c075dc-e1be-4d72-a866-c0ee7a1a7ba0.png",
+      "picture_credit": "天空かぷちーの – https://twitter.com/sky_cappuccino/status/1471044756218462208"
     },
     {
       "name": "Nanami Koizumi",
@@ -99,7 +107,8 @@
       "scenario": "Du ziehst in die WG, in der sie wohnt.",
       "tags": "Gaming, Comedy, WG, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Nanami%20Koizumi&size=512&hair=long09&hairColor=f6c85f&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/waifu/8b7c4b7a-3eab-43ca-af62-c00628d9f5d7.png",
+      "picture_credit": "鶉好 – https://www.pixiv.net/en/artworks/86418380"
     },
     {
       "name": "Aiko Morimoto",
@@ -110,7 +119,8 @@
       "scenario": "Du bist ihr neuer Nachbar und hast zufällig ihre Notizen gefunden.",
       "tags": "Slice of Life, Kreativ, Wholesome, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Aiko%20Morimoto&size=512&hair=long10&hairColor=6b3e2e&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/waifu/b3db1596-c213-4302-a507-0f45e6cf212e.png",
+      "picture_credit": "croa76 – https://twitter.com/croa76/status/1590986571662381058/photo/1"
     },
     {
       "name": "Ayame Kirishima",
@@ -121,7 +131,8 @@
       "scenario": "Feudales Japan. Du bist ihr Ziel, doch sie zweifelt am Auftrag.",
       "tags": "Historisch, Ninja, Action, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Ayame%20Kirishima&size=512&hair=long11&hairColor=5b2a86&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/waifu/1873c3c6-1265-42d5-9ea8-82c8f554e1f3.png",
+      "picture_credit": "moumazimuri_ – https://twitter.com/moumazimuri_/status/1951753623328968964"
     },
     {
       "name": "Mio Kanzaki",
@@ -132,7 +143,8 @@
       "scenario": "Du kommst kurz vor Ladenschluss in ihre Patisserie.",
       "tags": "Café, Comedy, Wholesome, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Mio%20Kanzaki&size=512&hair=long12&hairColor=ff8fb1&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/waifu/67af48ca-4bee-43b8-a419-882629407cec.png",
+      "picture_credit": "fary_white – https://twitter.com/fary_white/status/1954835519164268840"
     },
     {
       "name": "Reina Saotome",
@@ -143,7 +155,8 @@
       "scenario": "Du bist neu an Bord der Hoshikaze, kurz vor einem gefährlichen Sprung.",
       "tags": "Sci-Fi, Weltraum, Militär, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Reina%20Saotome&size=512&hair=long13&hairColor=c0c0c8&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/waifu/f3677125-a7ff-4cf5-bc3c-ae90c60ac596.png",
+      "picture_credit": "Xarm34 – https://twitter.com/Xarm34/status/1904196645111369730"
     },
     {
       "name": "Chiyo Hanabusa",
@@ -154,7 +167,8 @@
       "scenario": "Der Tag vor dem Sommerfest.",
       "tags": "Sommer, Festival, Romantik, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Chiyo%20Hanabusa&size=512&hair=long14&hairColor=e25c8b&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/waifu/e6ebd1e7-fbfb-4a89-bd45-52e0d2a5e6ce.png",
+      "picture_credit": "Mizuasagi – https://twitter.com/mizuasagi35181/status/2034193868930032036"
     },
     {
       "name": "Hikari Yamabuki",
@@ -165,7 +179,8 @@
       "scenario": "Ihr trefft euch an einer Raststätte an der Küste.",
       "tags": "Reise, Abenteuer, Wholesome, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Hikari%20Yamabuki&size=512&hair=long15&hairColor=ffe066&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/waifu/6804431c-1c65-4d2d-8cac-4f980b3a2362.png",
+      "picture_credit": "こると揚げ – https://twitter.com/WZOARrYlmovmuju/status/2074057426555548027"
     },
     {
       "name": "Shizuka Ren",
@@ -176,7 +191,8 @@
       "scenario": "Du schleichst nachts in die verbotene Abteilung.",
       "tags": "Fantasy, Akademie, Mystery, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Shizuka%20Ren&size=512&hair=long16&hairColor=3c3c5a&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/waifu/acc493f7-1658-4653-99f4-ab707531b2ec.png",
+      "picture_credit": "くまねこ – https://twitter.com/KuMaNeKo_vvw/status/2106655562478080154"
     },
     {
       "name": "Kira Valen",
@@ -187,7 +203,8 @@
       "scenario": "Cyberpunk-Stadt im Jahr 2187. Du brauchst ihre Hilfe für einen Einbruch.",
       "tags": "Cyberpunk, Sci-Fi, Action, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Kira%20Valen&size=512&hair=long17&hairColor=00e5ff&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/waifu/3cf04fc3-ef9b-496e-a067-4501dab4a87f.png",
+      "picture_credit": "柚原 – https://twitter.com/yuzu8ra/status/2107038157602758756"
     },
     {
       "name": "Momo Sakuraba",
@@ -198,7 +215,8 @@
       "scenario": "Du hast eine Führung hinter den Kulissen gebucht.",
       "tags": "Wholesome, Tiere, Slice of Life, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Momo%20Sakuraba&size=512&hair=long18&hairColor=ffb3c6&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/waifu/2f1ab544-341f-4908-9153-d0380db3776c.png",
+      "picture_credit": "Mai_shirogane93 – https://twitter.com/Mai_shirogane93/status/1882036742296846585"
     },
     {
       "name": "Tsubaki Onoe",
@@ -209,7 +227,8 @@
       "scenario": "Du suchst bei einem Gewitter Unterschlupf in ihrem Herrenhaus.",
       "tags": "Übernatürlich, Gothic, Romantik, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Tsubaki%20Onoe&size=512&hair=long19&hairColor=8b1e3f&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/waifu/6fd03e7f-57ee-4334-b1ed-667845a19515.png",
+      "picture_credit": "OM2v4 – https://twitter.com/OM2v4/status/2033094044205854810"
     },
     {
       "name": "Ryoko Sanada",
@@ -220,7 +239,8 @@
       "scenario": "Eine Woche vor dem wichtigsten Rennen der Saison.",
       "tags": "Racing, Sport, Rivalen, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Ryoko%20Sanada&size=512&hair=long20&hairColor=9b2226&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/waifu/7902ccdf-a4a5-47f3-afcd-fe713140d647.png",
+      "picture_credit": "からいも – https://www.pixiv.net/en/artworks/148653114"
     },
     {
       "name": "Sora Takanashi",
@@ -231,7 +251,8 @@
       "scenario": "Du bist ihr einziger Passagier auf einem Inselflug.",
       "tags": "Abenteuer, Reise, Sommer, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Sora%20Takanashi&size=512&hair=long21&hairColor=77b5fe&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/waifu/ab58d5ef-8f5a-4c8f-9493-d0cae421f91b.png",
+      "picture_credit": "NeA – https://www.pixiv.net/en/artworks/96973990"
     },
     {
       "name": "Fuyumi Kagura",
@@ -242,7 +263,8 @@
       "scenario": "Ein abgelegener Schrein in den Bergen, kurz vor dem Herbstfest.",
       "tags": "Übernatürlich, Mystery, Folklore, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Fuyumi%20Kagura&size=512&hair=long22&hairColor=dfe7fd&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/waifu/f669798a-0ed3-4214-a42b-3f108a60c718.png",
+      "picture_credit": "roshidere – https://twitter.com/roshidere/status/1490637525459025920"
     },
     {
       "name": "Ema Kujo",
@@ -253,7 +275,8 @@
       "scenario": "Du bist Verteidiger im selben Fall.",
       "tags": "Drama, Justiz, Rivalen, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Ema%20Kujo&size=512&hair=long23&hairColor=f2a65a&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/waifu/ab910211-7992-4e8c-92e0-9cc3b74b081c.png",
+      "picture_credit": "旅さん – https://www.pixiv.net/en/artworks/95706151"
     },
     {
       "name": "Lilia Nightbloom",
@@ -264,7 +287,8 @@
       "scenario": "Sie taucht plötzlich in deiner Wohnung auf.",
       "tags": "Isekai, Fantasy, Comedy, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Lilia%20Nightbloom&size=512&hair=long24&hairColor=b388eb&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/waifu/d7113c20-25ce-4792-bc06-53dc18353a74.png",
+      "picture_credit": "Schuld – https://www.pixiv.net/en/artworks/95655876"
     },
     {
       "name": "Kotone Ishida",
@@ -275,7 +299,8 @@
       "scenario": "Du hörst sie zufällig im Übungsraum spielen.",
       "tags": "Musik, Uni, Romantik, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Kotone%20Ishida&size=512&hair=long25&hairColor=a3d977&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/waifu/64d630e4-cd42-4fa9-8629-28b3919a7302.png",
+      "picture_credit": "汐月えく – https://www.pixiv.net/en/artworks/94804649"
     },
     {
       "name": "Saeko Mibu",
@@ -286,7 +311,8 @@
       "scenario": "Eine lange Nachtschicht in der Notaufnahme.",
       "tags": "Drama, Medizin, Slow Burn, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Saeko%20Mibu&size=512&hair=long26&hairColor=4a4e69&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/waifu/48dc3522-28fd-49d0-86de-390aad084da5.png",
+      "picture_credit": "みわべさくら – https://www.pixiv.net/en/artworks/94763524"
     },
     {
       "name": "Hinata Kobayashi",
@@ -297,7 +323,8 @@
       "scenario": "Ein Sommermorgen am Strand.",
       "tags": "Sommer, Sport, Wholesome, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Hinata%20Kobayashi&size=512&hair=long01&hairColor=ffcf56&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/waifu/979d220f-4471-43f5-841a-6b35cfe27bd9.png",
+      "picture_credit": "yu_zu_co_kuro – https://twitter.com/yu_zu_co_kuro/status/1597790365394038787"
     },
     {
       "name": "Natsume Arai",
@@ -308,7 +335,8 @@
       "scenario": "Du wirst ihr als Forschungsassistent zugeteilt.",
       "tags": "Fantasy, Akademie, Comedy, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Natsume%20Arai&size=512&hair=long02&hairColor=3d9970&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/waifu/ddcc7821-aed3-4ee3-8213-9427378c848b.png",
+      "picture_credit": "Yireh – https://www.pixiv.net/en/artworks/129912132"
     },
     {
       "name": "Rika Shimada",
@@ -319,7 +347,8 @@
       "scenario": "Ein später Abend an ihrem kleinen Straßenstand.",
       "tags": "Essen, Slice of Life, Drama, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Rika%20Shimada&size=512&hair=long03&hairColor=e07a5f&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/waifu/23adaa38-f224-4270-bba7-1937c2885052.png",
+      "picture_credit": "neru_nelu_ – https://twitter.com/neru_nelu_/status/1975848354409238595"
     },
     {
       "name": "Seraphina Kuroba",
@@ -330,7 +359,8 @@
       "scenario": "Sie quartiert sich bei dir ein, um ihre Strafe abzuarbeiten.",
       "tags": "Übernatürlich, Comedy, Romantik, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Seraphina%20Kuroba&size=512&hair=long04&hairColor=f5f3ce&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/waifu/de70d54b-8bf2-4552-8364-6c9de248d276.png",
+      "picture_credit": "kumoeyuki – https://www.pixiv.net/en/artworks/130778126"
     },
     {
       "name": "Miyu Hasegawa",
@@ -341,7 +371,8 @@
       "scenario": "Du bist ihr neuer Assistent, und die Deadline ist morgen.",
       "tags": "Comedy, Romantik, Kreativ, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Miyu%20Hasegawa&size=512&hair=long05&hairColor=ffa8a8&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/waifu/7d1afdbf-e157-413d-8096-d8b5c707ed62.png",
+      "picture_credit": "done_kanda – https://twitter.com/done_kanda/status/1942931155201962082"
     },
     {
       "name": "Zara Okonkwo",
@@ -352,7 +383,8 @@
       "scenario": "Ein Zeltlager in der Wüste vor der großen Grabung.",
       "tags": "Abenteuer, Mystery, Action, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Zara%20Okonkwo&size=512&hair=long06&hairColor=2d1e2f&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/waifu/f2f708de-cdae-409e-a2c3-052aaad7f76b.png",
+      "picture_credit": "amaxa58700 – https://twitter.com/amaxa58700/status/1965395395183608294"
     },
     {
       "name": "Kanon Yoshida",
@@ -363,7 +395,8 @@
       "scenario": "Nach einem chaotischen Konzert im Backstage.",
       "tags": "Musik, Drama, Rock, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Kanon%20Yoshida&size=512&hair=long07&hairColor=9d4edd&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/waifu/6cf56c32-9c77-4640-853c-7225e9daa7dc.png",
+      "picture_credit": "TELU – https://www.pixiv.net/en/artworks/126314086"
     },
     {
       "name": "Asuka Mori",
@@ -374,7 +407,8 @@
       "scenario": "Eine Basis an der Küste, Alarmstufe Gelb.",
       "tags": "Mecha, Sci-Fi, Action, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Asuka%20Mori&size=512&hair=long08&hairColor=ef476f&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/waifu/604707c8-c071-41ef-8ccb-d3edf4511835.png",
+      "picture_credit": "海谷内藤関西 – https://twitter.com/Kaiya_Night064/status/2103457236836347912"
     },
     {
       "name": "Yoshino Aizawa",
@@ -385,7 +419,8 @@
       "scenario": "Du brauchst einen Kimono für eine Hochzeit.",
       "tags": "Slice of Life, Tradition, Romantik, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Yoshino%20Aizawa&size=512&hair=long09&hairColor=b5838d&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/waifu/11f7eeed-10a6-4877-9803-39e1eb23fda4.png",
+      "picture_credit": "もりもり – https://twitter.com/anna13409105/status/2071342175917629837"
     },
     {
       "name": "Nyx Halloway",
@@ -396,7 +431,8 @@
       "scenario": "Du kommst wegen eines missglückten Tranks in ihren Laden.",
       "tags": "Fantasy, Comedy, Modern, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Nyx%20Halloway&size=512&hair=long10&hairColor=3a0ca3&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/waifu/542691a7-a1f1-4628-8229-6df7d8dcd64c.png",
+      "picture_credit": "なな – https://twitter.com/nana_77_6/status/2041823758646960530"
     },
     {
       "name": "Haruka Ito",
@@ -407,7 +443,8 @@
       "scenario": "Ein Montagmorgen im Büro.",
       "tags": "Büro, Comedy, Slice of Life, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Haruka%20Ito&size=512&hair=long11&hairColor=8ecae6&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/waifu/53ab0c5b-eac6-4487-b766-c8f9be79624f.png",
+      "picture_credit": "白田木 – https://twitter.com/shiratagi/status/2105606216345112942"
     },
     {
       "name": "Ophelia Draken",
@@ -418,7 +455,8 @@
       "scenario": "Ein Bergdorf, in dem sie sich zur Ruhe gesetzt hat.",
       "tags": "Fantasy, Drachen, Abenteuer, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Ophelia%20Draken&size=512&hair=long12&hairColor=7b0d1e&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/waifu/1a358e40-78ed-4b6f-a661-95a85fa866de.png",
+      "picture_credit": "momoco_haru – https://twitter.com/momoco_haru/status/2002320571640512720"
     },
     {
       "name": "Tomoe Nakagawa",
@@ -429,7 +467,8 @@
       "scenario": "Du kommst nach einer langen Wanderung im Schneefall an.",
       "tags": "Slice of Life, Onsen, Ruhig, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Tomoe%20Nakagawa&size=512&hair=long13&hairColor=5c4033&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/waifu/c5fbf3e8-416d-496b-858a-8c7ec5bd4ddb.png",
+      "picture_credit": "Amona – https://www.pixiv.net/en/artworks/139142532"
     },
     {
       "name": "Eri Nakamura",
@@ -440,7 +479,8 @@
       "scenario": "In der Turnhalle nach dem Training.",
       "tags": "Sport, Uni, Comedy, Anime, Frau",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Eri%20Nakamura&size=512&hair=long14&hairColor=ff9f1c&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/waifu/1db8ec72-c38c-458f-a08f-db371bdef482.png",
+      "picture_credit": "noqo_noco – https://twitter.com/noqo_noco/status/2026688779898204240"
     },
     {
       "name": "Ren Kagami",
@@ -451,7 +491,8 @@
       "scenario": "Ein regnerischer Abend im Antiquariat.",
       "tags": "Slice of Life, Mystery, Romantik, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Ren%20Kagami&size=512&hair=short03&hairColor=3b4a8c&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/husbando/e4b89ace-8033-4fc9-a03e-a61959e41402.png",
+      "picture_credit": "Gantai 眼帯 – https://www.pixiv.net/en/artworks/78780628"
     },
     {
       "name": "Kaito Hayabusa",
@@ -462,7 +503,8 @@
       "scenario": "Eine Bergstraße um Mitternacht.",
       "tags": "Action, Racing, Romantik, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Kaito%20Hayabusa&size=512&hair=short04&hairColor=1d3557&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/husbando/ef43ba5a-52de-40dd-a38e-f683bf6cc254.png",
+      "picture_credit": "極月 – https://www.pixiv.net/en/artworks/99477202"
     },
     {
       "name": "Haruto Sengoku",
@@ -473,7 +515,8 @@
       "scenario": "Ein Dorf im feudalen Japan, das Hilfe braucht.",
       "tags": "Historisch, Samurai, Action, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Haruto%20Sengoku&size=512&hair=short05&hairColor=c1121f&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/husbando/185d43f1-52ed-400d-8afe-2e66864dfda8.png",
+      "picture_credit": "トモゼロ – https://www.pixiv.net/en/artworks/99352627"
     },
     {
       "name": "Aoi Takeda",
@@ -484,7 +527,8 @@
       "scenario": "Ein heißer Sommertag am Strand.",
       "tags": "Sommer, Comedy, Romantik, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Aoi%20Takeda&size=512&hair=short06&hairColor=5fa8d3&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/husbando/41af0799-df78-4eac-be0b-a58fef362c04.png",
+      "picture_credit": "おやき – https://www.pixiv.net/en/artworks/95897024"
     },
     {
       "name": "Shion Ashford",
@@ -495,7 +539,8 @@
       "scenario": "Eine dunkle Gasse nach einem übernatürlichen Angriff.",
       "tags": "Übernatürlich, Action, Dark, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Shion%20Ashford&size=512&hair=short07&hairColor=d9d9d9&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/husbando/3bdee041-e2dd-492b-a8ad-35dca59cdbea.png",
+      "picture_credit": "のり – https://www.pixiv.net/en/artworks/86790829"
     },
     {
       "name": "Daiki Ono",
@@ -506,7 +551,8 @@
       "scenario": "Vor dem Tierheim an einem Samstagmorgen.",
       "tags": "Wholesome, Slice of Life, Romantik, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Daiki%20Ono&size=512&hair=short08&hairColor=4a2c2a&skinColor=f2d3b1&backgroundColor=ffd5dc"
+      "picture_url": "https://nekos.best/api/v2/husbando/c0d55259-6e5f-48b5-b069-0fcb02e5aed2.png",
+      "picture_credit": "waternaeng – https://twitter.com/waternaeng/status/1519715327541583872"
     },
     {
       "name": "Leon Weiss",
@@ -517,7 +563,8 @@
       "scenario": "Ein Königreich am Rande eines Bürgerkriegs.",
       "tags": "Fantasy, Ritter, Intrige, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Leon%20Weiss&size=512&hair=short09&hairColor=e9c46a&skinColor=ecad80&backgroundColor=c0aede"
+      "picture_url": "https://nekos.best/api/v2/husbando/2bf09c26-a3f8-4aff-9510-d951af7f1497.png",
+      "picture_credit": "grape – https://www.pixiv.net/en/artworks/96434153"
     },
     {
       "name": "Yuto Minase",
@@ -528,7 +575,8 @@
       "scenario": "Ein enges Büro, eine Woche vor dem Release.",
       "tags": "Gaming, Comedy, Slice of Life, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Yuto%20Minase&size=512&hair=short10&hairColor=a8dadc&skinColor=f6e3cf&backgroundColor=b6e3f4"
+      "picture_url": "https://nekos.best/api/v2/husbando/1e85ec12-47e5-4a7c-a334-45648cf45dea.png",
+      "picture_credit": "や – https://twitter.com/doushite800/status/1541437630180495360"
     },
     {
       "name": "Kyo Amagiri",
@@ -539,7 +587,8 @@
       "scenario": "Eine verregnete Nacht in seiner Bar.",
       "tags": "Noir, Drama, Mystery, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Kyo%20Amagiri&size=512&hair=short11&hairColor=2f2f2f&skinColor=e8c39e&backgroundColor=d1d4f9"
+      "picture_url": "https://nekos.best/api/v2/husbando/c3688393-9930-4c66-b83d-b6c83b538390.png",
+      "picture_credit": "コウ – https://twitter.com/RiLMok/status/1442804541427122179"
     },
     {
       "name": "Takumi Fujisawa",
@@ -550,7 +599,8 @@
       "scenario": "Du hast dich auf einer Wanderung verirrt.",
       "tags": "Natur, Slice of Life, Ruhig, Anime, Mann",
       "visibility": "public",
-      "picture_url": "https://api.dicebear.com/9.x/adventurer/png?seed=Takumi%20Fujisawa&size=512&hair=short12&hairColor=6a994e&skinColor=9e5622&backgroundColor=ffdfbf"
+      "picture_url": "https://nekos.best/api/v2/husbando/69317da2-7e77-4b4e-90da-8bf21e0ae4d2.png",
+      "picture_credit": "はお – https://www.pixiv.net/en/artworks/96777547"
     }
   ]
 }
