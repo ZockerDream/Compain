@@ -1,0 +1,8 @@
+# Signing key and its passwords: never commit, keep a backup (see README).
+keystore/
+# Build output
+.gradle/
+build/
+app/build/
+dist/
+local.properties

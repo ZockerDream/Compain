@@ -710,6 +710,24 @@
     }
     var searchBtn = el("button", { class: "ghost icon-only", "aria-label": "Search in this chat", onclick: function () { toggleSearch(); } }, icon("i-search"));
 
+    // Tools of the chat. On phones they sit in a ⋮ menu, so the header only shows back, picture, name and ⋮.
+    var tools = el("div", { class: "tools", id: "chat-tools" }, searchBtn, relationBtn, bookmarkBtn, pinBtn, infoBtn, exportLink, deleteWrap);
+    var moreBtn = el("button", { class: "ghost icon-only more-btn", id: "chat-more", "aria-label": "More", "aria-haspopup": "menu", "aria-expanded": "false" }, icon("i-more"));
+    var toolsWrap = el("div", { class: "tools-wrap" }, moreBtn, tools);
+    function setToolsMenu(open) {
+      toolsWrap.classList.toggle("open", open);
+      moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) setTimeout(function () {
+        document.addEventListener("click", function close(ev) {
+          if (!toolsWrap.classList.contains("open")) return;
+          // Export and delete open their own small menu inside: keep the ⋮ menu open for them.
+          if (ev.target.closest && (ev.target.closest("#export-btn, #delete-chat, .pop-menu"))) { document.addEventListener("click", close, { once: true }); return; }
+          setToolsMenu(false);
+        }, { once: true });
+      }, 0);
+    }
+    moreBtn.addEventListener("click", function () { setToolsMenu(!toolsWrap.classList.contains("open")); });
+
     pane.appendChild(el("header", { class: "conv-head" },
       el("button", { class: "ghost icon-only back-btn", "aria-label": "Back to chat list", onclick: function () { go("chats"); } }, icon("i-back")),
       chat.character_has_picture
@@ -719,7 +737,7 @@
       el("div", { class: "grow", style: "min-width:0" },
         el("div", { class: "name ellipsis", text: chat.character_name }),
         el("div", { class: "meta ellipsis", text: chat.title + (chat.character_tagline ? " · " + chat.character_tagline : "") })),
-      el("div", { class: "tools" }, searchBtn, relationBtn, bookmarkBtn, pinBtn, infoBtn, exportLink, deleteWrap)));
+      toolsWrap));
     pane.appendChild(searchBar);
     pane.appendChild(bookmarkBox);
     pane.appendChild(relationBox);
@@ -1769,6 +1787,7 @@
       el("div", { class: "card" }, el("h2", { text: "Color theme" }), el("p", { class: "muted small", style: "margin:6px 0 16px", text: "Accent color and tinted surfaces for the whole app." }), swatches),
       el("div", { class: "card" }, el("div", { class: "row", style: "justify-content:space-between;flex-wrap:wrap;gap:14px" },
         el("div", null, el("h2", { text: "Appearance" }), el("p", { class: "muted small", text: "System follows your device." })), modes)),
+      appCard(),
       languageCard(),
       el("div", { class: "card form" }, el("h2", { text: "Replies" }),
         el("div", { class: "two" },
@@ -1924,6 +1943,34 @@
         el("button", { onclick: function () { openPopover("changelog", null); } }, "Changelog"),
         el("button", { onclick: function () { openPopover("impressum", null); } }, "Impressum"),
         el("button", { onclick: function () { openPopover("datenschutz", null); } }, "Datenschutz")));
+  }
+
+  /* ---------- Android app (mobile_app/) ----------
+     The app adds window.CompainApp (a bridge to the native side). These settings exist only there and only
+     on that device, so they live in localStorage, not in the account. */
+  var inApp = !!(window.CompainApp && typeof window.CompainApp.serverUrl === "function");
+  function appPref(key, fallback) { try { var v = localStorage.getItem("compain.app." + key); return v === null ? fallback : v; } catch (e) { return fallback; } }
+  function setAppPref(key, value) { try { localStorage.setItem("compain.app." + key, value); } catch (e) { /* not stored */ } }
+  function applyAppPrefs() {
+    if (!inApp) return;
+    document.body.setAttribute("data-in-app", "1");
+    document.body.setAttribute("data-chat-full", appPref("chatFull", "0") === "1" ? "1" : "0");
+  }
+  function appCard() {
+    if (!inApp) return null;
+    var full = el("input", { type: "checkbox", id: "app-chat-full", checked: appPref("chatFull", "0") === "1" });
+    full.addEventListener("change", function () { setAppPref("chatFull", full.checked ? "1" : "0"); applyAppPrefs(); toast("Saved"); });
+    var server = "", version = "";
+    try { server = window.CompainApp.serverUrl(); version = window.CompainApp.version(); } catch (e) { /* older app */ }
+    return el("div", { class: "card form", id: "app-card" }, el("h2", { text: "App" }),
+      el("label", { class: "row", style: "justify-content:space-between;gap:16px;cursor:pointer", for: "app-chat-full" },
+        el("span", null, el("b", { text: "Full-screen chats" }),
+          el("span", { class: "muted small", style: "display:block;margin-top:4px", text: "Hide the bottom bar while a chat is open. Back with the arrow at the top or the back gesture." })),
+        full),
+      el("div", { class: "row", style: "justify-content:space-between;gap:16px;flex-wrap:wrap" },
+        el("span", { style: "min-width:0" }, el("b", { text: "Server" }), el("span", { class: "muted small ellipsis", style: "display:block;margin-top:4px", "data-no-i18n": "", text: server })),
+        el("button", { id: "app-change-server", onclick: function () { try { window.CompainApp.changeServer(); } catch (e) { toast(e.message); } } }, "Change server")),
+      version ? el("p", { class: "muted small", "data-no-i18n": "", text: "App " + version }) : null);
   }
 
   function languageCard() {
@@ -2686,6 +2733,7 @@
   window.addEventListener("hashchange", function () { if (me) go(location.hash.slice(1) || "home"); });
 
   /* ---------- boot ---------- */
+  applyAppPrefs();
   // Installable app (PWA). Service workers need HTTPS or localhost; elsewhere the app works without it.
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
     // When a new version takes over, load it once, so nobody keeps working on an old copy.

@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.10.0 – 2026-11-25
+
+- **Android app** in `mobile_app/`: Compain as an APK, in full screen, with everything the browser can do (login that stays, live updates, pictures and imports, downloads of exports, cards and backups, sound, back gesture). On the first start it asks for the server address. Build with `mobile_app/build.sh` (needs only Docker); see `mobile_app/README.md`.
+- **Phones: tidy chat header.** Only back, picture, name and **⋮**. Search, relationship, bookmarks, pin, story summary, export and delete are in the ⋮ menu, each with its name.
+- **Settings → App** (only in the Android app): *Full-screen chats* hides the bottom bar while a chat is open, and the chat uses the whole screen; *Change server*; app version.
+
 ## 1.9.1 – 2026-11-25
 
 - **Updates reach phones at once.** App files are now sent with `Cache-Control: no-cache`, the service worker takes them from the server first (the cache only offline) and an open or installed app reloads itself once when a new version is there. Before, a phone (especially the installed app on Android) could keep an old version for days, for example with the input field under the bottom bar.

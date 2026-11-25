@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Compain</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(520px 380px at 50% 28%,#2a1622 0%,#120d17 60%,#08070b 100%);color:#f4ede6;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{width:min(420px,100%);display:grid;gap:18px;text-align:center}
+.mark{width:112px;height:112px;margin:0 auto}
+h1{margin:0;font-size:30px;letter-spacing:-.02em;font-weight:700}
+p{margin:0;color:#c9b9c4}
+label{display:block;text-align:left;font-size:14px;color:#c9b9c4;margin-bottom:6px}
+input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #3a3242;background:#1a1520;color:#f4ede6;font-size:16px}
+input:focus{outline:2px solid #e8642c;outline-offset:1px}
+button{width:100%;padding:14px;border:0;border-radius:999px;background:#e8642c;color:#160c08;font-size:16px;font-weight:600}
+button.ghost{background:transparent;color:#f4ede6;border:1px solid #3a3242}
+.hint{font-size:13px;color:#9d8fa0;text-align:left}
+.err{color:#ff8a7a;font-size:14px;min-height:1.4em}
+</style>
+</head>
+<body>
+<main>
+  <svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Compain">   <defs>     <linearGradient id="e" x1="0.15" y1="0.05" x2="0.75" y2="1"><stop offset="0" stop-color="#ffc48a"/><stop offset="0.45" stop-color="#e8642c"/><stop offset="1" stop-color="#9e2152"/></linearGradient>     <radialGradient id="h" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#e8642c" stop-opacity="0.38"/><stop offset="1" stop-color="#e8642c" stop-opacity="0"/></radialGradient>     <radialGradient id="s" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff4e6" stop-opacity="0.9"/><stop offset="1" stop-color="#ffb36b" stop-opacity="0"/></radialGradient>     <mask id="m"><rect width="200" height="200" fill="#fff"/><circle cx="127" cy="84" r="61" fill="#000"/></mask>     <filter id="sb" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>     <mask id="mg" maskUnits="userSpaceOnUse" x="-60" y="-60" width="320" height="320"><rect x="-60" y="-60" width="320" height="320" fill="#fff"/><circle cx="125" cy="86" r="62" fill="#000" filter="url(#sb)"/></mask>     <filter id="b" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>   </defs>   <g mask="url(#mg)"><circle cx="100" cy="100" r="80" fill="#e8642c" filter="url(#b)" opacity="0.55"/></g>   <circle cx="100" cy="100" r="80" fill="url(#e)" mask="url(#m)"/>   <circle cx="100" cy="100" r="79" fill="none" stroke="#ffe2c4" stroke-opacity="0.35" stroke-width="1" mask="url(#m)"/>   <circle cx="139" cy="119" r="20" fill="url(#s)" opacity="0.7"/>   <path d="M139 105 C140.6 117.4 140.6 117.4 153 119 C140.6 120.6 140.6 120.6 139 133 C137.4 120.6 137.4 120.6 125 119 C137.4 117.4 137.4 117.4 139 105 Z" fill="#fff4e6"/>   <path d="M162 64 C162.6 68.4 162.6 68.4 167 69 C162.6 69.6 162.6 69.6 162 74 C161.4 69.6 161.4 69.6 157 69 C161.4 68.4 161.4 68.4 162 64 Z" fill="#fff4e6" opacity="0.75"/>   <circle cx="172" cy="96" r="1.8" fill="#fff4e6" opacity="0.6"/> </svg> 
+  <h1>compain</h1>
+  <p id="intro">Enter the address of your Compain server.</p>
+  <form id="f" style="display:grid;gap:14px" novalidate>
+    <div>
+      <label for="url" id="lbl">Server address</label>
+      <input id="url" type="url" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://compain.example.org">
+    </div>
+    <p class="hint" id="hint">For example https://compain.example.org, or http://192.168.1.20:8080 in your home network.</p>
+    <p class="err" id="err" role="alert"></p>
+    <button type="submit" id="go">Connect</button>
+  </form>
+</main>
+<script>
+  var de = (navigator.language || "").toLowerCase().indexOf("de") === 0;
+  if (de) {
+    document.getElementById("intro").textContent = "Gib die Adresse deines Compain-Servers ein.";
+    document.getElementById("lbl").textContent = "Server-Adresse";
+    document.getElementById("hint").textContent = "Zum Beispiel https://compain.example.org oder im Heimnetz http://192.168.1.20:8080.";
+    document.getElementById("go").textContent = "Verbinden";
+  }
+  var input = document.getElementById("url");
+  try { input.value = window.CompainApp.serverUrl(); } catch (e) {}
+  document.getElementById("f").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var ok = false;
+    try { ok = window.CompainApp.setServer(input.value); } catch (x) {}
+    if (!ok) document.getElementById("err").textContent = de ? "Das ist keine gültige Adresse (http:// oder https://)." : "That is not a valid address (http:// or https://).";
+  });
+  input.focus();
+</script>
+</body>
+</html>

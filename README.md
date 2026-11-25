@@ -78,4 +78,4 @@ A reply is much faster when the model runs on an NVIDIA graphics card. llama.cpp
 
 The script writes the choice into `.env` (`LLM_DEVICE=gpu` and `COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml`), so `docker compose up -d` keeps it. Without it the model runs on the processor, which is right for a server without a graphics card. Server Management, Overview shows where the model runs. `LLM_GPU_RESERVE_MB` (default 1024) is the graphics memory left free for the desktop.
 
-Install as an app: open Compain over HTTPS in Chrome or Safari on the phone and choose "Install app" / "Add to Home Screen".
+Install as an app: open Compain over HTTPS in Chrome or Safari on the phone and choose "Install app" / "Add to Home Screen". For Android there is also a real app (APK) in `mobile_app/`: build it with `mobile_app/build.sh`, see `mobile_app/README.md`.

@@ -727,6 +727,55 @@ for (const design of ["glass", "modern-glass", "modern", "classic"]) {
   await phone.click(".conv-head .back-btn");
 }
 
+// Phone chat header: only back, picture, name and ⋮; the tools are in the ⋮ menu.
+await phone.click("#bottombar button[data-go=chats]");
+await phone.waitForSelector("#chat-list .c-row", { timeout: 10000 });
+await phone.click("#chat-list .c-row");
+await phone.waitForSelector("#chat-more", { state: "visible" });
+check("phone: chat tools are hidden behind ⋮", !(await phone.isVisible("#chat-tools")));
+await phone.click("#chat-more");
+check("phone: ⋮ opens the tools with names", await phone.isVisible("#chat-tools") &&
+  (await phone.evaluate(() => getComputedStyle(document.querySelector("#chat-tools > button"), "::after").content)).length > 4);
+await phone.click("#chat-tools button[aria-label='Search in this chat']");
+check("phone: a tool from ⋮ works and the menu closes", (await phone.isVisible("#conv input[type=search], .search-bar:not(.hidden) input")) && !(await phone.isVisible("#chat-tools")));
+await phone.click(".conv-head .back-btn");
+
+// Android app (mobile_app/): window.CompainApp is there, Settings → App, full-screen chats.
+{
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 891 } });
+  await ctx.addInitScript(() => {
+    window.CompainApp = { serverUrl: () => location.origin + "/", version: () => "1.0.0", changeServer: () => { window.__changed = true; }, retry: () => {}, setServer: () => true };
+  });
+  const app = await ctx.newPage();
+  app.on("pageerror", (e) => consoleErrors.push(e.message));
+  await app.goto(BASE + "/");
+  await app.waitForSelector("#login-form", { state: "visible" });
+  await app.fill("#user", ADMIN_USER);
+  await app.fill("#pw", ADMIN_PW);
+  await app.click("#login-form button[type=submit]");
+  await passAgeGate(app);
+  await app.evaluate(() => { location.hash = "settings"; });
+  await app.waitForSelector("#app-card", { timeout: 10000 }).catch(() => {});
+  check("app: Settings show the App card", await app.isVisible("#app-card"));
+  check("browser: not in app mode outside the app", !(await phone.evaluate(() => document.body.hasAttribute("data-in-app"))));
+  await app.click("#app-change-server");
+  check("app: Change server reaches the app", await app.evaluate(() => window.__changed === true));
+  await app.check("#app-chat-full");
+  await app.click("#bottombar button[data-go=chats]");
+  await app.waitForSelector("#chat-list .c-row", { timeout: 10000 });
+  await app.click("#chat-list .c-row");
+  await app.waitForSelector("#conv .composer textarea", { state: "visible" });
+  await app.waitForTimeout(500);
+  const full = await app.evaluate(() => ({ bar: getComputedStyle(document.getElementById("bottombar")).display,
+    left: Math.round(document.querySelector("#conv").getBoundingClientRect().left), width: Math.round(document.querySelector("#conv").getBoundingClientRect().width),
+    comp: Math.round(document.querySelector("#conv .composer").getBoundingClientRect().bottom), vh: innerHeight }));
+  check("app: full-screen chat hides the bottom bar and uses the screen", full.bar === "none" && full.comp > full.vh - 40 && full.comp <= full.vh && full.left === 0 && full.width === 412, JSON.stringify(full));
+  await app.screenshot({ path: SHOTS + "13-app-fullscreen-chat.png" });
+  await app.click(".conv-head .back-btn");
+  check("app: bottom bar is back outside the chat", (await app.evaluate(() => getComputedStyle(document.getElementById("bottombar")).display)) !== "none");
+  await ctx.close();
+}
+
 await phone.click("#bottombar button[data-go=profile]");
 await phone.waitForSelector("#view-profile:not(.hidden)");
 await phone.screenshot({ path: SHOTS + "07-profile-phone.png" });

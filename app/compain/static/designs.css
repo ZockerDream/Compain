@@ -331,10 +331,26 @@ pre.codes { padding: 12px 14px; border-radius: 12px; background: var(--surface-2
     height: calc(100vh - var(--bottombar-h, 70px) - env(safe-area-inset-top, 0px));
     height: calc(100dvh - var(--bottombar-h, 70px) - env(safe-area-inset-top, 0px));
   }
-  /* Header: back, picture and name in the first row, the tools in a second row. */
-  body[data-chat="1"] .conv-head { flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; }
+  /* Header: back, picture, name and ⋮. The tools open as a menu under ⋮ (app.js, chat-more). */
+  body[data-chat="1"] .conv-head { gap: 10px; padding: 10px 12px; position: relative; }
   body[data-chat="1"] .conv-head .grow { flex: 1 1 0; }
-  body[data-chat="1"] .conv-head .tools { order: 3; width: 100%; justify-content: space-between; margin-left: 0; }
+  .conv-head .more-btn { display: inline-flex; }
+  .conv-head .tools-wrap { position: relative; margin-left: auto; }
+  .conv-head .tools-wrap .tools { display: none; }
+  .conv-head .tools-wrap.open .tools {
+    display: flex; flex-direction: column; align-items: stretch; gap: 2px; position: absolute; right: 0; top: calc(100% + 8px); z-index: 35;
+    min-width: 230px; max-width: calc(100vw - 32px); padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+  }
+  .conv-head .tools-wrap.open .tools > button, .conv-head .tools-wrap.open .tools .pop-wrap > button {
+    width: 100%; justify-content: flex-start; gap: 12px; padding: 10px 12px; height: auto; border-radius: 12px; position: relative;
+  }
+  .conv-head .tools-wrap.open .tools .pop-wrap { display: flex; width: 100%; }
+  /* The label of each tool is its (translated) aria-label. */
+  .conv-head .tools-wrap.open .tools > button::after, .conv-head .tools-wrap.open .tools .pop-wrap > button::after {
+    content: attr(aria-label); font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;
+  }
+  .conv-head .tools-wrap.open .tools .mini-count { position: static; order: 2; margin-left: auto; }
+  .conv-head .tools-wrap.open .tools .pop-menu { right: 8px; top: calc(100% + 2px); }
   /* Chat facts in one row that scrolls sideways instead of three rows. */
   body[data-chat="1"] .conv-stats:not(.hidden) { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; }
   body[data-chat="1"] .conv-stats .model-select { width: auto; }
@@ -364,3 +380,20 @@ pre.codes { padding: 12px 14px; border-radius: 12px; background: var(--surface-2
 .md-doc del { opacity: .7; }
 .delete-menu { min-width: 250px; max-width: min(300px, calc(100vw - 32px)); padding: 12px; gap: 10px; }
 .delete-menu p { margin: 0; line-height: 1.45; white-space: normal; }
+
+/* Desktop: the tools stay in the header, no ⋮. */
+@media (min-width: 901px) {
+  .conv-head .more-btn { display: none; }
+  .conv-head .tools-wrap { display: contents; }
+}
+
+/* Android app (mobile_app/): "Full-screen chats" hides the bottom bar in an open chat. */
+@media (max-width: 900px) {
+  body[data-chat="1"][data-chat-full="1"] .bottombar { display: none; }
+  body[data-chat="1"][data-chat-full="1"] { padding: 0; }
+  body[data-chat="1"][data-chat-full="1"] main.content { padding: 0; }
+  body[data-chat="1"][data-chat-full="1"] .chats-shell {
+    height: calc(100vh - env(safe-area-inset-top, 0px)); height: calc(100dvh - env(safe-area-inset-top, 0px));
+    border-radius: 0; border: 0; min-height: 0;
+  }
+}
