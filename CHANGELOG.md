@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.6.2 – 2026-11-25
+
+- **Server: the built-in HTTPS proxy (Caddy) stays off by default.** `docker compose up -d` starts only the app, the database and the model, so your own reverse proxy can sit in front. Caddy starts only with `COMPOSE_PROFILES=https` in `.env`; `scripts/update.sh` no longer turns it on just because `COMPAIN_DOMAIN` is set.
+- New `COMPAIN_PORT` in `.env` (default 8080). With a proxy on the same server, `127.0.0.1:8080` keeps the app reachable only through the proxy.
+- README: what your own proxy needs (WebSockets on `/ws`, `X-Forwarded-Proto`, no buffering).
+
 ## 1.6.1 – 2026-11-25
 
 - **Phones: the input field of a chat is visible again.** An open chat now ends right above the bottom bar in every design; the top buttons (Changelog, Impressum, Datenschutz) step aside while a chat is open.

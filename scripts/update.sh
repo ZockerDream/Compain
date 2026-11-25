@@ -3,8 +3,9 @@
 # Usage: ./scripts/update.sh   (the same as "git pull" and "docker compose up -d --build", with checks)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ARGS=()
-grep -q '^COMPAIN_DOMAIN=.\+' .env 2>/dev/null && ARGS+=(--profile https)
+# Caddy (HTTPS) only starts when COMPOSE_PROFILES=https is in .env; docker compose reads that itself.
+PORT=$(grep -oP '^COMPAIN_PORT=\K.*' .env 2>/dev/null | sed 's/.*://' || true)
+PORT=${PORT:-8080}
 
 for f in .env .impressum .datenschutz; do
   if [ ! -s "$f" ]; then
@@ -18,12 +19,12 @@ fi
 echo "1/4 Getting the newest code"
 git pull --ff-only
 echo "2/4 Building and starting (migrations run on start)"
-docker compose "${ARGS[@]}" up -d --build
+docker compose up -d --build
 echo "3/4 Waiting for the app"
 for i in $(seq 1 30); do
-  if curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then break; fi
+  if curl -fsS http://localhost:$PORT/api/health >/dev/null 2>&1; then break; fi
   sleep 2
 done
 echo "4/4 Health:"
-curl -fsS http://localhost:8080/api/health && echo
-docker compose "${ARGS[@]}" ps
+curl -fsS http://localhost:$PORT/api/health && echo
+docker compose ps

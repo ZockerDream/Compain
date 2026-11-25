@@ -35,7 +35,7 @@ The model:
 - **Graphics card (much faster):** with an NVIDIA card run `./scripts/llm.sh gpu` (back to the processor: `./scripts/llm.sh cpu`). See *Graphics card* below.
 - **Hosted (free tier or paid):** choose the provider in Server Management, Hosted API, enter the key, and press "Test connection".
 
-For HTTPS from outside your home network: point a domain to the server, set `COMPAIN_DOMAIN` in `.env`, open ports 80 and 443, and set `COMPOSE_PROFILES=https` in `.env`, then `docker compose up -d`.
+Only the app, the database and the model start by default. The built-in HTTPS proxy (Caddy) stays off; see *Install on the server*, step 6.
 
 Open http://localhost:8080 for the app. The design reference is `design/mockup.html`.
 
@@ -50,7 +50,11 @@ Run the browser tests against the running stack: `cd app/e2e && npm install && B
 3. Settings: `cp .env.example .env`, then set real values for `POSTGRES_PASSWORD`, `COMPAIN_SECRET_KEY` (long random text, for example `openssl rand -hex 32`, keep it safe) and `COMPAIN_ADMIN_PASSWORD`. Everything else already fits (Gemma 4 on the processor).
 4. Start: `docker compose up -d`. The first start downloads the model (about 17 GB, roughly an hour); `docker compose logs -f llm` shows it.
 5. Open `http://<server-ip>:8080`, log in as `admin`, then in Server Management, Models, press "Run speed test".
-6. Optional HTTPS: point a domain to the server, set `COMPAIN_DOMAIN` and `COMPOSE_PROFILES=https` in `.env`, open ports 80 and 443, and run `docker compose up -d`. Then turn on "HTTPS is set up" in Server Management, Domain & HTTPS.
+6. HTTPS, one of the two:
+   - **Your own reverse proxy (nginx, Traefik, Nginx Proxy Manager, …):** point it to `http://<server>:8080`. It must pass on WebSockets (path `/ws`, for live updates) and the header `X-Forwarded-Proto`, and must not buffer responses (replies are streamed). If the proxy runs on the same server, `COMPAIN_PORT=127.0.0.1:8080` in `.env` keeps the app reachable only through the proxy.
+   - **Built-in Caddy (only without your own proxy):** point a domain to the server, set `COMPAIN_DOMAIN` and `COMPOSE_PROFILES=https` in `.env`, open ports 80 and 443, and run `docker compose up -d`.
+
+   Then turn on "HTTPS is set up" in Server Management, Domain & HTTPS.
 7. Backups run every night (Server Management, Backups). They are stored in the `compain-data` volume; copy them off the server from time to time.
 
 Update later: `git pull` and `docker compose up -d` (the app is rebuilt and the migrations run on start). `./scripts/update.sh` does the same with a few checks.

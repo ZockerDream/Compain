@@ -55,8 +55,10 @@ services:
           create_host_path: false
       # Second place for backups (for example a mounted NAS or USB disk). Set BACKUP_OFFSITE_DIR in .env.
       - ${BACKUP_OFFSITE_DIR:-./offsite-backups}:/srv/app/offsite
+    # Port on the server. Behind your own reverse proxy you can set COMPAIN_PORT=127.0.0.1:8080 in .env,
+    # so the app is only reachable through the proxy.
     ports:
-      - "8080:8080"
+      - "${COMPAIN_PORT:-8080}:8080"
 
   # Self-hosted model server (llama.cpp, OpenAI-compatible), always started with the app.
   # On the first start it downloads the model into ./models (about 17 GB, resumes if interrupted).
@@ -86,8 +88,8 @@ services:
       retries: 3
       start_period: 120s
 
-  # HTTPS in front of the app. Start with: docker compose --profile https up -d
-  # Needs COMPAIN_DOMAIN in .env (a domain pointing to this server) and ports 80 and 443 open.
+  # Optional HTTPS in front of the app. Off by default (for example when you already have your own proxy).
+  # Turn on: COMPOSE_PROFILES=https and COMPAIN_DOMAIN in .env, ports 80 and 443 open.
   caddy:
     image: caddy:2-alpine
     profiles: ["https"]

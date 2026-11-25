@@ -72,7 +72,7 @@ Known risks:
 
 ## Layout
 
-- `docker-compose.yml`: `db` (PostgreSQL 17), `app` (API and web UI on port 8080), `llm` (llama.cpp on port 8081 inside Docker, aliases `llm-gemma` and `llm-mistral`; `scripts/llm-start.sh` downloads the model named by `LLM_MODEL` on the first start, file names and addresses in `scripts/models.sh`), optional profile `https` (Caddy on 80/443). The app has `pull_policy: build`, so `docker compose up -d` rebuilds it after `git pull`. `docker-compose.gpu.yml` puts `llm` on an NVIDIA card (`server-cuda` image), added through `COMPOSE_FILE` by `scripts/llm.sh gpu`. Reads `.env`.
+- `docker-compose.yml`: `db` (PostgreSQL 17), `app` (API and web UI on port 8080), `llm` (llama.cpp on port 8081 inside Docker, aliases `llm-gemma` and `llm-mistral`; `scripts/llm-start.sh` downloads the model named by `LLM_MODEL` on the first start, file names and addresses in `scripts/models.sh`), optional profile `https` (Caddy on 80/443, off by default; `COMPOSE_PROFILES=https` in `.env` turns it on), app port from `COMPAIN_PORT` (default 8080). The app has `pull_policy: build`, so `docker compose up -d` rebuilds it after `git pull`. `docker-compose.gpu.yml` puts `llm` on an NVIDIA card (`server-cuda` image), added through `COMPOSE_FILE` by `scripts/llm.sh gpu`. Reads `.env`.
 - `Caddyfile`: HTTPS reverse proxy for `COMPAIN_DOMAIN`.
 - `models/`: GGUF model files (git-ignored, several GB).
 - `.env.example`: all variables. Copy to `.env` and set real passwords.
