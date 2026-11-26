@@ -1,6 +1,6 @@
 # Compain: Concept
 
-Design reference: [design/mockup.html](design/mockup.html). Everything shown in the mockup is part of version 1, unless it is listed under "Later".
+Design reference: [design/mockup.html](design/mockup.html). Everything shown in the mockup is part of version 1, unless it is listed under "Later". What was built after the mockup (relationship, character assistant, Android app, logo) is described in [technical.md](technical.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Problem
 
@@ -114,7 +114,7 @@ Ten sections, as in the mockup:
 
 ## Later
 
-- Android app that uses the same server.
+- Nothing planned. The Android app that uses the same server was built in 1.10.0 (`mobile_app/`).
 
 ## Non-goals
 

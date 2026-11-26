@@ -1,5 +1,7 @@
 # Compain for Android
 
+Current version: **1.1.0** (`versionCode` 2), published with Compain 1.12.0 and later in `app/compain/static/android/`.
+
 The Android app (APK) for Compain. It opens your own Compain server in full screen, so every feature of the
 web app is there, and a new Compain version on the server reaches the app without a new APK.
 

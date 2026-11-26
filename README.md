@@ -6,7 +6,9 @@ A private, self-hosted AI roleplay chat app. Compain is a personal replacement f
 
 ## Status
 
-Version 1 is built: web app (English and German), API, Server Management, live sync, story memory, backups, Docker with PostgreSQL, and tests (API and browser). Only the Android app is planned for later. See [agent.md](agent.md) for the exact state.
+Version 1.14.0 (paused on 2026-11-26): web app (English and German), Android app, API, Server Management, live sync, story memory, relationship, backups, Docker with PostgreSQL and a self-hosted model, and tests (92 API tests, 145 browser checks). See [agent.md](agent.md) for the exact state, the open points and how to release; every change is in [CHANGELOG.md](CHANGELOG.md).
+
+**Continue the work:** read [agent.md](agent.md) (current status, open points, release steps), then [technical.md](technical.md).
 
 ## Files
 
@@ -16,9 +18,12 @@ Version 1 is built: web app (English and German), API, Server Management, live s
 | [concept.md](concept.md) | Goal, users, screens, all version 1 features, server management, content rules |
 | [technical.md](technical.md) | Stack, decisions, hosted API providers, data model, architecture, risks |
 | [design/mockup.html](design/mockup.html) | Approved clickable design (open in a browser) |
+| [CHANGELOG.md](CHANGELOG.md) | Every release, newest first (also shown in the app) |
 | [claude.md](claude.md) | Working rules for Claude Code in this repo |
-| [agent.md](agent.md) | Guidance for any AI agent working on this project |
-| `graphify-out/` | Knowledge-graph output from the graphify skill (empty for now) |
+| [agent.md](agent.md) | Hand-off note: current status, open points, layout, commands, how to release |
+| [mobile_app/README.md](mobile_app/README.md) | The Android app: build, install, update |
+| `examples/demo-characters.json` | 50 test characters to import |
+| `graphify-out/` | Knowledge-graph output from the graphify skill |
 
 ## Getting started
 
@@ -43,7 +48,7 @@ Open http://localhost:8080 for the app. The design reference is `design/mockup.h
 
 Run the API tests (needs Python 3.12): `cd app && python3 -m venv .venv && ./.venv/bin/pip install -r requirements-dev.txt && ./.venv/bin/python -m pytest -q`
 
-Run the browser tests against the running stack: `cd app/e2e && npm install && BASE_URL=http://localhost:8080 node run.mjs` (needs Chromium; see agent.md).
+Run the browser tests against the running stack on a fresh database (local data is backed up and restored): `cd app/e2e && npm install`, then `./scripts/test-browser.sh` (needs Chromium; see agent.md).
 
 ## Install on the server
 
@@ -78,4 +83,11 @@ A reply is much faster when the model runs on an NVIDIA graphics card. llama.cpp
 
 The script writes the choice into `.env` (`LLM_DEVICE=gpu` and `COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml`), so `docker compose up -d` keeps it. Without it the model runs on the processor, which is right for a server without a graphics card. Server Management, Overview shows where the model runs. `LLM_GPU_RESERVE_MB` (default 1024) is the graphics memory left free for the desktop.
 
-Install as an app: open Compain over HTTPS in Chrome or Safari on the phone and choose "Install app" / "Add to Home Screen". For Android there is also a real app (APK) in `mobile_app/`: build it with `mobile_app/build.sh`, see `mobile_app/README.md`.
+## Phones and the Android app
+
+- **Android app:** the server offers the newest APK (Settings → *Download the app* in the phone's browser). Install it, enter the server address, log in. Updates: Settings → App → *Update to …* in the app. Building it: `mobile_app/build.sh`, see [mobile_app/README.md](mobile_app/README.md).
+- **Web app:** open Compain over HTTPS in Chrome or Safari on the phone and choose "Install app" / "Add to Home Screen".
+
+## Updates
+
+On the server, in the Compain folder: `git pull` and `docker compose up -d`. The app is rebuilt, the database migrated, and browsers and the Android app load the new version by themselves. A new Android app version, when there is one, is offered in the app under Settings → App.
