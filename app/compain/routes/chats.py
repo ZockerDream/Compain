@@ -294,48 +294,79 @@ def important_lines(msgs: list[Message], names: dict, character: Character, pers
     return out
 
 
+def window_step(limit: int) -> int:
+    """How far the window of recent messages moves at once (see build_context)."""
+    return max(4, limit // 3)
+
+
 def build_context(
     db: DbSession, chat: Chat, character: Character, limit: int, reply_length: str = "medium", language: str = "auto",
     persona_name: str = "", persona_description: str = "", messages: list[Message] | None = None,
 ) -> list[dict]:
+    """The messages for the model.
+
+    Built so that the model server can reuse what it has already read (its prompt cache): the start of the
+    prompt must stay the same from one reply to the next. So
+    - the window of recent messages moves in steps of window_step(limit) messages, not by one each time
+      (a window that moves every reply makes the model read the whole story again: minutes on a processor);
+    - what changes often (the relationship) goes at the end, right before the reply, not into the system prompt.
+    """
     msgs = chat.messages if messages is None else messages
-    recent = msgs[-limit:]
     names = character_names(db, chat)
     important = important_lines(msgs, names, character, persona_name)
-    others = sorted({names[m.character_id][0] for m in recent
-                     if m.role == "assistant" and m.character_id and m.character_id != character.id and m.character_id in names})
-    # Many chat templates (Mistral, Gemma) need user and assistant turns to alternate, starting with
-    # the user. Merge repeated roles (for example after a failed reply) and open with a user turn.
-    history: list[dict] = []
-    for m in recent:
-        content = m.content
-        if m.role == "assistant" and m.character_id and m.character_id != character.id and m.character_id in names:
-            content = f"[{names[m.character_id][0]}]: {content}"
-        if history and history[-1]["role"] == m.role:
-            history[-1]["content"] += "\n\n" + content
-        else:
-            history.append({"role": m.role, "content": content})
-    relation = relation_line(chat, character.name, persona_name or "the user")
-    system = system_prompt(character, chat.summary, important, reply_length, language, persona_name, persona_description,
-                           others, relation)
+    step = window_step(limit)
+    start = 0 if len(msgs) <= limit else -(-(len(msgs) - limit) // step) * step  # rounded up to a whole step
 
-    # Stay inside the model's context window: drop the oldest turns first. Rough estimate:
-    # about 3.5 characters per token, plus room for the reply.
+    def history_from(first: int) -> tuple[list[dict], list[str]]:
+        recent = msgs[first:]
+        others = sorted({names[m.character_id][0] for m in recent
+                         if m.role == "assistant" and m.character_id and m.character_id != character.id and m.character_id in names})
+        # Many chat templates (Mistral, Gemma) need user and assistant turns to alternate, starting with
+        # the user. Merge repeated roles (for example after a failed reply) and open with a user turn.
+        out: list[dict] = []
+        for m in recent:
+            content = m.content
+            if m.role == "assistant" and m.character_id and m.character_id != character.id and m.character_id in names:
+                content = f"[{names[m.character_id][0]}]: {content}"
+            if out and out[-1]["role"] == m.role:
+                out[-1]["content"] += "\n\n" + content
+            else:
+                out.append({"role": m.role, "content": content})
+        return out, others
+
+    def system_for(others: list[str]) -> str:
+        return system_prompt(character, chat.summary, important, reply_length, language, persona_name, persona_description, others)
+
+    # Stay inside the model's context window: drop the oldest messages first, also in whole steps.
+    # Rough estimate: about 3.5 characters per token, plus room for the reply.
     budget = int(cfg.get(db, "context_tokens")) - REPLY_TOKENS.get(reply_length, 400) - 256
 
-    def tokens(items: list[dict]) -> int:
+    def tokens(system: str, items: list[dict]) -> int:
         return int((len(system) + sum(len(m["content"]) for m in items)) / 3.5)
 
-    while len(history) > 1 and tokens(history) > budget:
+    history, others = history_from(start)
+    system = system_for(others)
+    while tokens(system, history) > budget and start + step < len(msgs):
+        start += step
+        history, others = history_from(start)
+        system = system_for(others)
+    while len(history) > 1 and tokens(system, history) > budget:  # a single huge message: last resort
         history.pop(0)
     if history and history[0]["role"] == "assistant":
         history.insert(0, {"role": "user", "content": "(The scene begins.)"})
     # The model answers a user turn; to let the character continue, add a short stage direction.
     if not history or history[-1]["role"] == "assistant":
         history.append({"role": "user", "content": CONTINUE_PROMPT})
-    # A short reminder right before the reply: the model follows the latest turn most closely. Not stored.
+    # Right before the reply, not stored: how the character feels now, and the reply language.
+    # The model follows the latest turn most closely, and the cached start of the prompt stays the same.
+    notes = []
+    relation = relation_line(chat, character.name, persona_name or "the user")
+    if relation:
+        notes.append(f"[Story note, not part of the dialogue: {relation}]")
     if language in LANGUAGE_REMINDER:
-        history[-1] = {**history[-1], "content": history[-1]["content"] + "\n\n" + LANGUAGE_REMINDER[language]}
+        notes.append(LANGUAGE_REMINDER[language])
+    if notes:
+        history[-1] = {**history[-1], "content": history[-1]["content"] + "\n\n" + "\n".join(notes)}
     return build_messages(system, history)
 
 

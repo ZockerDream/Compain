@@ -72,3 +72,29 @@ def test_accounts_without_a_language_keep_following_the_user(tmp_path, monkeypat
     _stream(client, f"/api/chats/{chat['id']}/messages", h, {"content": "Hi", "language": "auto"})
     assert "Reply in the language the user writes in." in seen[-1][0]["content"]
     assert seen[-1][-1]["content"] == "Hi"
+
+
+def test_window_moves_in_steps_so_the_prompt_cache_holds(tmp_path):
+    """The start of the prompt must stay the same for several replies (llama.cpp prompt cache)."""
+    from compain.routes.chats import build_context, window_step
+
+    app, client, h = admin_client(tmp_path)
+    _, chat = _chat(client, h, "Mara", greeting="*Rain.* You are late.")
+    cid = chat["id"]
+    limit, step = 20, window_step(20)
+    starts = []
+    with app.state.session_factory() as db:
+        c = db.get(Chat, cid)
+        for i in range(60):
+            db.add(Message(chat_id=cid, role="user" if i % 2 == 0 else "assistant", content=f"line {i}"))
+            db.commit()
+            db.refresh(c)
+            msgs = build_context(db, c, c.character, limit)
+            starts.append((msgs[1]["content"], len(msgs)))
+    firsts = [f for f, _ in starts]
+    # The first history message changes only every few messages, never with each one.
+    changes = sum(1 for a, b in zip(firsts, firsts[1:]) if a != b)
+    assert changes <= 60 // step + 1
+    # The window never holds more than the limit (plus the opening line) and never shrinks below limit - step.
+    for content, n in starts[limit:]:
+        assert limit - step <= n - 1 <= limit + 1

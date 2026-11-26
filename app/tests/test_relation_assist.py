@@ -75,9 +75,12 @@ def test_relationship_is_judged_every_few_messages_and_goes_into_the_prompt(tmp_
 
     with app.state.session_factory() as db:
         c = db.get(Chat, cid)
-        system = build_context(db, c, c.character, 20)[0]["content"]
-    assert "How Mara feels about the user right now: trust 75/100, affection 62/100, mood: curious." in system
-    assert "She starts to like you." in system and "Never mention these numbers." in system
+        msgs = build_context(db, c, c.character, 20)
+    # The relationship goes right before the reply (not into the system prompt, so the prompt cache holds).
+    last = msgs[-1]["content"]
+    assert "How Mara feels about the user right now: trust 75/100, affection 62/100, mood: curious." in last
+    assert "She starts to like you." in last and "Never mention these numbers." in last
+    assert "feels about" not in msgs[0]["content"]
 
 
 def test_relationship_can_be_set_checked_reset_and_turned_off(tmp_path, monkeypatch):

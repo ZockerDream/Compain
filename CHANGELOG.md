@@ -2,6 +2,11 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.14.0 – 2026-11-26
+
+- **Much faster replies in long chats: the model no longer reads the whole story again for every reply.** The model server keeps what it has read (prompt cache), but only while the start of the prompt stays the same. Until now the window of recent messages moved by one message with every reply, so in a long chat the model had to read everything again (minutes on a processor). Now the window moves in steps (a third of *Context sent to the model*, for example every 20 messages at 60), and the relationship note, which changes every few messages, sits right before the reply instead of at the start. Measured: one more message in a chat of 3400 tokens took 4 s instead of 27–33 s.
+- Only every few steps (and when the story summary is rewritten) does the model read the story again once.
+
 ## 1.13.0 – 2026-11-26
 
 - **Smooth chat, no reloading.** A finished reply and live updates (from the model, another device, the story summary or the relationship) no longer draw the whole chat again: new messages are added, changed ones replaced, everything else stays. Before, the chat was drawn once or twice after every message. The input field, what you typed, the scroll position and open panels stay as they are.
