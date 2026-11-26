@@ -2,6 +2,12 @@
 
 All notable changes to Compain. Newest first.
 
+## 1.13.0 – 2026-11-26
+
+- **Smooth chat, no reloading.** A finished reply and live updates (from the model, another device, the story summary or the relationship) no longer draw the whole chat again: new messages are added, changed ones replaced, everything else stays. Before, the chat was drawn once or twice after every message. The input field, what you typed, the scroll position and open panels stay as they are.
+- **Phones and the Android app: the keyboard no longer opens by itself** after a reply or a live update. It opens when you tap the input field and stays open while you write.
+- The message count above the chat is gone.
+
 ## 1.12.1 – 2026-11-26
 
 - **Phones: the character editor fits the screen again.** Forms no longer grow wider than their card (long texts, the picture field, the character assistant); this fixes every form, not only the editor.

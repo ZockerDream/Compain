@@ -504,6 +504,10 @@ await second.click("#chat-list .c-row");
 await second.waitForSelector("#messages .msg");
 await second.evaluate(() => { const b = document.getElementById("messages"); b.scrollTop = 0; b.dispatchEvent(new Event("scroll")); });
 const listBefore = await second.textContent("#chat-list");
+// Mark the message area in both windows: after the reply it must be the same element (updated, not redrawn).
+await page.evaluate(() => { document.getElementById("messages").dataset.probe = "kept"; document.querySelector("#conv .composer textarea").dataset.probe = "kept"; });
+await second.evaluate(() => { document.getElementById("messages").dataset.probe = "kept"; });
+check("no message count above the chat", !/\d+ messages/.test(await page.textContent("#conv .conv-stats")));
 await page.fill("#conv textarea", "Live sync check");
 await page.keyboard.press("Enter");
 // The other window must update its chat list by itself, without reloading.
@@ -511,6 +515,11 @@ await second.waitForFunction((b) => document.querySelector("#chat-list") && docu
 const liveSeen = (await second.textContent("#chat-list")) !== listBefore;
 await waitForReply(page);
 check("second window updates without reload (live sync)", liveSeen);
+await page.waitForTimeout(1200);
+const kept = await page.evaluate(() => ({ box: document.getElementById("messages")?.dataset.probe, field: document.querySelector("#conv .composer textarea")?.dataset.probe,
+  last: (() => { const c = [...document.querySelectorAll("#messages .msg.char")].pop(); return !!(c && c.dataset.id && c.querySelector(".meta-line")); })(), temp: document.querySelectorAll("#messages .msg:not([data-id])").length }));
+check("a reply updates the chat in place (no redraw, the input field stays)", kept.box === "kept" && kept.field === "kept" && kept.last && kept.temp === 0, JSON.stringify(kept));
+check("the other window updates in place too", (await second.evaluate(() => document.getElementById("messages")?.dataset.probe)) === "kept");
 await second.waitForTimeout(1500);
 const endGap = await second.evaluate(() => { const b = document.getElementById("messages"); return Math.round(b.scrollHeight - b.scrollTop - b.clientHeight); });
 check("a new message scrolls the chat to the end, also in another window", endGap < 80, "gap " + endGap + " px");

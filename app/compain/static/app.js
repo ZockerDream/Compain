@@ -478,6 +478,15 @@
     }
 
     var bookmarkList = null;
+    // Live updates redraw only the list, not the open chat (see the "chats" message below).
+    state.updateChatList = async function () {
+      var fresh;
+      try { fresh = await api("/api/chats"); } catch (e) { return; }
+      if (!listBox.isConnected) return;
+      chats = fresh;
+      bookmarkList = null;
+      drawList();
+    };
     async function drawBookmarks() {
       if (!bookmarkList) { try { bookmarkList = await api("/api/chats/bookmarks"); } catch (e) { bookmarkList = []; } }
       listBox.textContent = "";
@@ -795,10 +804,11 @@
     pane.appendChild(relationBox);
 
     var important = chat.messages.filter(function (m) { return m.important; }).length;
+    var importantPill = el("span", { class: "pill", id: "stat-important" }, icon("i-star", "sm"), " " + important + " of 10 important");
+    var summaryPill = el("span", { class: "pill", id: "stat-summary", text: chat.summary ? "Story summary saved" : "No story summary yet" });
     pane.appendChild(el("div", { class: "conv-stats" },
-      el("span", { class: "pill", text: chat.messages.length + " messages" }),
-      el("span", { class: "pill" }, icon("i-star", "sm"), " " + important + " of 10 important"),
-      el("span", { class: "pill", text: chat.summary ? "Story summary saved" : "No story summary yet" }),
+      importantPill,
+      summaryPill,
       el("span", { class: "pill", text: "Model:" }), modelSel,
       el("span", { class: "pill model-state hidden", id: "model-state" })));
     pane.appendChild(summaryBox);
@@ -828,16 +838,55 @@
     };
     var box = el("div", { class: "messages", id: "messages" });
     pane.appendChild(box);
-    var lastId = chat.messages.length ? chat.messages[chat.messages.length - 1].id : null;
-    var prevChar = null;
-    chat.messages.forEach(function (m) {
-      // When the character changes in the story, show who comes in.
-      if (m.role === "assistant" && m.character_id && prevChar && m.character_id !== prevChar) {
-        box.appendChild(el("div", { class: "day", text: (m.character_name || "Someone") + " joins the scene" }));
-      }
-      if (m.role === "assistant" && m.character_id) prevChar = m.character_id;
-      box.appendChild(messageNode(m, chat, m.id === lastId, ctx));
-    });
+    // Messages are reconciled, not redrawn: a message that did not change keeps its node, new ones are added,
+    // changed ones replaced. A live update or a finished reply therefore never makes the chat flicker.
+    function signature(m, isLast) {
+      return [m.id, m.content, m.important, m.bookmarked, m.variant_index, m.variant_count, isLast, m.character_id].join("\u0001");
+    }
+    function drawMessages(list) {
+      var lastId = list.length ? list[list.length - 1].id : null;
+      var old = {};
+      Array.prototype.forEach.call(box.children, function (n) { if (n.dataset && n.dataset.sig) old[n.getAttribute("data-id")] = n; });
+      var want = [], prevChar = null;
+      list.forEach(function (m) {
+        // When the character changes in the story, show who comes in.
+        if (m.role === "assistant" && m.character_id && prevChar && m.character_id !== prevChar) {
+          want.push(el("div", { class: "day", text: (m.character_name || "Someone") + " joins the scene" }));
+        }
+        if (m.role === "assistant" && m.character_id) prevChar = m.character_id;
+        var sig = signature(m, m.id === lastId), node = old[String(m.id)];
+        if (!node || node.dataset.sig !== sig) { node = messageNode(m, chat, m.id === lastId, ctx); node.dataset.sig = sig; }
+        want.push(node);
+      });
+      var cur = box.firstChild;
+      want.forEach(function (n) {
+        if (cur === n) { cur = cur.nextSibling; return; }
+        if (cur && n.classList.contains("day") && cur.classList && cur.classList.contains("day") && cur.textContent === n.textContent) { cur = cur.nextSibling; return; }
+        box.insertBefore(n, cur);
+      });
+      while (cur) { var next = cur.nextSibling; box.removeChild(cur); cur = next; }
+    }
+    drawMessages(chat.messages);
+
+    // Live update of the open chat: new and changed messages, the facts above the chat, the relationship number.
+    async function refresh() {
+      if (busy || !pane.isConnected) return;
+      var fresh;
+      try { fresh = await api("/api/chats/" + chatId); }
+      catch (e) { if (pane.isConnected) renderChats(); return; } // deleted on another device, for example
+      if (busy || !pane.isConnected) return;
+      var grew = fresh.messages.length > chat.messages.length;
+      ["messages", "summary", "relation", "replying", "title"].forEach(function (k) { chat[k] = fresh[k]; });
+      drawMessages(chat.messages);
+      importantPill.lastChild.textContent = " " + chat.messages.filter(function (m) { return m.important; }).length + " of 10 important";
+      summaryPill.textContent = chat.summary ? "Story summary saved" : "No story summary yet";
+      var count = relationBtn.querySelector(".mini-count");
+      if (count && chat.relation && chat.relation.set) count.textContent = String(chat.relation.affection);
+      state.msgCount[chatId] = chat.messages.length;
+      if (grew) { stick = true; box.scrollTop = box.scrollHeight; }
+      if (fresh.replying && !busy) run("/api/chats/" + chatId + "/stream", null, null, true); // another device started a reply
+    }
+    state.liveConv = { chatId: chatId, pane: pane, refresh: refresh };
 
     var quick = el("div", { class: "quick" });
     quick.appendChild(el("button", { type: "button", class: "accent-chip", text: "Continue", title: "The character writes on",
@@ -856,7 +905,9 @@
     if (state.drafts[chatId]) { input.value = state.drafts[chatId]; delete state.drafts[chatId]; }
     var refocus = state.refocus === chatId;
     state.refocus = null;
-    if (refocus) {
+    // Only with a mouse and keyboard: on a phone, focusing the field would open the on-screen keyboard by itself.
+    var touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    if (refocus && !touch) {
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     }
@@ -975,12 +1026,9 @@
         setBusy(false);
       }
       if (detached || !pane.isConnected) return; // the user went elsewhere; the reply was saved on the server
-      // Reload so the new messages get their ids and actions. After Stop, give the server a moment to save.
-      state.refocus = chatId;
-      setTimeout(function () {
-        if (input.value.trim()) { state.drafts = state.drafts || {}; state.drafts[chatId] = input.value; }
-        renderChats();
-      }, stopped ? 600 : 0);
+      // Fetch the saved messages (ids and actions) and put them in place. Nothing else is drawn again, so the
+      // input field, the keyboard and the scroll position stay as they are. After Stop, give the server a moment.
+      setTimeout(function () { refresh(); if (state.updateChatList) state.updateChatList(); }, stopped ? 600 : 0);
     }
     box.scrollTop = box.scrollHeight;
     // Follow the end of the chat. A new message (own, the character's, or from another device) always scrolls
@@ -2740,6 +2788,10 @@
       }
       if (msg.type !== "chats" || (state.sending && state.sending.isConnected)) return;
       if (state.route === "chats") {
+        // The open chat and the list update in place: no redraw, nothing flickers, the keyboard stays as it is.
+        var live = state.liveConv;
+        if (live && live.pane.isConnected && live.chatId === state.chatId) { live.refresh(); if (state.updateChatList) state.updateChatList(); return; }
+        if (!state.chatId && state.updateChatList && $("chat-list")) { state.updateChatList(); return; }
         // A live update must not move the reader: keep the scroll position, the open panels and the typed text.
         var mbox = $("messages");
         if (mbox && !state.jumpTo) state.keepScroll = mbox.scrollHeight - mbox.scrollTop - mbox.clientHeight < 40 ? null : mbox.scrollTop;
