@@ -79,7 +79,7 @@ Known risks:
 - `docker-compose.yml`: `db` (PostgreSQL 17), `app` (API and web UI on port 8080), `llm` (llama.cpp on port 8081 inside Docker, aliases `llm-gemma` and `llm-mistral`; `scripts/llm-start.sh` downloads the model named by `LLM_MODEL` on the first start, file names and addresses in `scripts/models.sh`), optional profile `https` (Caddy on 80/443, off by default; `COMPOSE_PROFILES=https` in `.env` turns it on), app port from `COMPAIN_PORT` (default 8080). The app has `pull_policy: build`, so `docker compose up -d` rebuilds it after `git pull`. `docker-compose.gpu.yml` puts `llm` on an NVIDIA card (`server-cuda` image), added through `COMPOSE_FILE` by `scripts/llm.sh gpu`. Reads `.env`.
 - `Caddyfile`: HTTPS reverse proxy for `COMPAIN_DOMAIN` (only with `COMPOSE_PROFILES=https`).
 - `mobile_app/`: the Android app (see [mobile_app/README.md](mobile_app/README.md)): `MainActivity.java` (WebView, full screen, file picker, downloads, update via `PackageInstaller`, `window.CompainApp` bridge), `assets/setup.html` and `offline.html`, `build.sh` and `docker/Dockerfile` (JDK 17, Gradle, Android SDK 35). `keystore/` and `dist/` are git-ignored.
-- `examples/demo-characters.json`: 50 test characters (Compain character list).
+- `examples/demo-characters.json`: 50 test characters; `examples/modern-character.json`: "Modern life" pack with 100 characters (both Compain character lists, import with *Import card*).
 - `scripts/`: `llm-start.sh` and `models.sh` (model server), `llm.sh` (CPU/GPU), `update.sh`, `download-models.sh`, `test-browser.sh` (browser checks on a fresh database with backup and restore).
 - `models/`: GGUF model files (git-ignored, several GB).
 - `.env.example`: all variables. Copy to `.env` and set real passwords.

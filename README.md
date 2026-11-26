@@ -23,6 +23,7 @@ Version 1.14.0 (paused on 2026-11-26): web app (English and German), Android app
 | [agent.md](agent.md) | Hand-off note: current status, open points, layout, commands, how to release |
 | [mobile_app/README.md](mobile_app/README.md) | The Android app: build, install, update |
 | `examples/demo-characters.json` | 50 test characters to import |
+| `examples/modern-character.json` | "Modern life" pack: 100 characters (70 women, 30 men, 2015–2030, all adults) to import |
 | `graphify-out/` | Knowledge-graph output from the graphify skill |
 
 ## Getting started
